@@ -31,6 +31,13 @@
       :series="series"
       height="300px"
     />
+    <div class="row justify-end">
+      <div class="col-auto">
+        <AddTrajectoryButton
+          :shot="shot"
+        />
+      </div>
+    </div>
   </q-card>
 </template>
 
@@ -38,6 +45,7 @@
 // imports
 import { useBallisticStore } from 'stores/ballistic'
 import ElevationShotList from 'components/calculators/ballistic/ElevationShotList.vue'
+import AddTrajectoryButton from 'components/calculators/trajectories/AddTrajectoryButton.vue'
 import * as BC from 'js-ballistics'
 import { ref, reactive, computed, watch } from 'vue'
 import { colors, useQuasar } from 'quasar'
