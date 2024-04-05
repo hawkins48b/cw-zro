@@ -47,6 +47,11 @@ export default {
           label: 'Calculators'
         },
         {
+          path: '/trajectories',
+          icon: 'ssid_chart',
+          label: 'Trajectories'
+        },
+        {
           path: '/settings',
           icon: 'settings',
           label: 'Settings'
