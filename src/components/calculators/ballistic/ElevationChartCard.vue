@@ -45,7 +45,7 @@
 // imports
 import { useBallisticStore } from 'stores/ballistic'
 import ElevationShotList from 'components/calculators/ballistic/ElevationShotList.vue'
-import AddTrajectoryButton from 'components/calculators/trajectories/AddTrajectoryButton.vue'
+import AddTrajectoryButton from 'components/trajectories/AddTrajectoryButton.vue'
 import * as BC from 'js-ballistics'
 import { ref, reactive, computed, watch } from 'vue'
 import { colors, useQuasar } from 'quasar'
