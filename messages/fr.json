@@ -1,0 +1,55 @@
+{
+	"app_name": "ZRO Calculateur Balistique",
+	"app_description": "Outil de tir sportif de précision et de tir longue distance",
+
+	"nav_dashboard": "Tableau de bord",
+	"nav_profiles": "Profils",
+	"nav_calculators": "Calculateurs",
+	"nav_scope_view": "Vue lunette",
+	"nav_about": "À propos",
+
+	"dashboard_title": "Tableau de bord",
+	"dashboard_welcome": "Bienvenue sur ZRO",
+	"dashboard_subtitle": "Votre calculateur balistique de précision",
+
+	"profiles_title": "Profils",
+	"profiles_subtitle": "Gérez vos profils balistiques",
+	"profiles_new": "Nouveau profil",
+	"profiles_edit": "Modifier le profil",
+	"profiles_empty": "Aucun profil. Créez votre premier profil pour commencer.",
+
+	"calculators_title": "Calculateurs",
+	"calculators_subtitle": "Sélectionnez un calculateur",
+	"calc_ballistic": "Calculateur balistique",
+	"calc_ballistic_desc": "Calculer la trajectoire et la chute du projectile",
+	"calc_mpbr": "MPBR",
+	"calc_mpbr_desc": "Portée maximale en tir rasant",
+	"calc_trajectory_validation": "Validation de trajectoire",
+	"calc_trajectory_validation_desc": "Valider la trajectoire avec des données réelles",
+	"calc_compare": "Comparer les trajectoires",
+	"calc_compare_desc": "Comparaison côte à côte des trajectoires",
+	"calc_dope_cards": "Fiches de tir",
+	"calc_dope_cards_desc": "Générer des fiches de tir imprimables",
+
+	"scope_view_title": "Vue lunette",
+	"scope_view_subtitle": "Superposition du réticule avec données balistiques",
+
+	"about_title": "À propos",
+	"about_version": "Version {version}",
+	"about_description": "ZRO est un calculateur balistique de précision pour le tir sportif longue distance. Il calcule les trajectoires de projectiles, génère des fiches de tir et fournit une vue réticule pour le terrain.",
+
+	"common_save": "Enregistrer",
+	"common_cancel": "Annuler",
+	"common_delete": "Supprimer",
+	"common_edit": "Modifier",
+	"common_back": "Retour",
+	"common_loading": "Chargement...",
+	"common_error": "Une erreur est survenue",
+
+	"settings_dark_mode": "Mode sombre",
+	"settings_language": "Langue",
+
+	"error_page_title": "Page non trouvée",
+	"error_page_message": "La page que vous recherchez n'existe pas.",
+	"error_go_home": "Aller au tableau de bord"
+}

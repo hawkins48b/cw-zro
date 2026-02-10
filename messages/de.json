@@ -1,0 +1,55 @@
+{
+	"app_name": "ZRO Ballistikrechner",
+	"app_description": "Präzisionsschießsport und Langstrecken-Schießwerkzeug",
+
+	"nav_dashboard": "Übersicht",
+	"nav_profiles": "Profile",
+	"nav_calculators": "Rechner",
+	"nav_scope_view": "Zieloptik",
+	"nav_about": "Über",
+
+	"dashboard_title": "Übersicht",
+	"dashboard_welcome": "Willkommen bei ZRO",
+	"dashboard_subtitle": "Ihr Präzisions-Ballistikrechner",
+
+	"profiles_title": "Profile",
+	"profiles_subtitle": "Verwalten Sie Ihre ballistischen Profile",
+	"profiles_new": "Neues Profil",
+	"profiles_edit": "Profil bearbeiten",
+	"profiles_empty": "Noch keine Profile. Erstellen Sie Ihr erstes Profil.",
+
+	"calculators_title": "Rechner",
+	"calculators_subtitle": "Wählen Sie einen Rechner",
+	"calc_ballistic": "Ballistikrechner",
+	"calc_ballistic_desc": "Geschossflugbahn und Abfall berechnen",
+	"calc_mpbr": "MPBR",
+	"calc_mpbr_desc": "Maximale Punktreichweite",
+	"calc_trajectory_validation": "Flugbahnvalidierung",
+	"calc_trajectory_validation_desc": "Flugbahn mit realen Daten validieren",
+	"calc_compare": "Flugbahnen vergleichen",
+	"calc_compare_desc": "Flugbahnen nebeneinander vergleichen",
+	"calc_dope_cards": "Schusstafeln",
+	"calc_dope_cards_desc": "Druckbare Schusstafeln erstellen",
+
+	"scope_view_title": "Zieloptik",
+	"scope_view_subtitle": "Absehen-Overlay mit ballistischen Daten",
+
+	"about_title": "Über",
+	"about_version": "Version {version}",
+	"about_description": "ZRO ist ein Präzisions-Ballistikrechner für den Langstrecken-Schießsport. Er berechnet Geschossflugbahnen, erstellt Schusstafeln und bietet eine Absehen-Ansicht für den Feldeinsatz.",
+
+	"common_save": "Speichern",
+	"common_cancel": "Abbrechen",
+	"common_delete": "Löschen",
+	"common_edit": "Bearbeiten",
+	"common_back": "Zurück",
+	"common_loading": "Laden...",
+	"common_error": "Ein Fehler ist aufgetreten",
+
+	"settings_dark_mode": "Dunkelmodus",
+	"settings_language": "Sprache",
+
+	"error_page_title": "Seite nicht gefunden",
+	"error_page_message": "Die gesuchte Seite existiert nicht.",
+	"error_go_home": "Zur Übersicht"
+}

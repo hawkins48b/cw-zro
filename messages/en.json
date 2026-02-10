@@ -1,0 +1,55 @@
+{
+	"app_name": "ZRO Ballistic Calculator",
+	"app_description": "Precision shooting sports and long-range marksmanship tool",
+
+	"nav_dashboard": "Dashboard",
+	"nav_profiles": "Profiles",
+	"nav_calculators": "Calculators",
+	"nav_scope_view": "Scope View",
+	"nav_about": "About",
+
+	"dashboard_title": "Dashboard",
+	"dashboard_welcome": "Welcome to ZRO",
+	"dashboard_subtitle": "Your precision ballistic calculator",
+
+	"profiles_title": "Profiles",
+	"profiles_subtitle": "Manage your ballistic profiles",
+	"profiles_new": "New Profile",
+	"profiles_edit": "Edit Profile",
+	"profiles_empty": "No profiles yet. Create your first profile to get started.",
+
+	"calculators_title": "Calculators",
+	"calculators_subtitle": "Select a calculator",
+	"calc_ballistic": "Ballistic Calculator",
+	"calc_ballistic_desc": "Compute bullet trajectory and drop",
+	"calc_mpbr": "MPBR",
+	"calc_mpbr_desc": "Maximum Point Blank Range",
+	"calc_trajectory_validation": "Trajectory Validation",
+	"calc_trajectory_validation_desc": "Validate trajectory against real data",
+	"calc_compare": "Compare Trajectories",
+	"calc_compare_desc": "Side-by-side trajectory comparison",
+	"calc_dope_cards": "Dope Cards",
+	"calc_dope_cards_desc": "Generate printable dope cards",
+
+	"scope_view_title": "Scope View",
+	"scope_view_subtitle": "Reticle overlay with ballistic data",
+
+	"about_title": "About",
+	"about_version": "Version {version}",
+	"about_description": "ZRO is a precision ballistic calculator for long-range shooting sports. It computes bullet trajectories, generates dope cards, and provides a scope reticle view for field use.",
+
+	"common_save": "Save",
+	"common_cancel": "Cancel",
+	"common_delete": "Delete",
+	"common_edit": "Edit",
+	"common_back": "Back",
+	"common_loading": "Loading...",
+	"common_error": "An error occurred",
+
+	"settings_dark_mode": "Dark Mode",
+	"settings_language": "Language",
+
+	"error_page_title": "Page Not Found",
+	"error_page_message": "The page you are looking for does not exist.",
+	"error_go_home": "Go to Dashboard"
+}
