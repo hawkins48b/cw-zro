@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">ZRO - Ballistic Calculator</string>
-    <string name="title_activity_main">ZRO - Ballistic Calculator</string>
-    <string name="package_name">ch.chocolatewarfare.app.zro</string>
-    <string name="custom_url_scheme">ch.chocolatewarfare.app.zro</string>
-</resources>

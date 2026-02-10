@@ -1,37 +1,42 @@
-# ZRO Ballistic Calculator (zro)
+# sv
 
-A free tool for citizen. Designed with simplicity and efficiency in mind, our ballistic calculator offers a comprehensive solution to obtain accurate ballistic data for your rifles, all presented in either imperial or metric units, according to your preference.
+Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
 
-Access it [here](https://chocolate-warfare.com/zro)
+## Creating a project
 
-Developed by [Chocolate Warfare](https://chocolate-warfare.com).
+If you're seeing this, you've probably already done this step. Congrats!
 
-## Install the dependencies
-```bash
-yarn
-# or
-npm install
+```sh
+# create a new project
+npx sv create my-app
 ```
 
-### Start the app in development mode (hot-code reloading, error reporting, etc.)
-```bash
-quasar dev
+To recreate this project with the same configuration:
+
+```sh
+# recreate this project
+npx sv create --template minimal --no-types --install npm .
 ```
 
+## Developing
 
-### Lint the files
-```bash
-yarn lint
-# or
-npm run lint
+Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+
+```sh
+npm run dev
+
+# or start the server and open the app in a new browser tab
+npm run dev -- --open
 ```
 
+## Building
 
+To create a production version of your app:
 
-### Build the app for production
-```bash
-quasar build
+```sh
+npm run build
 ```
 
-### Customize the configuration
-See [Configuring quasar.config.js](https://v2.quasar.dev/quasar-cli-vite/quasar-config-js).
+You can preview the production build with `npm run preview`.
+
+> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.

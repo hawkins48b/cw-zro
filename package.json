@@ -1,62 +1,23 @@
 {
-  "name": "cw-zro",
-  "version": "1.11.5",
-  "description": "A simple ballistic calculator",
-  "productName": "ZRO - Ballistic Calculator",
-  "author": "Quentin Mathey <q.mathey@gmail.com>",
-  "private": true,
-  "scripts": {
-    "lint": "eslint --ext .js,.vue ./",
-    "test": "echo \"No test specified\" && exit 0",
-    "dev": "quasar dev",
-    "build": "quasar build",
-    "git": "git add . && git commit -m",
-    "patch": "npm run git",
-    "postpatch": "npm version patch && git push",
-    "minor": "npm run git",
-    "postminor": "npm version minor && git push",
-    "major": "npm run git",
-    "postmajor": "npm version major && git push"
-  },
-  "dependencies": {
-    "@capacitor/core": "^6.2.0",
-    "@capacitor/filesystem": "^6.0.2",
-    "@capacitor/share": "^6.0.3",
-    "@quasar/cli": "^2.4.1",
-    "@quasar/extras": "^1.16.4",
-    "apexcharts": "^3.48.0",
-    "axios": "^1.2.1",
-    "js-ballistics": "^1.1.2",
-    "pdf-lib": "^1.17.1",
-    "pinia": "^2.1.7",
-    "pinia-plugin-persistedstate": "^3.2.1",
-    "quasar": "^2.8.0",
-    "vue": "^3.4.18",
-    "vue-router": "^4.0.12",
-    "vue3-apexcharts": "^1.5.2"
-  },
-  "devDependencies": {
-    "@quasar/app-vite": "^1.8.0",
-    "autoprefixer": "^10.4.2",
-    "eslint": "^8.11.0",
-    "eslint-config-standard": "^17.0.0",
-    "eslint-plugin-import": "^2.19.1",
-    "eslint-plugin-n": "^15.0.0",
-    "eslint-plugin-promise": "^6.0.0",
-    "eslint-plugin-vue": "^9.0.0",
-    "postcss": "^8.4.14",
-    "vite-plugin-checker": "^0.6.4",
-    "workbox-build": "^7.0.0",
-    "workbox-cacheable-response": "^7.0.0",
-    "workbox-core": "^7.0.0",
-    "workbox-expiration": "^7.0.0",
-    "workbox-precaching": "^7.0.0",
-    "workbox-routing": "^7.0.0",
-    "workbox-strategies": "^7.0.0"
-  },
-  "engines": {
-    "node": "^20 || ^18 || ^16",
-    "npm": ">= 6.13.4",
-    "yarn": ">= 1.21.1"
-  }
+	"name": "cw-zro",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"prepare": "svelte-kit sync || echo ''"
+	},
+	"devDependencies": {
+		"@skeletonlabs/skeleton": "^4.12.0",
+		"@skeletonlabs/skeleton-svelte": "^4.12.0",
+		"@sveltejs/adapter-auto": "^7.0.0",
+		"@sveltejs/kit": "^2.50.2",
+		"@sveltejs/vite-plugin-svelte": "^6.2.4",
+		"@tailwindcss/vite": "^4.1.18",
+		"svelte": "^5.49.2",
+		"tailwindcss": "^4.1.18",
+		"vite": "^7.3.1"
+	}
 }
