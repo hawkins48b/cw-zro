@@ -2,11 +2,10 @@
 	"app_name": "ZRO Calculateur Balistique",
 	"app_description": "Outil de tir sportif de précision et de tir longue distance",
 
-	"nav_dashboard": "Tableau de bord",
 	"nav_profiles": "Profils",
 	"nav_calculators": "Calculateurs",
 	"nav_scope_view": "Vue lunette",
-	"nav_about": "À propos",
+	"nav_settings": "Paramètres",
 
 	"dashboard_title": "Tableau de bord",
 	"dashboard_welcome": "Bienvenue sur ZRO",
@@ -51,5 +50,7 @@
 
 	"error_page_title": "Page non trouvée",
 	"error_page_message": "La page que vous recherchez n'existe pas.",
-	"error_go_home": "Aller au tableau de bord"
+	"settings_title": "Paramètres",
+
+	"error_go_home": "Aller à la vue lunette"
 }

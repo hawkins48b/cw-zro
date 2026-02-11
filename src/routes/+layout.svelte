@@ -6,14 +6,12 @@
 	import { localizeHref } from '$lib/paraglide/runtime';
 	import { AppBar, Navigation } from '@skeletonlabs/skeleton-svelte';
 	import {
-		LayoutDashboardIcon,
 		CrosshairIcon,
 		CalculatorIcon,
 		TelescopeIcon,
-		InfoIcon
+		SettingsIcon
 	} from '@lucide/svelte';
 	import DarkModeToggle from '$lib/components/DarkModeToggle.svelte';
-	import LanguageSwitcher from '$lib/components/LanguageSwitcher.svelte';
 	import { settings, applyDarkMode } from '$lib/stores/settings.svelte.js';
 	import { browser } from '$app/environment';
 
@@ -26,16 +24,14 @@
 	);
 
 	const navItems = [
-		{ href: '/dashboard', labelKey: 'nav_dashboard', icon: LayoutDashboardIcon },
-		{ href: '/profiles', labelKey: 'nav_profiles', icon: CrosshairIcon },
-		{ href: '/calculators', labelKey: 'nav_calculators', icon: CalculatorIcon },
 		{ href: '/scope-view', labelKey: 'nav_scope_view', icon: TelescopeIcon },
-		{ href: '/about', labelKey: 'nav_about', icon: InfoIcon }
+		{ href: '/profiles', labelKey: 'nav_profiles', icon: CrosshairIcon },
+		{ href: '/calculators', labelKey: 'nav_calculators', icon: CalculatorIcon }
 	];
 
 	function isActive(href) {
 		const path = page.url.pathname;
-		if (href === '/dashboard') return path === '/dashboard' || path === '/';
+		if (href === '/scope-view') return path === '/scope-view' || path === '/';
 		return path.startsWith(href);
 	}
 
@@ -55,7 +51,7 @@
 	<AppBar>
 		<AppBar.Toolbar class="grid-cols-[auto_1fr_auto]">
 			<AppBar.Lead>
-				<a href={localizeHref('/dashboard')} class="flex items-center gap-2">
+				<a href={localizeHref('/scope-view')} class="flex items-center gap-2">
 					<img src={favicon} alt="ZRO" class="size-8" />
 					<span class="font-bold text-xl hidden sm:inline">ZRO</span>
 				</a>
@@ -65,7 +61,9 @@
 			</AppBar.Headline>
 			<AppBar.Trail>
 				<DarkModeToggle />
-				<LanguageSwitcher />
+				<a href={localizeHref('/settings')} class="btn btn-icon preset-tonal-surface" aria-label={m.nav_settings()}>
+					<SettingsIcon class="size-5" />
+				</a>
 			</AppBar.Trail>
 		</AppBar.Toolbar>
 	</AppBar>
@@ -102,7 +100,7 @@
 	<!-- Bottom bar navigation (mobile) -->
 	{#if navLayout === 'bar'}
 		<Navigation layout="bar">
-			<Navigation.Menu class="grid grid-cols-5 gap-1">
+			<Navigation.Menu class="grid grid-cols-3 gap-1">
 				{#each navItems as item}
 					{@const Icon = item.icon}
 					{@const active = isActive(item.href)}

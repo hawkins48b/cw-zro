@@ -1,6 +1,6 @@
 @import 'tailwindcss';
 @import '@skeletonlabs/skeleton';
 @import '@skeletonlabs/skeleton-svelte';
-@import '@skeletonlabs/skeleton/themes/cerberus';
+@import '$lib/themes/zro.css';
 
 @custom-variant dark (&:where(.dark, .dark *));

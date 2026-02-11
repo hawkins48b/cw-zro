@@ -11,7 +11,7 @@
 <div class="flex flex-col items-center justify-center gap-4 py-16">
 	<h1 class="h1">{page.status}</h1>
 	<p class="text-xl text-surface-500">{m.error_page_message()}</p>
-	<a href={localizeHref('/dashboard')} class="btn preset-filled-primary-500">
+	<a href={localizeHref('/scope-view')} class="btn preset-filled-primary-500">
 		{m.error_go_home()}
 	</a>
 </div>

@@ -2,11 +2,10 @@
 	"app_name": "ZRO Ballistikrechner",
 	"app_description": "Präzisionsschießsport und Langstrecken-Schießwerkzeug",
 
-	"nav_dashboard": "Übersicht",
 	"nav_profiles": "Profile",
 	"nav_calculators": "Rechner",
 	"nav_scope_view": "Zieloptik",
-	"nav_about": "Über",
+	"nav_settings": "Einstellungen",
 
 	"dashboard_title": "Übersicht",
 	"dashboard_welcome": "Willkommen bei ZRO",
@@ -51,5 +50,7 @@
 
 	"error_page_title": "Seite nicht gefunden",
 	"error_page_message": "Die gesuchte Seite existiert nicht.",
-	"error_go_home": "Zur Übersicht"
+	"settings_title": "Einstellungen",
+
+	"error_go_home": "Zur Zieloptik"
 }

@@ -2,11 +2,10 @@
 	"app_name": "ZRO Ballistic Calculator",
 	"app_description": "Precision shooting sports and long-range marksmanship tool",
 
-	"nav_dashboard": "Dashboard",
 	"nav_profiles": "Profiles",
 	"nav_calculators": "Calculators",
 	"nav_scope_view": "Scope View",
-	"nav_about": "About",
+	"nav_settings": "Settings",
 
 	"dashboard_title": "Dashboard",
 	"dashboard_welcome": "Welcome to ZRO",
@@ -51,5 +50,7 @@
 
 	"error_page_title": "Page Not Found",
 	"error_page_message": "The page you are looking for does not exist.",
-	"error_go_home": "Go to Dashboard"
+	"settings_title": "Settings",
+
+	"error_go_home": "Go to Scope View"
 }
