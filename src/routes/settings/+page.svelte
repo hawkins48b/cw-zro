@@ -1,6 +1,5 @@
 <script>
 	import { m } from '$lib/paraglide/messages.js';
-	import DarkModeToggle from '$lib/components/DarkModeToggle.svelte';
 	import LanguageSwitcher from '$lib/components/LanguageSwitcher.svelte';
 </script>
 
@@ -8,17 +7,11 @@
 	<title>{m.settings_title()} — {m.app_name()}</title>
 </svelte:head>
 
-<header class="space-y-2 mb-8">
+<header class="space-y-2 mb-8 hidden sm:block">
 	<h1 class="h1">{m.settings_title()}</h1>
 </header>
 
 <div class="space-y-6">
-	<!-- Dark Mode -->
-	<div class="card p-6 flex items-center justify-between">
-		<span class="font-medium">{m.settings_dark_mode()}</span>
-		<DarkModeToggle />
-	</div>
-
 	<!-- Language -->
 	<div class="card p-6 flex items-center justify-between">
 		<span class="font-medium">{m.settings_language()}</span>

@@ -74,6 +74,13 @@ All user-facing text must be translatable:
 
 `app.css` imports Tailwind, Skeleton core, Skeleton Svelte components, and the theme. The root layout (`+layout.svelte`) imports `app.css`. Tailwind runs as a Vite plugin (configured in `vite.config.js`), not via PostCSS.
 
+### Buttons & Icons
+
+- **Buttons must use icons, not text labels.** Use icons from `@lucide/svelte` (already installed). If no suitable Lucide icon exists, create a custom SVG component in `src/lib/components/` following the `ReticleIcon.svelte` pattern.
+- Add a `title` attribute (using a translation key) for accessibility/tooltip on every icon button.
+- Icon sizing uses Tailwind utilities: `size-5` for buttons, `size-6` for standalone icons.
+- Icons inherit color via `currentColor` — rely on Skeleton presets and semantic tokens for theming.
+
 ### Skeleton UI Conventions
 
 - **Framework components**: imported from `@skeletonlabs/skeleton-svelte` (AppBar, Navigation, Tabs, Dialog, etc.)
@@ -91,6 +98,15 @@ All user-facing text must be translatable:
 - Use `{#snippet}` / `{@render}` not `<slot>`
 - Use callback props not `createEventDispatcher`
 - Arrays/objects in `$state()` are deeply reactive
+
+### Data Storage
+
+All user data is stored locally via `localStorage` — no backend, no database:
+
+- **Profiles** (`src/lib/stores/profiles.svelte.js`): reactive Svelte 5 store backed by localStorage. Contains user-created ballistic profiles (simple key/value objects). Accessed via `profiles.list`, `profiles.add()`, `profiles.update()`, `profiles.remove()`, `profiles.get()`.
+- **Settings** (`src/lib/stores/settings.svelte.js`): dark mode preference and other app settings.
+- **Static app data** (calibers, bullet libraries, presets): served as static JSON files, not stored in localStorage.
+- **No external database** — keep everything client-side for offline use and privacy compliance.
 
 ### Deployment Targets
 

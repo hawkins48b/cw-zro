@@ -8,11 +8,11 @@
 </svelte:head>
 
 <header class="flex items-center justify-between mb-8">
-	<div class="space-y-2">
+	<div class="space-y-2 hidden sm:block">
 		<h1 class="h1">{m.profiles_title()}</h1>
 		<p class="text-surface-500">{m.profiles_subtitle()}</p>
 	</div>
-	<a href={localizeHref('/profiles/new')} class="btn preset-filled-primary-500">
+	<a href={localizeHref('/profiles/new')} class="btn preset-filled-primary-500 sm:ml-0 ml-auto">
 		{m.profiles_new()}
 	</a>
 </header>

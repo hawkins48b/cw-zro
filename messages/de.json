@@ -1,6 +1,7 @@
 {
 	"app_name": "ZRO Ballistikrechner",
 	"app_description": "Präzisionsschießsport und Langstrecken-Schießwerkzeug",
+	"app_tagline": "Ballistikrechner",
 
 	"nav_profiles": "Profile",
 	"nav_calculators": "Rechner",

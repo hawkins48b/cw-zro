@@ -22,7 +22,7 @@
 	<title>{m.calculators_title()} — {m.app_name()}</title>
 </svelte:head>
 
-<header class="space-y-2 mb-8">
+<header class="space-y-2 mb-8 hidden sm:block">
 	<h1 class="h1">{m.calculators_title()}</h1>
 	<p class="text-surface-500">{m.calculators_subtitle()}</p>
 </header>

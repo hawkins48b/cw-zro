@@ -1,6 +1,7 @@
 {
 	"app_name": "ZRO Ballistic Calculator",
 	"app_description": "Precision shooting sports and long-range marksmanship tool",
+	"app_tagline": "Ballistic Calculator",
 
 	"nav_profiles": "Profiles",
 	"nav_calculators": "Calculators",

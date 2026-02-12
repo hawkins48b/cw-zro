@@ -1,6 +1,7 @@
 {
 	"app_name": "ZRO Calculateur Balistique",
 	"app_description": "Outil de tir sportif de précision et de tir longue distance",
+	"app_tagline": "Calculateur Balistique",
 
 	"nav_profiles": "Profils",
 	"nav_calculators": "Calculateurs",
