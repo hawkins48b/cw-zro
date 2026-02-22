@@ -17,6 +17,16 @@
 	"profiles_new": "New Profile",
 	"profiles_edit": "Edit Profile",
 	"profiles_empty": "No profiles yet. Create your first profile to get started.",
+	"profiles_delete": "Delete profile",
+	"profiles_active": "Active profile",
+	"profiles_set_active": "Set as active profile",
+	"profiles_sort_recent": "Recent",
+	"profiles_sort_name": "Rifle",
+	"profiles_sort_ammo": "Ammo",
+	"profiles_duplicate": "Duplicate",
+
+	"unit_yd": "yd",
+	"unit_m": "m",
 
 	"calculators_title": "Calculators",
 	"calculators_subtitle": "Select a calculator",

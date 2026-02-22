@@ -17,6 +17,16 @@
 	"profiles_new": "Nouveau profil",
 	"profiles_edit": "Modifier le profil",
 	"profiles_empty": "Aucun profil. Créez votre premier profil pour commencer.",
+	"profiles_delete": "Supprimer le profil",
+	"profiles_active": "Profil actif",
+	"profiles_set_active": "Définir comme profil actif",
+	"profiles_sort_recent": "Récent",
+	"profiles_sort_name": "Fusil",
+	"profiles_sort_ammo": "Munition",
+	"profiles_duplicate": "Dupliquer",
+
+	"unit_yd": "yd",
+	"unit_m": "m",
 
 	"calculators_title": "Calculateurs",
 	"calculators_subtitle": "Sélectionnez un calculateur",

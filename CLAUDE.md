@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ZRO is a ballistic calculator for firearms (v2 rewrite), targeting web, mobile (Capacitor), and desktop (Electron). It replaces a Vue/Quasar v1 app. The app computes bullet trajectories, dope cards, MPBR, and provides a scope view for field use.
 
+**v1 Reference**: The original Vue/Quasar v1 app lives at `/home/quentin/projects/cw-zro-old`. Use it as a reference for existing features, business logic, ballistic calculation algorithms, and data structures when building v2.
+
 ## iOS App Store Compliance
 
 This app **must** pass Apple App Store review. Follow these rules strictly:

@@ -3,7 +3,7 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import { page } from '$app/state';
 	import { m } from '$lib/paraglide/messages.js';
-	import { localizeHref } from '$lib/paraglide/runtime';
+	import { localizeHref, deLocalizeHref } from '$lib/paraglide/runtime';
 	import { AppBar, Navigation } from '@skeletonlabs/skeleton-svelte';
 	import {
 		ListIcon,
@@ -33,8 +33,8 @@
 		return path.startsWith(href);
 	}
 
-	let pageTitle = $derived(() => {
-		const path = page.url.pathname;
+	let pageTitle = $derived.by(() => {
+		const path = deLocalizeHref(page.url.pathname);
 		if (path.startsWith('/profiles')) return m.profiles_title();
 		if (path.startsWith('/calculators')) return m.calculators_title();
 		if (path.startsWith('/settings')) return m.settings_title();
@@ -63,7 +63,7 @@
 				</a>
 				<div class="flex items-center gap-2 sm:hidden">
 					<img src={favicon} alt="ZRO" class="size-8" />
-					<span class="font-bold text-lg">{pageTitle()}</span>
+					<span class="font-bold text-lg">{pageTitle}</span>
 				</div>
 			</AppBar.Lead>
 			<AppBar.Headline>
