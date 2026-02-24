@@ -12,5 +12,10 @@ export default defineConfig({
 			strategy: ['url', 'cookie', 'baseLocale']
 		}),
 		sveltekit()
-	]
+	],
+	test: {
+		include: ['src/**/*.test.js'],
+		environment: 'jsdom',
+		globals: true
+	}
 });

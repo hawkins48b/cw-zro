@@ -2,11 +2,44 @@ import { browser } from '$app/environment';
 
 const STORAGE_KEY = 'zro-profiles';
 
+const DEFAULT_PROFILE = {
+	name: 'Example Colt M4',
+	barrelTwist: '',
+	barrelTwistUnit: 'in',
+	opticName: 'Aimpoint CompM2',
+	opticHeight: '3.5',
+	opticHeightUnit: 'in',
+	zeroDist: 25,
+	zeroUnit: 'yd',
+	bulletBrand: 'M193',
+	bulletDiameter: '0.223',
+	bulletDiameterUnit: 'in',
+	bulletWeight: '55',
+	bulletWeightUnit: 'gr',
+	bcType: 'G1',
+	bc: '0.285',
+	bulletLength: '',
+	bulletLengthUnit: 'in',
+	velocity: '3000',
+	velocityUnit: 'fps',
+	temperature: '59',
+	temperatureUnit: 'f',
+	tempModifier: '',
+	spinDrift: false,
+	tempSensitivity: false,
+	ammo: 'M193 55\u202fgr',
+	optic: 'Aimpoint CompM2'
+};
+
 function load() {
 	if (!browser) return [];
 	try {
 		const raw = localStorage.getItem(STORAGE_KEY);
-		return raw ? JSON.parse(raw) : [];
+		if (raw) return JSON.parse(raw);
+		// Seed default profile on first launch
+		const defaults = [{ ...DEFAULT_PROFILE, id: crypto.randomUUID() }];
+		localStorage.setItem(STORAGE_KEY, JSON.stringify(defaults));
+		return defaults;
 	} catch {
 		return [];
 	}

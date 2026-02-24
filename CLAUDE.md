@@ -36,6 +36,8 @@ This app **must** pass Apple App Store review. Follow these rules strictly:
 npm run dev        # Start dev server
 npm run build      # Production build
 npm run preview    # Preview production build
+npm run test       # Run tests in watch mode (Vitest)
+npm run test:run   # Run tests once (CI)
 ```
 
 ## Architecture
@@ -105,10 +107,37 @@ All user-facing text must be translatable:
 
 All user data is stored locally via `localStorage` — no backend, no database:
 
-- **Profiles** (`src/lib/stores/profiles.svelte.js`): reactive Svelte 5 store backed by localStorage. Contains user-created ballistic profiles (simple key/value objects). Accessed via `profiles.list`, `profiles.add()`, `profiles.update()`, `profiles.remove()`, `profiles.get()`.
+- **Profiles** (`src/lib/stores/profiles.svelte.js`): reactive Svelte 5 store backed by localStorage. Contains user-created ballistic profiles (flat key/value objects). Accessed via `profiles.list`, `profiles.add()`, `profiles.update()`, `profiles.remove()`, `profiles.get()`. Seeds a default Colt M4 profile on first launch.
 - **Settings** (`src/lib/stores/settings.svelte.js`): dark mode preference and other app settings.
 - **Static app data** (calibers, bullet libraries, presets): served as static JSON files, not stored in localStorage.
 - **No external database** — keep everything client-side for offline use and privacy compliance.
+
+#### Store architecture pattern
+
+Stores use module-level `$state` (`.svelte.js` extension required). Because module-level reactive state is a singleton that's hard to reset in tests, **business logic is extracted into pure utility functions** in `src/lib/utils/` and tested there. The store is a thin reactive wrapper around those functions.
+
+- `src/lib/utils/profileOps.js` — pure CRUD helpers (`addProfile`, `updateProfile`, `removeProfile`, `getProfile`, `duplicateProfile`) that operate on plain arrays and return new arrays without mutation.
+- `src/lib/utils/profileValidation.js` — pure validation (`validateProfile`, `isValid`) and data helpers (`buildAmmoString`). No i18n or Svelte dependencies.
+
+When adding a new store, follow this pattern: extract the logic to a pure utility, keep the store as the reactive + persistence layer only.
+
+### Form Validation
+
+Forms use `validateProfile` from `src/lib/utils/profileValidation.js`:
+
+- All **visible** fields are required. Fields hidden by toggles (spin drift, temp sensitivity) are only validated when the toggle is on.
+- Numeric fields must be positive numbers; temperature and temp modifier accept any number (including negatives).
+- Errors are shown **only after the first save attempt** (`submitted` flag). Before that, the form is silent.
+- Each field shows either its hint text or a red error message — never both. `UnitField` accepts an `invalid` prop (error string) that replaces the hint.
+- Error message keys: `validation_required`, `validation_positive_number`.
+
+### Testing
+
+- **Framework**: Vitest with jsdom environment. Config lives in `vite.config.js` (`test` key). Tests are co-located in `src/test/`.
+- **What to test**: pure utility functions only — no Svelte component rendering, no store singletons, no i18n mocks needed.
+- **What not to test**: stores directly (singleton state is hard to reset), Svelte components (use manual browser testing), i18n output (tested implicitly via the app).
+- Test files: `src/test/profileValidation.test.js`, `src/test/profileOps.test.js`.
+- When adding business logic (calculations, validators, data transformers), extract it to `src/lib/utils/` as a pure function and write a test alongside it.
 
 ### Deployment Targets
 

@@ -1,88 +1,47 @@
 <script>
 	import { m } from '$lib/paraglide/messages.js';
 	import { localizeHref } from '$lib/paraglide/runtime';
-	import { Plus, Pencil, Trash2, Crosshair, Copy, ArrowUp, ArrowDown } from '@lucide/svelte';
+	import { profiles } from '$lib/stores/profiles.svelte.js';
+	import { Plus, Pencil, Trash2, Crosshair, Copy, ArrowUp, ArrowDown, Search } from '@lucide/svelte';
 	import { fly, fade } from 'svelte/transition';
+	import { usePress } from 'svelte-gestures';
+	import { swipe } from '$lib/actions/swipe.js';
 
-	// Mock data — replace with profiles.list once form is wired up
-	let profileList = $state([
-		{
-			id: '1',
-			name: 'Remington 700',
-			ammo: '.308 Win · Sierra 168gr MatchKing',
-			optic: 'Vortex Razor HD Gen II 4.5-27x56',
-			zeroDist: 100,
-			zeroUnit: 'yd'
-		},
-		{
-			id: '2',
-			name: 'Tikka T3x CTR',
-			ammo: '6.5 Creedmoor · Hornady 140gr ELD Match',
-			optic: 'Schmidt & Bender PMII 5-25x56',
-			zeroDist: 200,
-			zeroUnit: 'm'
-		},
-		{
-			id: '3',
-			name: 'Accuracy International AXMC',
-			ammo: '.338 Lapua Mag · Lapua 250gr Scenar',
-			optic: 'Kahles K525i 5-25x56',
-			zeroDist: 300,
-			zeroUnit: 'm'
-		},
-		{
-			id: '4',
-			name: 'Ruger Precision Rifle',
-			ammo: '6.5 Creedmoor · Berger 130gr AR Hybrid',
-			optic: 'Nightforce ATACR 5-25x56',
-			zeroDist: 100,
-			zeroUnit: 'yd'
-		},
-		{
-			id: '5',
-			name: 'Christensen Arms MPR',
-			ammo: '.300 Win Mag · Hornady 212gr ELD-X',
-			optic: 'Leupold Mark 5HD 5-25x56',
-			zeroDist: 200,
-			zeroUnit: 'yd'
-		},
-		{
-			id: '6',
-			name: 'Sako TRG-42',
-			ammo: '.338 Lapua Mag · Berger 300gr OTM Tactical',
-			optic: 'March Tactical 5-40x56',
-			zeroDist: 100,
-			zeroUnit: 'm'
-		},
-		{
-			id: '7',
-			name: 'Barrett MRAD',
-			ammo: '.300 Norma Mag · Lapua 230gr Scenar-L',
-			optic: 'Tangent Theta TT315M 5-25x56',
-			zeroDist: 100,
-			zeroUnit: 'm'
-		}
-	]);
-
-	let activeId = $state('1');
+	let activeId = $state(profiles.list[0]?.id ?? null);
 	let sortBy = $state('recent');
-	let sortDesc = $state(true); // true = newest first
+	let sortDesc = $state(true);
+	let searchActive = $state(false);
+	let searchQuery = $state('');
+	let searchInput = $state(null);
 
-	let activeProfile = $derived(profileList.find((p) => p.id === activeId));
+	$effect(() => {
+		if (searchActive && searchInput) searchInput.focus();
+	});
+
+	let activeProfile = $derived(profiles.list.find((p) => p.id === activeId));
 
 	let sortedProfiles = $derived.by(() => {
+		const list = profiles.list;
 		switch (sortBy) {
 			case 'name':
-				return [...profileList].sort((a, b) =>
+				return [...list].sort((a, b) =>
 					sortDesc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)
 				);
 			case 'ammo':
-				return [...profileList].sort((a, b) =>
+				return [...list].sort((a, b) =>
 					sortDesc ? a.ammo.localeCompare(b.ammo) : b.ammo.localeCompare(a.ammo)
 				);
 			default: // 'recent'
-				return sortDesc ? [...profileList] : [...profileList].reverse();
+				return sortDesc ? [...list] : [...list].reverse();
 		}
+	});
+
+	let filteredProfiles = $derived.by(() => {
+		const q = searchQuery.trim().toLowerCase();
+		if (!q) return sortedProfiles;
+		return sortedProfiles.filter(
+			(p) => p.name.toLowerCase().includes(q) || p.ammo.toLowerCase().includes(q)
+		);
 	});
 
 	function handleSortClick(value) {
@@ -93,9 +52,69 @@
 		}
 	}
 
-	// --- Context menu ---
+	function toggleSearch() {
+		searchActive = !searchActive;
+		if (!searchActive) searchQuery = '';
+	}
+
+	// ── Long press (context menu) ──────────────────────────────────────────
+
+	function makePressHandler() {
+		return usePress(
+			(e) => {
+				const wrapper = e.detail.target?.closest('[data-card-id]');
+				if (!wrapper) return;
+				wrapper.addEventListener('click', stopClick, { capture: true, once: true });
+				openContextMenu(wrapper.dataset.cardId);
+			},
+			() => ({ timeframe: 500, spread: 10, triggerBeforeFinished: true, touchAction: 'auto' })
+		);
+	}
+
+	function stopClick(e) {
+		e.stopPropagation();
+	}
+
+	const pinnedPress = makePressHandler();
+	const listPress = makePressHandler();
+
+	// ── Delete confirmation ────────────────────────────────────────────────
+
+	let deleteConfirmId = $state(null);
+	let deleteSource = $state(null); // 'swipe' | 'menu'
+	let deleteConfirmProfile = $derived(profiles.list.find((p) => p.id === deleteConfirmId) ?? null);
+
+	function requestDelete(id, source = 'menu') {
+		deleteConfirmId = id;
+		deleteSource = source;
+	}
+
+	function confirmDelete() {
+		const id = deleteConfirmId;
+		const source = deleteSource;
+		deleteConfirmId = null;
+		deleteSource = null;
+		if (source === 'swipe') {
+			swipeRefs[id]?.flyOut(() => collapseAndRemove(id));
+		} else {
+			setTimeout(() => collapseAndRemove(id), 50);
+		}
+	}
+
+	function cancelDelete() {
+		const id = deleteConfirmId;
+		const source = deleteSource;
+		deleteConfirmId = null;
+		deleteSource = null;
+		if (source === 'swipe') {
+			swipeRefs[id]?.snapBack();
+		}
+	}
+
+	// ── Context menu ───────────────────────────────────────────────────────
+
 	let contextMenuId = $state(null);
-	let contextMenuProfile = $derived(profileList.find((p) => p.id === contextMenuId));
+	let contextMenuProfile = $derived(profiles.list.find((p) => p.id === contextMenuId));
 
 	function openContextMenu(id) {
 		contextMenuId = id;
@@ -106,95 +125,38 @@
 	}
 
 	function duplicateProfile(id) {
-		const src = profileList.find((p) => p.id === id);
+		const src = profiles.get(id);
 		if (!src) return;
-		profileList = [...profileList, { ...src, id: crypto.randomUUID(), name: `${src.name} (copy)` }];
+		const { id: _id, ...rest } = src;
+		profiles.add({ ...rest, name: `${rest.name} - Copy` });
 		closeContextMenu();
 	}
 
 	function deleteFromMenu(id) {
 		closeContextMenu();
-		setTimeout(() => collapseAndRemove(id), 180);
+		setTimeout(() => requestDelete(id, 'menu'), 180);
 	}
 
-	// --- Tap: activate profile ---
-	const suppressNextClick = {};
+	// ── Tap: activate profile ──────────────────────────────────────────────
 
 	function handleCardTap(id) {
-		if (suppressNextClick[id]) {
-			suppressNextClick[id] = false;
-			return;
-		}
 		if (id !== activeId) activeId = id;
 	}
 
-	// --- Long press: open context menu ---
-	const LONG_PRESS_MS = 500;
-	const longPressTimers = {};
-	const longPressOrigin = {};
-	let longPressingDown = $state({});
+	// ── Swipe refs & background state ─────────────────────────────────────
 
-	function handlePointerDown(e, id) {
-		// Don't start a long press from the desktop edit button (it stops propagation)
-		longPressOrigin[id] = { x: e.clientX, y: e.clientY };
-		longPressingDown[id] = true;
-		suppressNextClick[id] = false;
+	const swipeRefs = {};
 
-		longPressTimers[id] = setTimeout(() => {
-			longPressingDown[id] = false;
-			suppressNextClick[id] = true;
-			openContextMenu(id);
-		}, LONG_PRESS_MS);
+	function setSwipeRef(id, api) {
+		if (api) swipeRefs[id] = api;
+		else delete swipeRefs[id];
 	}
 
-	function handlePointerMove(e, id) {
-		const o = longPressOrigin[id];
-		if (!o || !longPressTimers[id]) return;
-		if (Math.abs(e.clientX - o.x) > 8 || Math.abs(e.clientY - o.y) > 8) {
-			cancelLongPress(id);
-		}
-	}
+	let swipeActive = $state({});
 
-	function handlePointerUp(id) {
-		cancelLongPress(id);
-	}
+	// ── Collapse & remove ──────────────────────────────────────────────────
 
-	function cancelLongPress(id) {
-		clearTimeout(longPressTimers[id]);
-		delete longPressTimers[id];
-		longPressingDown[id] = false;
-	}
-
-	// --- Swipe-to-delete ---
-	let swipeOffsets = $state({});
-	let swipeAnimating = $state({});
-	const swipeStartX = {};
 	let itemRefs = $state({});
-
-	function startSwipe(e, id) {
-		if (id === activeId) return;
-		if (contextMenuId) closeContextMenu();
-		swipeStartX[id] = e.touches[0].clientX;
-		swipeAnimating[id] = false;
-	}
-
-	function moveSwipe(e, id) {
-		const dx = e.touches[0].clientX - (swipeStartX[id] ?? 0);
-		if (Math.abs(dx) > 8) cancelLongPress(id); // movement cancels long press
-		if (dx < 0) swipeOffsets[id] = Math.max(dx, -100);
-	}
-
-	function endSwipe(id) {
-		if ((swipeOffsets[id] ?? 0) < -60) {
-			swipeAnimating[id] = true;
-			swipeOffsets[id] = -600;
-			setTimeout(() => collapseAndRemove(id), 300);
-		} else {
-			swipeAnimating[id] = true;
-			swipeOffsets[id] = 0;
-			setTimeout(() => (swipeAnimating[id] = false), 300);
-		}
-	}
 
 	function collapseAndRemove(id) {
 		const el = itemRefs[id];
@@ -207,13 +169,14 @@
 	}
 
 	function removeFromList(id) {
-		const newList = profileList.filter((p) => p.id !== id);
-		profileList = newList;
-		if (activeId === id) activeId = newList[0]?.id ?? null;
-		delete swipeOffsets[id];
-		delete swipeAnimating[id];
+		if (activeId === id) activeId = profiles.list.find((p) => p.id !== id)?.id ?? null;
+		profiles.remove(id);
+		delete swipeActive[id];
+		delete swipeRefs[id];
 		delete itemRefs[id];
 	}
+
+	// ── Misc ───────────────────────────────────────────────────────────────
 
 	function zeroLabel(profile) {
 		return `${profile.zeroDist}\u202f${profile.zeroUnit === 'yd' ? m.unit_yd() : m.unit_m()}`;
@@ -224,25 +187,17 @@
 		{ value: 'name', labelKey: 'profiles_sort_name' },
 		{ value: 'ammo', labelKey: 'profiles_sort_ammo' }
 	];
-
-	function cardTransform(id) {
-		const x = swipeOffsets[id] ?? 0;
-		const scale = longPressingDown[id] ? 0.96 : 1;
-		return `translateX(${x}px) scale(${scale})`;
-	}
-
-	function cardTransition(id) {
-		if (swipeAnimating[id]) return 'transform 300ms ease';
-		if (longPressingDown[id]) return 'transform 500ms ease';
-		return 'none';
-	}
 </script>
 
 <svelte:head>
 	<title>{m.profiles_title()} — {m.app_name()}</title>
 </svelte:head>
 
-<svelte:window onkeydown={(e) => e.key === 'Escape' && closeContextMenu()} />
+<svelte:window onkeydown={(e) => {
+	if (e.key !== 'Escape') return;
+	if (deleteConfirmId !== null) cancelDelete();
+	else closeContextMenu();
+}} />
 
 <!-- Page header -->
 <header class="hidden sm:block mb-6">
@@ -252,7 +207,7 @@
 	</div>
 </header>
 
-{#if profileList.length === 0}
+{#if profiles.list.length === 0}
 	<!-- Toolbar with just the add button -->
 	<div class="flex justify-end mb-4 max-w-2xl">
 		<a
@@ -271,10 +226,8 @@
 		<div class="mb-6 max-w-2xl" bind:this={itemRefs[profile.id]}>
 			<div
 				class="card select-none preset-tonal-primary"
-				onpointerdown={(e) => handlePointerDown(e, profile.id)}
-				onpointermove={(e) => handlePointerMove(e, profile.id)}
-				onpointerup={() => handlePointerUp(profile.id)}
-				onpointercancel={() => cancelLongPress(profile.id)}
+				data-card-id={profile.id}
+				{...pinnedPress}
 			>
 				<div class="p-4 flex items-start gap-3">
 					<div class="flex-1 min-w-0">
@@ -285,7 +238,6 @@
 						href={localizeHref(`/profiles/${profile.id}`)}
 						class="btn btn-icon preset-tonal-primary hidden sm:flex shrink-0 -mr-1"
 						title={m.common_edit()}
-						onpointerdown={(e) => e.stopPropagation()}
 					>
 						<Pencil class="size-4" />
 					</a>
@@ -301,10 +253,10 @@
 		</div>
 	{/if}
 
-	<!-- Sort filter + add button -->
-	<div class="flex items-center gap-2 mb-4 max-w-2xl">
+	<!-- Sort filter + search + add button -->
+	<div class="flex items-center gap-2 mb-2 max-w-2xl">
 		<div class="flex gap-2 overflow-x-auto pb-1 flex-1">
-			{#if profileList.length > 1}
+			{#if profiles.list.length > 1}
 				{#each sortOptions as opt}
 					{@const isActiveSort = sortBy === opt.value}
 					<button
@@ -323,6 +275,13 @@
 				{/each}
 			{/if}
 		</div>
+		<button
+			class="btn btn-icon shrink-0 {searchActive ? 'preset-filled-primary-500' : 'preset-tonal-surface'}"
+			title={m.profiles_search()}
+			onclick={toggleSearch}
+		>
+			<Search class="size-5" />
+		</button>
 		<a
 			href={localizeHref('/profiles/new')}
 			class="btn btn-icon preset-filled-primary-500 shrink-0"
@@ -332,14 +291,31 @@
 		</a>
 	</div>
 
-	{#if profileList.length > 1}
-		<div class="grid gap-3 max-w-2xl">
-			{#each sortedProfiles as profile (profile.id)}
+	<!-- Search input -->
+	{#if searchActive}
+		<div class="mb-4 max-w-2xl" transition:fly={{ y: -8, duration: 180, opacity: 0 }}>
+			<input
+				type="search"
+				class="input w-full"
+				placeholder={m.profiles_search_placeholder()}
+				bind:value={searchQuery}
+				bind:this={searchInput}
+			/>
+		</div>
+	{/if}
+
+	{#if profiles.list.length > 1}
+		{#if filteredProfiles.length === 0 && searchQuery.trim()}
+			<p class="text-surface-400 max-w-2xl">{m.profiles_no_results()}</p>
+		{:else}
+		<!-- listPress spread here so one pointer-controls instance covers all list cards -->
+		<div class="grid gap-3 max-w-2xl" {...listPress}>
+			{#each filteredProfiles as profile (profile.id)}
 				{@const isActive = profile.id === activeId}
-				<div bind:this={itemRefs[profile.id]}>
+				<div bind:this={itemRefs[profile.id]} data-card-id={profile.id}>
 					<div
 						class="relative overflow-hidden rounded-container"
-						class:bg-error-500={!isActive && (swipeOffsets[profile.id] ?? 0) < 0}
+						class:bg-error-500={swipeActive[profile.id]}
 					>
 						{#if !isActive}
 							<div class="absolute inset-y-0 right-0 flex items-center pr-5">
@@ -347,21 +323,18 @@
 							</div>
 						{/if}
 
-						<!-- Card -->
+						<!-- Card — swipe action handles horizontal drag -->
 						<div
 							class="card select-none relative {isActive
 								? 'preset-tonal-primary'
 								: 'preset-outlined-surface-200-800 bg-surface-50-950'}"
 							style:border-radius="0"
-							style:transform={cardTransform(profile.id)}
-							style:transition={cardTransition(profile.id)}
-							ontouchstart={!isActive ? (e) => startSwipe(e, profile.id) : undefined}
-							ontouchmove={!isActive ? (e) => moveSwipe(e, profile.id) : undefined}
-							ontouchend={!isActive ? () => endSwipe(profile.id) : undefined}
-							onpointerdown={(e) => handlePointerDown(e, profile.id)}
-							onpointermove={(e) => handlePointerMove(e, profile.id)}
-							onpointerup={() => handlePointerUp(profile.id)}
-							onpointercancel={() => cancelLongPress(profile.id)}
+							use:swipe={{
+								canSwipe: !isActive,
+								ref: (api) => setSwipeRef(profile.id, api)
+							}}
+							onswipedelete={() => requestDelete(profile.id, 'swipe')}
+							onswipechange={(e) => { swipeActive[profile.id] = e.detail.active; }}
 						>
 							<!-- Tap area -->
 							<div
@@ -388,13 +361,16 @@
 									class="btn btn-icon {isActive ? 'preset-tonal-primary' : 'preset-tonal-surface'} hidden sm:flex shrink-0 -mr-1"
 									title={m.common_edit()}
 									onclick={(e) => e.stopPropagation()}
-									onpointerdown={(e) => e.stopPropagation()}
 								>
 									<Pencil class="size-4" />
 								</a>
 							</div>
 
-							<div onclick={() => handleCardTap(profile.id)}
+							<div
+								role="button"
+								tabindex="0"
+								onclick={() => handleCardTap(profile.id)}
+								onkeydown={(e) => e.key === 'Enter' && handleCardTap(profile.id)}
 								class="border-t px-4 py-2.5 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 text-sm cursor-pointer
 									{isActive ? 'border-primary-500/20 opacity-70' : 'border-surface-200-800 text-surface-500'}"
 							>
@@ -412,7 +388,43 @@
 				</div>
 			{/each}
 		</div>
+		{/if}
 	{/if}
+{/if}
+
+<!-- Delete confirmation dialog -->
+{#if deleteConfirmId !== null}
+	<div
+		transition:fade={{ duration: 180 }}
+		class="fixed inset-0 z-50 bg-black/50"
+		role="presentation"
+		onclick={cancelDelete}
+	></div>
+	<div
+		transition:fly={{ y: 16, duration: 220, opacity: 0 }}
+		class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
+	>
+		<div
+			class="card preset-filled-surface-100-900 p-6 w-full max-w-sm shadow-2xl pointer-events-auto"
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="delete-dialog-title"
+			aria-describedby="delete-dialog-desc"
+		>
+			<h2 id="delete-dialog-title" class="h5 mb-2">{m.profiles_delete()}</h2>
+			<p id="delete-dialog-desc" class="text-surface-500 mb-6">
+				{m.profiles_delete_confirm({ name: deleteConfirmProfile?.name ?? '' })}
+			</p>
+			<footer class="flex gap-2 justify-end">
+				<button class="btn preset-tonal-surface" onclick={cancelDelete}>
+					{m.common_cancel()}
+				</button>
+				<button class="btn preset-filled-error-500" onclick={confirmDelete}>
+					{m.common_delete()}
+				</button>
+			</footer>
+		</div>
+	</div>
 {/if}
 
 <!-- Context menu bottom sheet -->
