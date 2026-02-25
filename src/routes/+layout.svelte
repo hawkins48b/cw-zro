@@ -23,8 +23,8 @@
 
 	const navItems = [
 		{ href: '/scope-view', labelKey: 'nav_scope_view', icon: ReticleIcon },
-		{ href: '/profiles', labelKey: 'nav_profiles', icon: ListIcon },
-		{ href: '/calculators', labelKey: 'nav_calculators', icon: CalculatorIcon }
+		{ href: '/calculators', labelKey: 'nav_calculators', icon: CalculatorIcon },
+		{ href: '/profiles', labelKey: 'nav_profiles', icon: ListIcon }
 	];
 
 	function isActive(href) {

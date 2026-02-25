@@ -1,6 +1,4 @@
-import { browser } from '$app/environment';
-
-const STORAGE_KEY = 'zro-profiles';
+import { localStore } from './localStore.svelte.js';
 
 const DEFAULT_PROFILE = {
 	name: 'Example Colt M4',
@@ -31,52 +29,33 @@ const DEFAULT_PROFILE = {
 	optic: 'Aimpoint CompM2'
 };
 
-function load() {
-	if (!browser) return [];
-	try {
-		const raw = localStorage.getItem(STORAGE_KEY);
-		if (raw) return JSON.parse(raw);
-		// Seed default profile on first launch
-		const defaults = [{ ...DEFAULT_PROFILE, id: crypto.randomUUID() }];
-		localStorage.setItem(STORAGE_KEY, JSON.stringify(defaults));
-		return defaults;
-	} catch {
-		return [];
-	}
-}
-
-function save(data) {
-	if (!browser) return;
-	localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
-
-let list = $state(load());
+const store = localStore('zro-profiles', () => [{ ...DEFAULT_PROFILE, id: crypto.randomUUID() }]);
 
 export const profiles = {
 	get list() {
-		return list;
+		return store.value;
 	},
 	add(profile) {
 		const id = crypto.randomUUID();
-		list.push({ ...profile, id });
-		save(list);
+		store.value.push({ ...profile, id });
+		store.persist();
 		return id;
 	},
 	update(id, data) {
-		const i = list.findIndex((p) => p.id === id);
+		const i = store.value.findIndex((p) => p.id === id);
 		if (i === -1) return false;
-		list[i] = { ...list[i], ...data, id };
-		save(list);
+		store.value[i] = { ...store.value[i], ...data, id };
+		store.persist();
 		return true;
 	},
 	remove(id) {
-		const i = list.findIndex((p) => p.id === id);
+		const i = store.value.findIndex((p) => p.id === id);
 		if (i === -1) return false;
-		list.splice(i, 1);
-		save(list);
+		store.value.splice(i, 1);
+		store.persist();
 		return true;
 	},
 	get(id) {
-		return list.find((p) => p.id === id);
+		return store.value.find((p) => p.id === id);
 	}
 };

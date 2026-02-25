@@ -2,12 +2,12 @@
 	import { m } from '$lib/paraglide/messages.js';
 	import { localizeHref } from '$lib/paraglide/runtime';
 	import { profiles } from '$lib/stores/profiles.svelte.js';
+	import { activeProfile } from '$lib/stores/activeProfile.svelte.js';
 	import { Plus, Pencil, Trash2, Crosshair, Copy, ArrowUp, ArrowDown, Search } from '@lucide/svelte';
 	import { fly, fade } from 'svelte/transition';
 	import { usePress } from 'svelte-gestures';
 	import { swipe } from '$lib/actions/swipe.js';
 
-	let activeId = $state(profiles.list[0]?.id ?? null);
 	let sortBy = $state('recent');
 	let sortDesc = $state(true);
 	let searchActive = $state(false);
@@ -17,8 +17,6 @@
 	$effect(() => {
 		if (searchActive && searchInput) searchInput.focus();
 	});
-
-	let activeProfile = $derived(profiles.list.find((p) => p.id === activeId));
 
 	let sortedProfiles = $derived.by(() => {
 		const list = profiles.list;
@@ -140,7 +138,7 @@
 	// ── Tap: activate profile ──────────────────────────────────────────────
 
 	function handleCardTap(id) {
-		if (id !== activeId) activeId = id;
+		if (id !== activeProfile.id) activeProfile.setActive(id);
 	}
 
 	// ── Swipe refs & background state ─────────────────────────────────────
@@ -169,7 +167,7 @@
 	}
 
 	function removeFromList(id) {
-		if (activeId === id) activeId = profiles.list.find((p) => p.id !== id)?.id ?? null;
+		if (activeProfile.id === id) activeProfile.setActive(profiles.list.find((p) => p.id !== id)?.id ?? null);
 		profiles.remove(id);
 		delete swipeActive[id];
 		delete swipeRefs[id];
@@ -221,8 +219,8 @@
 	<p class="text-surface-400">{m.profiles_empty()}</p>
 {:else}
 	<!-- Active profile pinned above the filter -->
-	{#if activeProfile}
-		{@const profile = activeProfile}
+	{#if activeProfile.profile}
+		{@const profile = activeProfile.profile}
 		<div class="mb-6 max-w-2xl" bind:this={itemRefs[profile.id]}>
 			<div
 				class="card select-none preset-tonal-primary"
@@ -311,7 +309,7 @@
 		<!-- listPress spread here so one pointer-controls instance covers all list cards -->
 		<div class="grid gap-3 max-w-2xl" {...listPress}>
 			{#each filteredProfiles as profile (profile.id)}
-				{@const isActive = profile.id === activeId}
+				{@const isActive = profile.id === activeProfile.id}
 				<div bind:this={itemRefs[profile.id]} data-card-id={profile.id}>
 					<div
 						class="relative overflow-hidden rounded-container"
@@ -459,7 +457,7 @@
 				<Copy class="size-5" />
 				{m.profiles_duplicate()}
 			</button>
-			{#if contextMenuId !== activeId}
+			{#if contextMenuId !== activeProfile.id}
 				<button
 					class="btn preset-tonal-error justify-start gap-3 h-12"
 					onclick={() => deleteFromMenu(contextMenuId)}

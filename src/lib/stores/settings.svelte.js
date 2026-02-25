@@ -1,26 +1,19 @@
 import { browser } from '$app/environment';
+import { localStore } from './localStore.svelte.js';
 
-const STORAGE_KEY = 'zro-dark-mode';
-
-function getInitialDarkMode() {
-	if (!browser) return false;
-	const stored = localStorage.getItem(STORAGE_KEY);
-	if (stored !== null) return stored === 'true';
-	return window.matchMedia('(prefers-color-scheme: dark)').matches;
-}
-
-let darkMode = $state(getInitialDarkMode());
+const store = localStore(
+	'zro-dark-mode',
+	() => browser && window.matchMedia('(prefers-color-scheme: dark)').matches,
+	{ seed: false }
+);
 
 export const settings = {
 	get darkMode() {
-		return darkMode;
+		return store.value;
 	},
 	toggleDarkMode() {
-		darkMode = !darkMode;
-		if (browser) {
-			localStorage.setItem(STORAGE_KEY, String(darkMode));
-			applyDarkMode(darkMode);
-		}
+		store.value = !store.value;
+		applyDarkMode(store.value);
 	}
 };
 
