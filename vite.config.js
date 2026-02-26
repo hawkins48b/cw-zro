@@ -13,6 +13,11 @@ export default defineConfig({
 		}),
 		sveltekit()
 	],
+	ssr: {
+		// js-ballistics uses extensionless ESM imports which Node.js strict ESM can't resolve.
+		// Bundling it for SSR lets Vite handle the resolution instead of Node.
+		noExternal: ['js-ballistics']
+	},
 	test: {
 		include: ['src/**/*.test.js'],
 		environment: 'jsdom',

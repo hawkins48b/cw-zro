@@ -27,6 +27,7 @@
 	"dependencies": {
 		"@inlang/paraglide-js": "^2.10.0",
 		"@lucide/svelte": "^0.563.1",
+		"js-ballistics": "^2.2.0-beta.2",
 		"svelte-gestures": "^5.2.2"
 	}
 }
