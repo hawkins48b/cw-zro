@@ -140,10 +140,14 @@
 				<text x="50" y="77" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="600" class="fill-surface-500 dark:fill-surface-400">180°</text>
 				<text x="24" y="50" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="600" class="fill-surface-500 dark:fill-surface-400">270°</text>
 
-				<!-- Rotating group: chevron only -->
+				<!-- Rotating group: arrow shaft + arrowhead at source end (top) -->
 				<g transform="rotate({dirDeg} 50 50)">
+					<line
+						x1="50" y1="21" x2="50" y2="72"
+						class="stroke-blue-400" stroke-width="1.5" stroke-linecap="round"
+					/>
 					<polyline
-						points="44,30 50,41 56,30"
+						points="44,21 50,13 56,21"
 						fill="none" class="stroke-blue-400"
 						stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"
 					/>
@@ -159,10 +163,12 @@
 				<line x1="55" y1="50" x2="60" y2="50" class="stroke-surface-500 dark:stroke-surface-400" stroke-width="0.8" />
 				<circle cx="50" cy="50" r="4" fill="none" class="stroke-blue-400" stroke-width="1.5" />
 
-				<!-- Wind icon at source end of arrow, rotated 90° to face downwind -->
+				<!-- Wind icon at tail end of arrow (vertically mirrored from original) -->
 				<g transform="rotate({dirDeg} 50 50)">
-					<g transform="rotate(90, 50, 18)">
-						<Wind x={43} y={11} size={14} class="stroke-blue-400" />
+					<g transform="scale(1,-1) translate(0,-100)">
+						<g transform="rotate(90, 50, 18)">
+							<Wind x={43} y={11} size={14} class="stroke-blue-400" />
+						</g>
 					</g>
 				</g>
 			</svg>

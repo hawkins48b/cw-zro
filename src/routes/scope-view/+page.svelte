@@ -16,6 +16,7 @@
 	let showElevation = $state(false);
 	import DistanceInput from '$lib/components/DistanceInput.svelte';
 	import WindInput from '$lib/components/WindInput.svelte';
+	import ScopeReticle from '$lib/components/ScopeReticle.svelte';
 	import { activeProfile } from '$lib/stores/activeProfile.svelte.js';
 	import { scopeView } from '$lib/stores/scopeView.svelte.js';
 	import { calculateShotPoint, getElevationValue, getWindageValue } from '$lib/utils/ballisticCalculator.js';
@@ -277,8 +278,8 @@
 		</div>
 	</div>
 
-	<!-- ═══ RIGHT: Adjustments ══════════════════════════════════════ -->
-	<div>
+	<!-- ═══ RIGHT: Adjustments + Reticle ═══════════════════════════ -->
+	<div class="space-y-4">
 		<div class="card preset-filled-surface-100-900 p-4 space-y-4">
 			<h2 class="h5 border-b border-surface-200-800 pb-2">{m.scope_view_adjustments()}</h2>
 
@@ -419,5 +420,8 @@
 				</div>
 			</div>
 		</div>
+
+		<!-- ── Scope Reticle ─────────────────────────────────────── -->
+		<ScopeReticle {point} />
 	</div>
 </div>

@@ -147,6 +147,13 @@
 	"scope_view_terminal_velocity": "Terminal Velocity",
 	"scope_view_no_profile": "No active profile. Go to Profiles to activate one.",
 	"scope_view_no_valid_result": "Cannot compute — check profile and conditions",
+	"scope_view_reticle": "Holds",
+	"scope_view_reticle_red_dot": "Red Dot",
+	"scope_view_reticle_mil_dot": "Mil-Dot",
+	"scope_view_reticle_moa": "MOA",
+	"scope_view_reticle_mrad": "MRAD",
+	"scope_view_aim_point": "Hold point",
+	"scope_view_aim_out_of_view": "Out of view",
 
 	"about_title": "About",
 	"about_version": "Version {version}",

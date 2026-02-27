@@ -147,6 +147,13 @@
 	"scope_view_terminal_velocity": "Vitesse terminale",
 	"scope_view_no_profile": "Aucun profil actif. Allez dans Profils pour en activer un.",
 	"scope_view_no_valid_result": "Calcul impossible — vérifiez le profil et les conditions",
+	"scope_view_reticle": "Corrections",
+	"scope_view_reticle_red_dot": "Point rouge",
+	"scope_view_reticle_mil_dot": "Mil-point",
+	"scope_view_reticle_moa": "MOA",
+	"scope_view_reticle_mrad": "MRAD",
+	"scope_view_aim_point": "Point de visée",
+	"scope_view_aim_out_of_view": "Hors champ",
 
 	"about_title": "À propos",
 	"about_version": "Version {version}",

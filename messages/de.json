@@ -147,6 +147,13 @@
 	"scope_view_terminal_velocity": "Auftreffgeschwindigkeit",
 	"scope_view_no_profile": "Kein aktives Profil. Gehe zu Profile, um eines zu aktivieren.",
 	"scope_view_no_valid_result": "Berechnung nicht möglich — Profil und Bedingungen prüfen",
+	"scope_view_reticle": "Korrekturen",
+	"scope_view_reticle_red_dot": "Roter Punkt",
+	"scope_view_reticle_mil_dot": "Mil-Punkt",
+	"scope_view_reticle_moa": "MOA",
+	"scope_view_reticle_mrad": "MRAD",
+	"scope_view_aim_point": "Haltepunkt",
+	"scope_view_aim_out_of_view": "Außerhalb",
 
 	"about_title": "Über",
 	"about_version": "Version {version}",
