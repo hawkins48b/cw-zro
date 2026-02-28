@@ -15,39 +15,59 @@
 	let { title, initialData = {}, onSave, onCancel } = $props();
 
 	let form = $state({
-		// Rifle
-		name: initialData.name ?? '',
-		barrelTwist: initialData.barrelTwist ?? '',
-		barrelTwistUnit: initialData.barrelTwistUnit ?? 'in',
-
-		// Optic
-		opticName: initialData.opticName ?? '',
-		opticHeight: initialData.opticHeight != null ? String(initialData.opticHeight) : '',
-		opticHeightUnit: initialData.opticHeightUnit ?? 'in',
-		zeroDist: initialData.zeroDist != null ? String(initialData.zeroDist) : '',
-		zeroUnit: initialData.zeroUnit ?? 'yd',
-
-		// Ammunition
-		bulletBrand: initialData.bulletBrand ?? '',
-		bulletDiameter: initialData.bulletDiameter != null ? String(initialData.bulletDiameter) : '',
-		bulletDiameterUnit: initialData.bulletDiameterUnit ?? 'in',
-		bulletWeight: initialData.bulletWeight != null ? String(initialData.bulletWeight) : '',
-		bulletWeightUnit: initialData.bulletWeightUnit ?? 'gr',
-		bcType: initialData.bcType ?? 'G1',
-		bc: initialData.bc != null ? String(initialData.bc) : '',
-		bulletLength: initialData.bulletLength != null ? String(initialData.bulletLength) : '',
-		bulletLengthUnit: initialData.bulletLengthUnit ?? 'in',
-
-		// Measures
-		velocity: initialData.velocity != null ? String(initialData.velocity) : '',
-		velocityUnit: initialData.velocityUnit ?? 'fps',
-		temperature: initialData.temperature != null ? String(initialData.temperature) : '',
-		temperatureUnit: initialData.temperatureUnit ?? 'f',
-		tempModifier: initialData.tempModifier != null ? String(initialData.tempModifier) : ''
+		name: '',
+		barrelTwist: '',
+		barrelTwistUnit: 'in',
+		opticName: '',
+		opticHeight: '',
+		opticHeightUnit: 'in',
+		zeroDist: '',
+		zeroUnit: 'yd',
+		bulletBrand: '',
+		bulletDiameter: '',
+		bulletDiameterUnit: 'in',
+		bulletWeight: '',
+		bulletWeightUnit: 'gr',
+		bcType: 'G1',
+		bc: '',
+		bulletLength: '',
+		bulletLengthUnit: 'in',
+		velocity: '',
+		velocityUnit: 'fps',
+		temperature: '',
+		temperatureUnit: 'f',
+		tempModifier: ''
 	});
 
-	let spinDrift = $state(initialData.spinDrift ?? false);
-	let tempSensitivity = $state(initialData.tempSensitivity ?? false);
+	let spinDrift = $state(false);
+	let tempSensitivity = $state(false);
+
+	$effect(() => {
+		form.name = initialData.name ?? '';
+		form.barrelTwist = initialData.barrelTwist ?? '';
+		form.barrelTwistUnit = initialData.barrelTwistUnit ?? 'in';
+		form.opticName = initialData.opticName ?? '';
+		form.opticHeight = initialData.opticHeight != null ? String(initialData.opticHeight) : '';
+		form.opticHeightUnit = initialData.opticHeightUnit ?? 'in';
+		form.zeroDist = initialData.zeroDist != null ? String(initialData.zeroDist) : '';
+		form.zeroUnit = initialData.zeroUnit ?? 'yd';
+		form.bulletBrand = initialData.bulletBrand ?? '';
+		form.bulletDiameter = initialData.bulletDiameter != null ? String(initialData.bulletDiameter) : '';
+		form.bulletDiameterUnit = initialData.bulletDiameterUnit ?? 'in';
+		form.bulletWeight = initialData.bulletWeight != null ? String(initialData.bulletWeight) : '';
+		form.bulletWeightUnit = initialData.bulletWeightUnit ?? 'gr';
+		form.bcType = initialData.bcType ?? 'G1';
+		form.bc = initialData.bc != null ? String(initialData.bc) : '';
+		form.bulletLength = initialData.bulletLength != null ? String(initialData.bulletLength) : '';
+		form.bulletLengthUnit = initialData.bulletLengthUnit ?? 'in';
+		form.velocity = initialData.velocity != null ? String(initialData.velocity) : '';
+		form.velocityUnit = initialData.velocityUnit ?? 'fps';
+		form.temperature = initialData.temperature != null ? String(initialData.temperature) : '';
+		form.temperatureUnit = initialData.temperatureUnit ?? 'f';
+		form.tempModifier = initialData.tempModifier != null ? String(initialData.tempModifier) : '';
+		spinDrift = initialData.spinDrift ?? false;
+		tempSensitivity = initialData.tempSensitivity ?? false;
+	});
 
 	let tempModifierUnit = $derived(
 		form.temperatureUnit === 'f' ? m.unit_fps_per_f() : m.unit_fps_per_c()
