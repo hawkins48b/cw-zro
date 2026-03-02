@@ -197,13 +197,6 @@
 	else closeContextMenu();
 }} />
 
-<!-- Page header -->
-<header class="hidden sm:block mb-6">
-	<div class="space-y-1">
-		<h1 class="h1">{m.profiles_title()}</h1>
-		<p class="text-surface-500">{m.profiles_subtitle()}</p>
-	</div>
-</header>
 
 {#if profiles.list.length === 0}
 	<!-- Toolbar with just the add button -->

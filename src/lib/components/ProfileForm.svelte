@@ -8,9 +8,13 @@
 	 * @prop {Function} onCancel()   - Called when the user cancels or presses back.
 	 */
 	import { m } from '$lib/paraglide/messages.js';
-	import { ToggleLeft, ToggleRight } from '@lucide/svelte';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
+	import { localizeHref } from '$lib/paraglide/runtime.js';
+	import { ToggleLeft, ToggleRight, Search } from '@lucide/svelte';
 	import UnitField from '$lib/components/UnitField.svelte';
 	import { validateProfile, isValid, buildAmmoString } from '$lib/utils/profileValidation.js';
+	import { ammoSelection } from '$lib/stores/ammoSelection.svelte.js';
 
 	let { initialData = {}, onSave, onCancel } = $props();
 
@@ -67,6 +71,23 @@
 		form.tempModifier = initialData.tempModifier != null ? String(initialData.tempModifier) : '';
 		spinDrift = initialData.spinDrift ?? false;
 		tempSensitivity = initialData.tempSensitivity ?? false;
+	});
+
+	$effect(() => {
+		const sel = ammoSelection.pending;
+		if (!sel) return;
+		form.bulletBrand = sel.brand;
+		form.bulletDiameter = String(sel.diameter);
+		form.bulletDiameterUnit = sel.diameterUnit.toLowerCase();
+		form.bulletWeight = String(sel.weight);
+		form.bulletWeightUnit = sel.weightUnit.toLowerCase();
+		form.bc = String(sel.ballisticCoefficient);
+		form.bcType = sel.ballisticCoefficientProfile;
+		if (sel.length) {
+			form.bulletLength = String(sel.length);
+			form.bulletLengthUnit = sel.lengthUnit.toLowerCase();
+		}
+		ammoSelection.clear();
 	});
 
 	let tempModifierUnit = $derived(
@@ -197,7 +218,17 @@
 
 	<!-- ── Ammunition ─────────────────────────────────────────── -->
 	<div class="card preset-filled-surface-100-900 p-4 space-y-4">
-		<h2 class="h5 border-b border-surface-200-800 pb-2">{m.profile_section_ammo()}</h2>
+		<div class="flex items-center justify-between border-b border-surface-200-800 pb-2">
+			<h2 class="h5">{m.profile_section_ammo()}</h2>
+			<button
+				type="button"
+				class="btn btn-sm preset-tonal-surface"
+				onclick={() => goto(localizeHref('/profiles/ammo-selector') + '?return=' + page.url.pathname)}
+				title={m.ammo_selector_select()}
+			>
+				<Search class="size-4" />
+			</button>
+		</div>
 
 		<!-- Bullet brand -->
 		<div class="space-y-1.5">

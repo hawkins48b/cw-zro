@@ -7,7 +7,7 @@ const ISA_DEFAULTS = {
 	pressureUnit: 'inhg',
 	temperature: '59',
 	temperatureUnit: 'f',
-	humidity: '78'
+	humidity: '0'
 };
 
 const store = localStore('zro-scope-view', () => ({
@@ -56,10 +56,11 @@ export const scopeView = {
 		store.value = { ...store.value, elevation: { ...store.value.elevation, ...patch } };
 	},
 	setAtmosphere(patch) {
-		store.value = {
-			...store.value,
-			atmosphere: { ...store.value.atmosphere, ...patch }
-		};
+		if (patch.useISA === true) {
+			store.value = { ...store.value, atmosphere: { useISA: true, ...ISA_DEFAULTS } };
+		} else {
+			store.value = { ...store.value, atmosphere: { ...store.value.atmosphere, ...patch } };
+		}
 	},
 	setWind(patch) {
 		store.value = { ...store.value, wind: { ...store.value.wind, ...patch } };

@@ -6,7 +6,8 @@
 		TargetIcon,
 		GitCompareArrowsIcon,
 		ClipboardListIcon,
-		CheckCircleIcon
+		CheckCircleIcon,
+		ChevronRightIcon
 	} from '@lucide/svelte';
 
 	const calculators = [
@@ -22,20 +23,17 @@
 	<title>{m.calculators_title()} — {m.app_name()}</title>
 </svelte:head>
 
-<header class="space-y-2 mb-8 hidden sm:block">
-	<h1 class="h1">{m.calculators_title()}</h1>
-	<p class="text-surface-500">{m.calculators_subtitle()}</p>
-</header>
 
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3 lg:max-w-xl">
 	{#each calculators as calc}
 		{@const Icon = calc.icon}
-		<a href={localizeHref(calc.href)} class="card p-4 hover:preset-tonal-primary flex items-start gap-4">
-			<Icon class="size-8 text-primary-500 shrink-0" />
-			<div>
-				<h3 class="h4">{m[calc.labelKey]()}</h3>
-				<p class="text-sm text-surface-500">{m[calc.descKey]()}</p>
+		<a href={localizeHref(calc.href)} class="card p-4 hover:preset-tonal-primary flex items-center gap-4">
+			<Icon class="size-6 text-primary-500 shrink-0" />
+			<div class="flex-1 min-w-0">
+				<div class="font-medium">{m[calc.labelKey]()}</div>
+				<p class="text-sm text-surface-500 hidden lg:block">{m[calc.descKey]()}</p>
 			</div>
+			<ChevronRightIcon class="size-5 text-surface-400 shrink-0" />
 		</a>
 	{/each}
 </div>

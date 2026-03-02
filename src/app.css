@@ -4,3 +4,4 @@
 @import '$lib/themes/zro.css';
 
 @custom-variant dark (&:where(.dark, .dark *));
+@custom-variant landscape (@media (orientation: landscape));

@@ -16,6 +16,7 @@
 	let showElevation = $state(false);
 	import DistanceInput from '$lib/components/DistanceInput.svelte';
 	import WindInput from '$lib/components/WindInput.svelte';
+	import AtmosphereCard from '$lib/components/AtmosphereCard.svelte';
 	import ScopeReticle from '$lib/components/ScopeReticle.svelte';
 	import { activeProfile } from '$lib/stores/activeProfile.svelte.js';
 	import { scopeView } from '$lib/stores/scopeView.svelte.js';
@@ -88,11 +89,6 @@
 	<title>{m.scope_view_title()} — {m.app_name()}</title>
 </svelte:head>
 
-<!-- Page header (desktop only) -->
-<header class="space-y-2 mb-6 hidden sm:block">
-	<h1 class="h1">{m.scope_view_title()}</h1>
-	<p class="text-surface-500">{m.scope_view_subtitle()}</p>
-</header>
 
 <!-- ── Main grid ─────────────────────────────────────────────────── -->
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -161,121 +157,10 @@
 		</div>
 
 		<!-- Atmosphere -->
-		<div class="card preset-filled-surface-100-900 p-4 space-y-4">
-			<div class="border-b border-surface-200-800 pb-2">
-				<label class="flex items-center gap-2 cursor-pointer select-none">
-					<input
-						type="checkbox"
-						class="checkbox"
-						checked={scopeView.atmosphere.useISA}
-						onchange={(e) => scopeView.setAtmosphere({ useISA: e.target.checked })}
-					/>
-					<span class="text-sm">{m.scope_view_use_isa()}</span>
-				</label>
-			</div>
-
-			{#if !scopeView.atmosphere.useISA}
-				<!-- Altitude -->
-				<div class="space-y-1.5">
-					<span class="text-sm font-medium">{m.scope_view_altitude()}</span>
-					<div class="input !flex !items-center gap-2">
-						<input
-							class="flex-1 min-w-0 bg-transparent border-none outline-none shadow-none p-0"
-							type="text"
-							inputmode="decimal"
-							value={scopeView.atmosphere.altitude}
-							oninput={(e) => scopeView.setAtmosphere({ altitude: e.target.value })}
-						/>
-						<div class="flex items-center gap-1 shrink-0">
-							{#each [{ value: 'ft', label: m.unit_ft() }, { value: 'm', label: m.unit_m() }] as opt}
-								<button
-									type="button"
-									class="chip text-xs {scopeView.atmosphere.altitudeUnit === opt.value
-										? 'preset-filled-primary-500'
-										: 'preset-tonal-surface'}"
-									onclick={() => scopeView.setAtmosphere({ altitudeUnit: opt.value })}
-								>
-									{opt.label}
-								</button>
-							{/each}
-						</div>
-					</div>
-				</div>
-
-				<!-- Pressure -->
-				<div class="space-y-1.5">
-					<span class="text-sm font-medium">{m.scope_view_pressure()}</span>
-					<div class="input !flex !items-center gap-2">
-						<input
-							class="flex-1 min-w-0 bg-transparent border-none outline-none shadow-none p-0"
-							type="text"
-							inputmode="decimal"
-							value={scopeView.atmosphere.pressure}
-							oninput={(e) => scopeView.setAtmosphere({ pressure: e.target.value })}
-						/>
-						<div class="flex items-center gap-1 shrink-0">
-							{#each [{ value: 'inhg', label: m.unit_inhg() }, { value: 'hpa', label: m.unit_hpa() }] as opt}
-								<button
-									type="button"
-									class="chip text-xs {scopeView.atmosphere.pressureUnit === opt.value
-										? 'preset-filled-primary-500'
-										: 'preset-tonal-surface'}"
-									onclick={() => scopeView.setAtmosphere({ pressureUnit: opt.value })}
-								>
-									{opt.label}
-								</button>
-							{/each}
-						</div>
-					</div>
-				</div>
-
-				<!-- Temperature -->
-				<div class="space-y-1.5">
-					<span class="text-sm font-medium">{m.scope_view_atmo_temp()}</span>
-					<div class="input !flex !items-center gap-2">
-						<input
-							class="flex-1 min-w-0 bg-transparent border-none outline-none shadow-none p-0"
-							type="text"
-							inputmode="decimal"
-							value={scopeView.atmosphere.temperature}
-							oninput={(e) => scopeView.setAtmosphere({ temperature: e.target.value })}
-						/>
-						<div class="flex items-center gap-1 shrink-0">
-							{#each [{ value: 'f', label: m.unit_f() }, { value: 'c', label: m.unit_c() }] as opt}
-								<button
-									type="button"
-									class="chip text-xs {scopeView.atmosphere.temperatureUnit === opt.value
-										? 'preset-filled-primary-500'
-										: 'preset-tonal-surface'}"
-									onclick={() => scopeView.setAtmosphere({ temperatureUnit: opt.value })}
-								>
-									{opt.label}
-								</button>
-							{/each}
-						</div>
-					</div>
-				</div>
-
-				<!-- Humidity -->
-				<div class="space-y-1.5">
-					<span class="text-sm font-medium">{m.scope_view_humidity()}</span>
-					<div class="input !flex !items-center gap-2">
-						<input
-							class="flex-1 min-w-0 bg-transparent border-none outline-none shadow-none p-0"
-							type="text"
-							inputmode="decimal"
-							value={scopeView.atmosphere.humidity}
-							oninput={(e) => scopeView.setAtmosphere({ humidity: e.target.value })}
-						/>
-						<span class="text-surface-500 text-sm select-none shrink-0">%</span>
-					</div>
-				</div>
-			{:else}
-				<p class="text-sm text-surface-500-400">
-					ICAO — 0 {m.unit_ft()}, 29.92 {m.unit_inhg()}, 59 {m.unit_f()}, 78%
-				</p>
-			{/if}
-		</div>
+		<AtmosphereCard
+			atmosphere={scopeView.atmosphere}
+			onchange={(patch) => scopeView.setAtmosphere(patch)}
+		/>
 	</div>
 
 	<!-- ═══ RIGHT: Adjustments + Reticle ═══════════════════════════ -->
