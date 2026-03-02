@@ -11,7 +11,6 @@
 </svelte:head>
 
 <ProfileForm
-	title={m.profiles_new()}
 	onSave={(data) => {
 		profiles.add(data);
 		goto(localizeHref('/profiles'));

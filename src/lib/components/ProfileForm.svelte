@@ -8,11 +8,11 @@
 	 * @prop {Function} onCancel()   - Called when the user cancels or presses back.
 	 */
 	import { m } from '$lib/paraglide/messages.js';
-	import { ChevronLeft, Check, ToggleLeft, ToggleRight } from '@lucide/svelte';
+	import { ToggleLeft, ToggleRight } from '@lucide/svelte';
 	import UnitField from '$lib/components/UnitField.svelte';
 	import { validateProfile, isValid, buildAmmoString } from '$lib/utils/profileValidation.js';
 
-	let { title, initialData = {}, onSave, onCancel } = $props();
+	let { initialData = {}, onSave, onCancel } = $props();
 
 	let form = $state({
 		name: '',
@@ -101,35 +101,6 @@
 		});
 	}
 </script>
-
-<!-- Page header -->
-<header class="flex items-center gap-3 mb-6">
-	<button
-		type="button"
-		class="btn btn-icon preset-tonal-surface shrink-0"
-		title={m.common_back()}
-		onclick={onCancel}
-	>
-		<ChevronLeft class="size-5" />
-	</button>
-	<h1 class="h3 flex-1">{title}</h1>
-	<button
-		type="button"
-		class="btn btn-icon preset-filled-primary-500 shrink-0 sm:hidden"
-		title={m.common_save()}
-		onclick={save}
-	>
-		<Check class="size-5" />
-	</button>
-	<div class="hidden sm:flex gap-2">
-		<button type="button" class="btn preset-tonal-surface" onclick={onCancel}>
-			{m.common_cancel()}
-		</button>
-		<button type="button" class="btn preset-filled-primary-500" onclick={save}>
-			{m.common_save()}
-		</button>
-	</div>
-</header>
 
 <form class="space-y-4 max-w-lg" onsubmit={(e) => { e.preventDefault(); save(); }}>
 
@@ -338,8 +309,8 @@
 		{/if}
 	</div>
 
-	<!-- Mobile save / cancel footer -->
-	<div class="flex gap-2 sm:hidden pb-4">
+	<!-- Save / cancel footer -->
+	<div class="flex gap-2 pb-4">
 		<button type="button" class="btn preset-tonal-surface flex-1" onclick={onCancel}>
 			{m.common_cancel()}
 		</button>

@@ -82,20 +82,26 @@ export function calculateShotPoint(profile, range, atmosphere, wind) {
 		// --- Atmosphere ---
 		let atmo;
 		if (atmosphere) {
+			const altVal = parseFloat(atmosphere.altitude);
+			const pressVal = parseFloat(atmosphere.pressure);
+			const tempVal = parseFloat(atmosphere.temperature);
+			const humVal = parseFloat(atmosphere.humidity);
+
+			// All values must be finite; pressure must be positive; humidity 0–100
+			if (
+				!isFinite(altVal) ||
+				!isFinite(pressVal) || pressVal <= 0 ||
+				!isFinite(tempVal) ||
+				!isFinite(humVal) || humVal < 0 || humVal > 100
+			) return null;
+
 			const altitude =
-				atmosphere.altitudeUnit === 'm'
-					? UNew.Meter(parseFloat(atmosphere.altitude))
-					: UNew.Foot(parseFloat(atmosphere.altitude));
+				atmosphere.altitudeUnit === 'm' ? UNew.Meter(altVal) : UNew.Foot(altVal);
 			const pressure =
-				atmosphere.pressureUnit === 'hpa'
-					? UNew.hPa(parseFloat(atmosphere.pressure))
-					: UNew.InHg(parseFloat(atmosphere.pressure));
+				atmosphere.pressureUnit === 'hpa' ? UNew.hPa(pressVal) : UNew.InHg(pressVal);
 			const temperature =
-				atmosphere.temperatureUnit === 'c'
-					? UNew.Celsius(parseFloat(atmosphere.temperature))
-					: UNew.Fahrenheit(parseFloat(atmosphere.temperature));
-			const humidity = parseFloat(atmosphere.humidity);
-			atmo = new Atmo({ altitude, pressure, temperature, humidity });
+				atmosphere.temperatureUnit === 'c' ? UNew.Celsius(tempVal) : UNew.Fahrenheit(tempVal);
+			atmo = new Atmo({ altitude, pressure, temperature, humidity: humVal });
 		} else {
 			atmo = new Atmo(); // ICAO standard atmosphere
 		}

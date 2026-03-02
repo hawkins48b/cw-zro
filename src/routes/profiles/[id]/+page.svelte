@@ -15,7 +15,6 @@
 
 {#if profile}
 	<ProfileForm
-		title={m.profiles_edit()}
 		initialData={profile}
 		onSave={(data) => {
 			profiles.update(page.params.id, data);
