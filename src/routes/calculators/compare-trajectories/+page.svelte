@@ -214,9 +214,9 @@
 			{#if resolvedEntries.length > 0}
 				<div class="grid gap-2">
 					{#each resolvedEntries as entry, i}
-						<div class="card preset-tonal-primary p-3 space-y-2">
+						<div class="card preset-tonal-primary p-2 sm:p-3 overflow-hidden">
 							<!-- Header: color dot + name + remove -->
-							<div class="flex items-center gap-3">
+							<div class="flex items-center gap-2">
 								<span
 									class="size-3 rounded-full shrink-0"
 									style="background-color: {CHART_COLORS[i % CHART_COLORS.length]}"
@@ -236,28 +236,25 @@
 							</div>
 
 							<!-- Zero distance override -->
-							<div class="space-y-1.5">
-								<span class="text-xs font-medium opacity-70">{m.compare_zero_override()}</span>
-								<div class="input !flex !items-center gap-2">
-									<input
-										class="flex-1 min-w-0 bg-transparent border-none outline-none shadow-none p-0"
-										type="text"
-										inputmode="decimal"
-										placeholder={String(entry.profile.zeroDist)}
-										value={entry.zeroDist}
-										oninput={(e) => compareTrajectories.updateEntry(entry.id, { zeroDist: e.target.value })}
-									/>
-									<div class="flex items-center gap-1 shrink-0">
-										{#each [{ value: 'yd', label: m.unit_yd() }, { value: 'm', label: m.unit_m() }] as opt}
-											<button
-												type="button"
-												class="chip text-xs {entry.zeroUnit === opt.value
-													? 'preset-filled-primary-500'
-													: 'preset-tonal-surface'}"
-												onclick={() => compareTrajectories.updateEntry(entry.id, { zeroUnit: opt.value })}
-											>{opt.label}</button>
-										{/each}
-									</div>
+							<div class="mt-1.5 input !flex !items-center gap-1.5">
+								<input
+									class="flex-1 min-w-0 bg-transparent border-none outline-none shadow-none p-0 text-right"
+									type="text"
+									inputmode="decimal"
+									placeholder={String(entry.profile.zeroDist)}
+									value={entry.zeroDist}
+									oninput={(e) => compareTrajectories.updateEntry(entry.id, { zeroDist: e.target.value })}
+								/>
+								<div class="flex items-center gap-1 shrink-0">
+									{#each [{ value: 'yd', label: m.unit_yd() }, { value: 'm', label: m.unit_m() }] as opt}
+										<button
+											type="button"
+											class="chip text-xs {entry.zeroUnit === opt.value
+												? 'preset-filled-primary-500'
+												: 'preset-tonal-surface'}"
+											onclick={() => compareTrajectories.updateEntry(entry.id, { zeroUnit: opt.value })}
+										>{opt.label}</button>
+									{/each}
 								</div>
 							</div>
 						</div>

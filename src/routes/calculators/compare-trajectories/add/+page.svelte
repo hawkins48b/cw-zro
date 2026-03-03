@@ -3,7 +3,8 @@
 	import { localizeHref } from '$lib/paraglide/runtime';
 	import { profiles } from '$lib/stores/profiles.svelte.js';
 	import { compareTrajectories } from '$lib/stores/compareTrajectories.svelte.js';
-	import { Crosshair, ArrowUp, ArrowDown, Search, Check, Plus } from '@lucide/svelte';
+	import { goto } from '$app/navigation';
+	import { Crosshair, ArrowUp, ArrowDown, Search, Plus } from '@lucide/svelte';
 	import { fly } from 'svelte/transition';
 
 	// ── Sort & search ───────────────────────────────────────────────
@@ -47,9 +48,6 @@
 		);
 	});
 
-	// ── Set of already-added profile IDs ────────────────────────────
-	let addedIds = $derived(new Set(compareTrajectories.entries.map((e) => e.profileId)));
-
 	function handleSortClick(value) {
 		if (value === sortBy) {
 			sortDesc = !sortDesc;
@@ -71,6 +69,7 @@
 			String(profile.zeroDist ?? '100'),
 			profile.zeroUnit ?? 'yd'
 		);
+		goto(localizeHref('/calculators/compare-trajectories'));
 	}
 
 	function profileZeroLabel(profile) {
@@ -141,31 +140,22 @@
 		{:else}
 			<div class="grid gap-2 max-w-2xl">
 				{#each filteredProfiles as profile}
-					{@const alreadyAdded = addedIds.has(profile.id)}
 					<button
 						type="button"
-						class="card text-left transition-colors
-							{alreadyAdded
-								? 'preset-tonal-primary'
-								: 'preset-outlined-surface-200-800 bg-surface-50-950 hover:preset-tonal-primary'}"
+						class="card text-left transition-colors preset-outlined-surface-200-800 bg-surface-50-950 hover:preset-tonal-primary"
 						onclick={() => addProfile(profile.id)}
 					>
 						<div class="p-3 flex items-start gap-3">
 							<div class="flex-1 min-w-0">
 								<p class="font-semibold leading-snug">{profile.name}</p>
-								<p class="text-sm mt-0.5 {alreadyAdded ? 'opacity-70' : 'text-surface-500'}">{profile.ammo}</p>
+								<p class="text-sm mt-0.5 text-surface-500">{profile.ammo}</p>
 							</div>
-							{#if alreadyAdded}
-								<Check class="size-5 shrink-0 mt-0.5" />
-							{:else}
-								<Plus class="size-5 text-surface-400 shrink-0 mt-0.5" />
-							{/if}
+							<Plus class="size-5 text-surface-400 shrink-0 mt-0.5" />
 						</div>
-						<div class="border-t px-3 py-2 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 text-sm
-							{alreadyAdded ? 'border-primary-500/20 opacity-70' : 'border-surface-200-800 text-surface-500'}">
+						<div class="border-t px-3 py-2 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 text-sm border-surface-200-800 text-surface-500">
 							<Crosshair class="size-3.5" />
 							<span class="truncate">{profile.optic}</span>
-							<span class="chip text-xs font-semibold {alreadyAdded ? 'preset-filled-primary-500' : 'preset-tonal-primary'}">
+							<span class="chip text-xs font-semibold preset-tonal-primary">
 								{profileZeroLabel(profile)}
 							</span>
 						</div>
