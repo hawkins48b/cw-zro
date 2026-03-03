@@ -88,7 +88,7 @@
 
 			const distUnit = isMetric ? Unit.Meter : Unit.Yard;
 			const yUnit = getYUnit(yAxisKey);
-			const data = (result.chartPoints ?? []).map((p) => ({
+			const data = (result.trajectory ?? []).map((p) => ({
 				x: Math.round(p.distance.In(distUnit) * 10) / 10,
 				y: Math.round(p.targetDrop.In(yUnit) * 100) / 100
 			}));
