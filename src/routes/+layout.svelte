@@ -51,6 +51,8 @@
 		if (path.startsWith('/profiles/ammo-selector')) return m.ammo_selector_title();
 		if (path.startsWith('/profiles/')) return m.profiles_edit();
 		if (path.startsWith('/profiles')) return m.profiles_title();
+		if (path.startsWith('/calculators/compare-trajectories/add')) return m.compare_pick_profile();
+		if (path.startsWith('/calculators/compare-trajectories')) return m.compare_title();
 		if (path.startsWith('/calculators/ballistic')) return m.ballistic_title();
 		if (path.startsWith('/calculators')) return m.calculators_title();
 		if (path.startsWith('/settings/about')) return m.about_title();

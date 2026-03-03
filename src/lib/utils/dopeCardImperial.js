@@ -36,7 +36,7 @@ export async function generateImperialDopeCard(profile) {
 
 	function fillHeader() {
 		// Weapon name
-		drawText(profile.rifleDesignation ?? '', 1.88, 0.59, 11);
+		drawText(profile.name ?? '', 1.88, 0.59, 11);
 		// Ammo brand
 		drawText(profile.bulletBrand ?? '', 4, 0.59, 11);
 		// Near zero (profile zero distance in yd)

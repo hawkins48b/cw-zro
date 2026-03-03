@@ -16,7 +16,8 @@ const store = localStore('zro-scope-view', () => ({
 	atmosphere: { useISA: true, ...ISA_DEFAULTS },
 	wind: { speed: '0', speedUnit: 'mph', direction: '90' },
 	adjustments: { elevation: 'MOA', windage: 'MOA', link: true },
-	reticleType: 'mil-dot'
+	reticleType: 'mil-dot',
+	rotation: 0
 }));
 
 // One-time migration: convert stored clock direction to degrees
@@ -48,6 +49,9 @@ export const scopeView = {
 	get reticleType() {
 		return store.value.reticleType ?? 'mil-dot';
 	},
+	get rotation() {
+		return store.value.rotation ?? 0;
+	},
 
 	setRange(patch) {
 		store.value = { ...store.value, range: { ...store.value.range, ...patch } };
@@ -67,6 +71,12 @@ export const scopeView = {
 	},
 	setReticleType(type) {
 		store.value = { ...store.value, reticleType: type };
+	},
+	setRotation(angle) {
+		store.value = { ...store.value, rotation: angle };
+	},
+	resetRotation() {
+		store.value = { ...store.value, rotation: 0 };
 	},
 	setAdjustments(patch) {
 		const cur = store.value.adjustments;

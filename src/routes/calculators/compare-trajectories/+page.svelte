@@ -1,12 +1,13 @@
 <script>
 	import { onMount } from 'svelte';
 	import { m } from '$lib/paraglide/messages.js';
+	import { localizeHref } from '$lib/paraglide/runtime';
 	import { profiles } from '$lib/stores/profiles.svelte.js';
 	import { settings } from '$lib/stores/settings.svelte.js';
 	import { compareTrajectories } from '$lib/stores/compareTrajectories.svelte.js';
 	import { calculateFullTrajectory } from '$lib/utils/ballisticCalculator.js';
 	import { Unit } from 'js-ballistics';
-	import { Plus, X, Crosshair } from '@lucide/svelte';
+	import { Plus, X } from '@lucide/svelte';
 
 	// ── ApexCharts (lazy-loaded, browser-only) ───────────────────────
 	let ApexCharts = $state(null);
@@ -16,17 +17,6 @@
 		const mod = await import('apexcharts');
 		ApexCharts = mod.default;
 	});
-
-	// ── Add a profile to the entries list ────────────────────────────
-	function addProfile(profileId) {
-		const profile = profiles.get(profileId);
-		if (!profile) return;
-		compareTrajectories.addEntry(
-			profileId,
-			String(profile.zeroDist ?? '100'),
-			profile.zeroUnit ?? 'yd'
-		);
-	}
 
 	// ── Chart unit helpers ───────────────────────────────────────────
 	const Y_AXIS_OPTIONS = [
@@ -205,89 +195,78 @@
 		</div>
 	{:else}
 
-		<!-- ═══ Profile selector (card-based, like /profiles) ════════ -->
-		<div class="space-y-2">
-			<span class="text-sm font-medium">{m.compare_add_profile()}</span>
-			<div class="grid gap-2 max-w-2xl">
-				{#each profiles.list as profile}
-					<button
-						type="button"
-						class="card preset-outlined-surface-200-800 bg-surface-50-950 text-left hover:preset-tonal-primary transition-colors"
-						onclick={() => addProfile(profile.id)}
-					>
-						<div class="p-3 flex items-start gap-3">
-							<div class="flex-1 min-w-0">
-								<p class="font-semibold leading-snug">{profile.name}</p>
-								<p class="text-sm mt-0.5 text-surface-500">{profile.ammo}</p>
-							</div>
-							<Plus class="size-5 text-surface-400 shrink-0 mt-0.5" />
-						</div>
-						<div class="border-t border-surface-200-800 px-3 py-2 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 text-sm text-surface-500">
-							<Crosshair class="size-3.5" />
-							<span class="truncate">{profile.optic}</span>
-							<span class="chip text-xs font-semibold preset-tonal-primary">
-								{profileZeroLabel(profile)}
-							</span>
-						</div>
-					</button>
-				{/each}
+		<!-- ═══ Selected entries ════════════════════════════════════ -->
+		<div class="space-y-2 max-w-2xl">
+			<div class="flex items-center gap-2">
+				<span class="text-sm font-medium flex-1">{m.compare_selected()}</span>
+				{#if resolvedEntries.length > 0}
+					<span class="chip text-xs preset-filled-primary-500">{resolvedEntries.length}</span>
+				{/if}
+				<a
+					href={localizeHref('/calculators/compare-trajectories/add')}
+					class="btn btn-icon preset-filled-primary-500 shrink-0"
+					title={m.compare_add_profile()}
+				>
+					<Plus class="size-5" />
+				</a>
 			</div>
-		</div>
 
-		<!-- ═══ Entries list with editable zero ══════════════════════ -->
-		{#if resolvedEntries.length > 0}
-			<div class="space-y-2">
-				{#each resolvedEntries as entry, i}
-					<div class="card preset-filled-surface-100-900 p-3 space-y-2">
-						<!-- Header: color dot + name + remove -->
-						<div class="flex items-center gap-3">
-							<span
-								class="size-3 rounded-full shrink-0"
-								style="background-color: {CHART_COLORS[i % CHART_COLORS.length]}"
-							></span>
-							<div class="flex-1 min-w-0">
-								<p class="text-sm font-semibold truncate">{entry.profile.name}</p>
-								<p class="text-xs text-surface-500-400 truncate">{entry.profile.ammo}</p>
+			{#if resolvedEntries.length > 0}
+				<div class="grid gap-2">
+					{#each resolvedEntries as entry, i}
+						<div class="card preset-tonal-primary p-3 space-y-2">
+							<!-- Header: color dot + name + remove -->
+							<div class="flex items-center gap-3">
+								<span
+									class="size-3 rounded-full shrink-0"
+									style="background-color: {CHART_COLORS[i % CHART_COLORS.length]}"
+								></span>
+								<div class="flex-1 min-w-0">
+									<p class="text-sm font-semibold truncate">{entry.profile.name}</p>
+									<p class="text-xs opacity-70 truncate">{entry.profile.ammo}</p>
+								</div>
+								<button
+									type="button"
+									class="btn btn-icon btn-sm preset-tonal-error shrink-0"
+									title={m.compare_remove()}
+									onclick={() => compareTrajectories.removeEntry(entry.id)}
+								>
+									<X class="size-4" />
+								</button>
 							</div>
-							<button
-								type="button"
-								class="btn btn-icon btn-sm preset-tonal-error shrink-0"
-								title={m.compare_remove()}
-								onclick={() => compareTrajectories.removeEntry(entry.id)}
-							>
-								<X class="size-4" />
-							</button>
-						</div>
 
-						<!-- Zero distance override -->
-						<div class="space-y-1.5">
-							<span class="text-xs font-medium text-surface-500-400">{m.compare_zero_override()}</span>
-							<div class="input !flex !items-center gap-2">
-								<input
-									class="flex-1 min-w-0 bg-transparent border-none outline-none shadow-none p-0"
-									type="text"
-									inputmode="decimal"
-									placeholder={String(entry.profile.zeroDist)}
-									value={entry.zeroDist}
-									oninput={(e) => compareTrajectories.updateEntry(entry.id, { zeroDist: e.target.value })}
-								/>
-								<div class="flex items-center gap-1 shrink-0">
-									{#each [{ value: 'yd', label: m.unit_yd() }, { value: 'm', label: m.unit_m() }] as opt}
-										<button
-											type="button"
-											class="chip text-xs {entry.zeroUnit === opt.value
-												? 'preset-filled-primary-500'
-												: 'preset-tonal-surface'}"
-											onclick={() => compareTrajectories.updateEntry(entry.id, { zeroUnit: opt.value })}
-										>{opt.label}</button>
-									{/each}
+							<!-- Zero distance override -->
+							<div class="space-y-1.5">
+								<span class="text-xs font-medium opacity-70">{m.compare_zero_override()}</span>
+								<div class="input !flex !items-center gap-2">
+									<input
+										class="flex-1 min-w-0 bg-transparent border-none outline-none shadow-none p-0"
+										type="text"
+										inputmode="decimal"
+										placeholder={String(entry.profile.zeroDist)}
+										value={entry.zeroDist}
+										oninput={(e) => compareTrajectories.updateEntry(entry.id, { zeroDist: e.target.value })}
+									/>
+									<div class="flex items-center gap-1 shrink-0">
+										{#each [{ value: 'yd', label: m.unit_yd() }, { value: 'm', label: m.unit_m() }] as opt}
+											<button
+												type="button"
+												class="chip text-xs {entry.zeroUnit === opt.value
+													? 'preset-filled-primary-500'
+													: 'preset-tonal-surface'}"
+												onclick={() => compareTrajectories.updateEntry(entry.id, { zeroUnit: opt.value })}
+											>{opt.label}</button>
+										{/each}
+									</div>
 								</div>
 							</div>
 						</div>
-					</div>
-				{/each}
-			</div>
-		{/if}
+					{/each}
+				</div>
+			{:else}
+				<p class="text-sm text-surface-500-400 text-center py-4">{m.compare_no_entries()}</p>
+			{/if}
+		</div>
 
 		<!-- ═══ Chart controls ═══════════════════════════════════════ -->
 		<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -340,8 +319,6 @@
 				<h2 class="font-semibold">{m.compare_chart_title()}</h2>
 				<div bind:this={chartEl}></div>
 			</div>
-		{:else if resolvedEntries.length === 0}
-			<p class="text-sm text-surface-500-400 text-center py-4">{m.compare_no_entries()}</p>
 		{/if}
 
 	{/if}

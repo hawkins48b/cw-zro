@@ -7,9 +7,11 @@ import { Calculator, Weapon, DragModel, Ammo, Atmo, Wind, Shot, UNew, Table, Uni
  * @param {object} range   - { distance: string|number, unit: 'yd'|'m' }
  * @param {object|null} atmosphere - custom atmo or null for ISA
  * @param {object} wind    - { speed, speedUnit: 'mph'|'mps', direction, directionUnit: 'clock'|'deg' }
+ * @param {object} [options] - optional settings
+ * @param {number} [options.cantAngle=0] - rifle cant angle in degrees
  * @returns {TrajectoryData|null} last trajectory point or null on error
  */
-export function calculateShotPoint(profile, range, atmosphere, wind) {
+export function calculateShotPoint(profile, range, atmosphere, wind, options = {}) {
 	try {
 		const dist = Math.abs(parseFloat(range.distance));
 		if (!dist || dist <= 0) return null;
@@ -128,7 +130,8 @@ export function calculateShotPoint(profile, range, atmosphere, wind) {
 			range.unit === 'm' ? UNew.Meter(dist) : UNew.Yard(dist);
 
 		// --- Compute ---
-		const shot = new Shot({ weapon, ammo, atmo, winds });
+		const cantDeg = options.cantAngle ?? 0;
+		const shot = new Shot({ weapon, ammo, atmo, winds, cantAngle: cantDeg !== 0 ? UNew.Degree(cantDeg) : undefined });
 		const calc = new Calculator();
 		calc.setWeaponZero(shot, zeroDistance);
 		const result = calc.fire({ shot, trajectoryRange, trajectoryStep: trajectoryRange });

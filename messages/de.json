@@ -156,6 +156,8 @@
 	"scope_view_reticle_mrad": "MRAD",
 	"scope_view_aim_point": "Haltepunkt",
 	"scope_view_aim_out_of_view": "Außerhalb",
+	"scope_view_rotation": "Verkantung",
+	"scope_view_rotation_reset": "Verkantung zurücksetzen",
 
 	"about_title": "Über",
 	"about_version": "Version {version}",
@@ -303,6 +305,7 @@
 
 	"compare_title": "Trajektorien vergleichen",
 	"compare_add_profile": "Profil hinzufügen",
+	"compare_pick_profile": "Profil auswählen",
 	"compare_select_profile": "Profil auswählen",
 	"compare_zero_override": "Nulldistanz",
 	"compare_zero_hint": "Nulldistanz für diesen Eintrag überschreiben",
@@ -312,6 +315,7 @@
 	"compare_max_dist": "Max. Distanz",
 	"compare_y_axis": "Y-Achse",
 	"compare_chart_title": "Trajektorienvergleich",
+	"compare_selected": "Ausgewählt",
 	"unit_feet": "Fuß",
 
 	"ammo_selector_title": "Munitionsbibliothek",

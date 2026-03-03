@@ -156,6 +156,8 @@
 	"scope_view_reticle_mrad": "MRAD",
 	"scope_view_aim_point": "Point de visée",
 	"scope_view_aim_out_of_view": "Hors champ",
+	"scope_view_rotation": "Inclinaison",
+	"scope_view_rotation_reset": "Réinitialiser l'inclinaison",
 
 	"about_title": "À propos",
 	"about_version": "Version {version}",
@@ -303,6 +305,7 @@
 
 	"compare_title": "Comparer les trajectoires",
 	"compare_add_profile": "Ajouter un profil",
+	"compare_pick_profile": "Choisir un profil",
 	"compare_select_profile": "Sélectionner un profil",
 	"compare_zero_override": "Distance de mise à zéro",
 	"compare_zero_hint": "Remplacer la distance de zéro pour cette entrée",
@@ -312,6 +315,7 @@
 	"compare_max_dist": "Distance max.",
 	"compare_y_axis": "Axe Y",
 	"compare_chart_title": "Comparaison de trajectoires",
+	"compare_selected": "Sélectionnés",
 	"unit_feet": "pieds",
 
 	"ammo_selector_title": "Bibliothèque munitions",

@@ -3,6 +3,7 @@
 	import { getElevationValue, getWindageValue } from '$lib/utils/ballisticCalculator.js';
 	import { scopeView } from '$lib/stores/scopeView.svelte.js';
 	import { settings } from '$lib/stores/settings.svelte.js';
+	import { RotateCcw } from '@lucide/svelte';
 
 	let { point = null } = $props();
 
@@ -179,7 +180,10 @@
 				</g>
 			{/if}
 
-			<!-- ═══════════════ RED DOT ═══════════════════════════════ -->
+			<!-- ═══════════════ ROTATED RETICLE GROUP ═══════════════════ -->
+		<g transform="rotate({scopeView.rotation}, {CX}, {CY})">
+
+		<!-- ═══════════════ RED DOT ═══════════════════════════════ -->
 			{#if scopeView.reticleType === 'red-dot'}
 				<g clip-path="url(#scope-glass-clip)">
 					<!-- Very faint reference lines for orientation -->
@@ -377,6 +381,8 @@
 				</g>
 			{/if}
 
+		</g><!-- END rotated reticle group -->
+
 			<!-- ── Vignette overlay (applied over all reticle types) ── -->
 			<circle cx={CX} cy={CY} r={R} fill="url(#scope-vignette)" />
 
@@ -411,6 +417,7 @@
 				<text x={lx} y={ly + 22} text-anchor={anchor} font-size="16" font-family="monospace" font-weight="bold" class={windClass}>{windArrow} {windWord} {windVal}</text>
 			</g>
 		{/if}
+
 		</svg>
 	</div>
 
@@ -436,5 +443,34 @@
 				1 interval = 1 MOA
 			{/if}
 		</span>
+	</div>
+
+	<!-- Rotation (cant) dial -->
+	<div class="space-y-2">
+		<div class="flex items-center gap-3">
+			<span class="text-xs text-surface-500-400 shrink-0">{m.scope_view_rotation()}</span>
+			<input
+				type="range"
+				min="-90"
+				max="90"
+				step="1"
+				value={scopeView.rotation}
+				oninput={(e) => scopeView.setRotation(Number(e.target.value))}
+				class="flex-1 accent-primary-500"
+			/>
+			<span class="text-xs font-mono w-10 text-right tabular-nums">{scopeView.rotation}°</span>
+		</div>
+		<div class="flex justify-center">
+			<button
+				type="button"
+				class="btn btn-sm preset-tonal-surface"
+				title={m.scope_view_rotation_reset()}
+				disabled={scopeView.rotation === 0}
+				onclick={() => scopeView.resetRotation()}
+			>
+				<RotateCcw class="size-4" />
+				<span class="text-xs">{m.scope_view_rotation_reset()}</span>
+			</button>
+		</div>
 	</div>
 </div>

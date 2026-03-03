@@ -50,6 +50,13 @@
 		return calculateShotPoint(profile, effectiveRange, atmoParams, scopeView.wind);
 	});
 
+	let cantedPoint = $derived.by(() => {
+		if (!scopeView.rotation) return point;
+		const profile = activeProfile.profile;
+		if (!profile || !effectiveRange) return null;
+		return calculateShotPoint(profile, effectiveRange, atmoParams, scopeView.wind, { cantAngle: scopeView.rotation });
+	});
+
 	let elevValue = $derived(getElevationValue(point, scopeView.adjustments.elevation));
 	let windValue = $derived(getWindageValue(point, scopeView.adjustments.windage));
 
@@ -307,6 +314,6 @@
 		</div>
 
 		<!-- ── Scope Reticle ─────────────────────────────────────── -->
-		<ScopeReticle {point} />
+		<ScopeReticle point={cantedPoint} />
 	</div>
 </div>

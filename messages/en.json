@@ -156,6 +156,8 @@
 	"scope_view_reticle_mrad": "MRAD",
 	"scope_view_aim_point": "Hold point",
 	"scope_view_aim_out_of_view": "Out of view",
+	"scope_view_rotation": "Cant",
+	"scope_view_rotation_reset": "Reset cant angle",
 
 	"about_title": "About",
 	"about_version": "Version {version}",
@@ -303,6 +305,7 @@
 
 	"compare_title": "Compare Trajectories",
 	"compare_add_profile": "Add Profile",
+	"compare_pick_profile": "Pick profile",
 	"compare_select_profile": "Select a profile",
 	"compare_zero_override": "Zero Distance",
 	"compare_zero_hint": "Override zero distance for this entry",
@@ -312,6 +315,7 @@
 	"compare_max_dist": "Max Distance",
 	"compare_y_axis": "Y Axis",
 	"compare_chart_title": "Trajectory Comparison",
+	"compare_selected": "Selected",
 	"unit_feet": "feet",
 
 	"ammo_selector_title": "Ammo Library",
