@@ -22,7 +22,14 @@ const validForm = {
 	bulletLength: '',
 	// temp fields (not required when tempSensitivity=false)
 	temperature: '',
-	tempModifier: ''
+	tempModifier: '',
+	// click adjustment fields
+	elevationClickValue: '0.5',
+	elevationClickUnit: 'MOA',
+	windageClickValue: '0.5',
+	windageClickUnit: 'MOA',
+	clickLink: true,
+	reticleType: 'red-dot'
 };
 
 // ── validateProfile ────────────────────────────────────────────────────────
@@ -168,6 +175,48 @@ describe('validateProfile — temperature sensitivity fields', () => {
 	it('flags non-numeric tempModifier', () => {
 		const e = validateProfile({ ...tempForm, tempModifier: 'fast' }, false, true);
 		expect(e.tempModifier).toBe('invalid_number');
+	});
+});
+
+describe('validateProfile — click adjustment fields', () => {
+	it('passes with valid elevation click value when linked', () => {
+		const e = validateProfile(validForm, false, false);
+		expect(e.elevationClickValue).toBeUndefined();
+	});
+
+	it('flags empty elevation click value as required', () => {
+		const e = validateProfile({ ...validForm, elevationClickValue: '' }, false, false);
+		expect(e.elevationClickValue).toBe('required');
+	});
+
+	it('flags zero elevation click value as invalid_number', () => {
+		const e = validateProfile({ ...validForm, elevationClickValue: '0' }, false, false);
+		expect(e.elevationClickValue).toBe('invalid_number');
+	});
+
+	it('flags negative elevation click value as invalid_number', () => {
+		const e = validateProfile({ ...validForm, elevationClickValue: '-1' }, false, false);
+		expect(e.elevationClickValue).toBe('invalid_number');
+	});
+
+	it('skips windage validation when linked', () => {
+		const e = validateProfile({ ...validForm, clickLink: true, windageClickValue: '' }, false, false);
+		expect(e.windageClickValue).toBeUndefined();
+	});
+
+	it('validates windage click value when unlinked', () => {
+		const e = validateProfile({ ...validForm, clickLink: false, windageClickValue: '' }, false, false);
+		expect(e.windageClickValue).toBe('required');
+	});
+
+	it('flags non-positive windage click value when unlinked', () => {
+		const e = validateProfile({ ...validForm, clickLink: false, windageClickValue: '0' }, false, false);
+		expect(e.windageClickValue).toBe('invalid_number');
+	});
+
+	it('passes windage validation when unlinked and valid', () => {
+		const e = validateProfile({ ...validForm, clickLink: false, windageClickValue: '0.25' }, false, false);
+		expect(e.windageClickValue).toBeUndefined();
 	});
 });
 

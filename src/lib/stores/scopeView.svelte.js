@@ -15,8 +15,6 @@ const store = localStore('zro-scope-view', () => ({
 	elevation: { angle: '0', unit: 'deg' },
 	atmosphere: { useISA: true, ...ISA_DEFAULTS },
 	wind: { speed: '0', speedUnit: 'mph', direction: '90' },
-	adjustments: { elevation: 'MOA', windage: 'MOA', link: true },
-	reticleType: 'mil-dot',
 	rotation: 0
 }));
 
@@ -43,12 +41,6 @@ export const scopeView = {
 	get wind() {
 		return store.value.wind;
 	},
-	get adjustments() {
-		return store.value.adjustments;
-	},
-	get reticleType() {
-		return store.value.reticleType ?? 'mil-dot';
-	},
 	get rotation() {
 		return store.value.rotation ?? 0;
 	},
@@ -69,26 +61,12 @@ export const scopeView = {
 	setWind(patch) {
 		store.value = { ...store.value, wind: { ...store.value.wind, ...patch } };
 	},
-	setReticleType(type) {
-		store.value = { ...store.value, reticleType: type };
-	},
 	setRotation(angle) {
 		store.value = { ...store.value, rotation: angle };
 	},
 	resetRotation() {
 		store.value = { ...store.value, rotation: 0 };
 	},
-	setAdjustments(patch) {
-		const cur = store.value.adjustments;
-		const next = { ...cur, ...patch };
-		// When linked, keep both units in sync
-		if (next.link) {
-			if (patch.elevation !== undefined) next.windage = next.elevation;
-			if (patch.windage !== undefined) next.elevation = next.windage;
-		}
-		store.value = { ...store.value, adjustments: next };
-	},
-
 	resetAtmosphere() {
 		store.value = {
 			...store.value,

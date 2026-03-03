@@ -75,6 +75,12 @@
 	"profile_optic_height_hint": "Distance entre l'axe du canon et l'axe de la lunette",
 	"profile_optic_zero_dist": "Distance de réglage",
 	"profile_optic_zero_dist_hint": "Distance à laquelle votre arme est réglée",
+	"profile_optic_reticle_type": "Type de réticule",
+	"profile_optic_reticle_type_hint": "Type de réticule de votre optique",
+	"profile_optic_click_elevation": "Clic élévation",
+	"profile_optic_click_windage": "Clic dérive",
+	"profile_optic_click_hint": "Réglage par clic de vos tourelles",
+	"profile_optic_click_link": "Lier les valeurs de clic élévation et dérive",
 
 	"profile_ammo_brand": "Marque du projectile",
 	"profile_ammo_brand_placeholder": "ex. Sierra, Hornady, Berger",
@@ -156,6 +162,8 @@
 	"scope_view_reticle_mrad": "MRAD",
 	"scope_view_aim_point": "Point de visée",
 	"scope_view_aim_out_of_view": "Hors champ",
+	"scope_view_clicks": "clics",
+	"scope_view_click": "clic",
 	"scope_view_rotation": "Inclinaison",
 	"scope_view_rotation_reset": "Réinitialiser l'inclinaison",
 

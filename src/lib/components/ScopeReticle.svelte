@@ -2,6 +2,7 @@
 	import { m } from '$lib/paraglide/messages.js';
 	import { getElevationValue, getWindageValue } from '$lib/utils/ballisticCalculator.js';
 	import { scopeView } from '$lib/stores/scopeView.svelte.js';
+	import { activeProfile } from '$lib/stores/activeProfile.svelte.js';
 	import { settings } from '$lib/stores/settings.svelte.js';
 	import { RotateCcw } from '@lucide/svelte';
 
@@ -48,13 +49,8 @@
 	const MRAD_GRAD_LABELS = [2, 4];
 	const MOA_GRAD_LABELS = [4, 8, 12, 16];
 
-	// Reticle type options
-	const RETICLE_TYPES = [
-		{ value: 'moa', label: () => m.scope_view_reticle_moa() },
-		{ value: 'mrad', label: () => m.scope_view_reticle_mrad() },
-		{ value: 'mil-dot', label: () => m.scope_view_reticle_mil_dot() },
-		{ value: 'red-dot', label: () => m.scope_view_reticle_red_dot() }
-	];
+	// Reticle type from active profile
+	const reticleType = $derived(activeProfile.profile?.reticleType ?? 'red-dot');
 
 	// ── Aim point computation ─────────────────────────────────────────
 	// BDC holdover logic: the green dot shows the reticle mark the shooter
@@ -77,7 +73,7 @@
 		if (point === null || elevMoa === null || windMoa === null) return null;
 
 		let dx, dy;
-		if (scopeView.reticleType === 'mil-dot' || scopeView.reticleType === 'mrad') {
+		if (reticleType === 'mil-dot' || reticleType === 'mrad') {
 			const elevMrad = elevMoa / MOA_PER_MRAD;
 			const windMrad = windMoa / MOA_PER_MRAD;
 			dx = windMrad * MRAD_SCALE;
@@ -102,23 +98,8 @@
 </script>
 
 <div class="card preset-filled-surface-100-900 p-4 space-y-3">
-	<!-- Header: title + reticle type selector -->
-	<div class="flex flex-wrap items-center justify-between gap-2">
-		<h2 class="h5">{m.scope_view_reticle()}</h2>
-		<div class="flex gap-1">
-			{#each RETICLE_TYPES as type}
-				<button
-					type="button"
-					class="chip text-xs {scopeView.reticleType === type.value
-						? 'preset-filled-primary-500'
-						: 'preset-tonal-surface'}"
-					onclick={() => scopeView.setReticleType(type.value)}
-				>
-					{type.label()}
-				</button>
-			{/each}
-		</div>
-	</div>
+	<!-- Header -->
+	<h2 class="h5">{m.scope_view_reticle()}</h2>
 
 	<!-- SVG Reticle View -->
 	<div class="flex justify-center">
@@ -184,7 +165,7 @@
 		<g transform="rotate({scopeView.rotation}, {CX}, {CY})">
 
 		<!-- ═══════════════ RED DOT ═══════════════════════════════ -->
-			{#if scopeView.reticleType === 'red-dot'}
+			{#if reticleType === 'red-dot'}
 				<g clip-path="url(#scope-glass-clip)">
 					<!-- Very faint reference lines for orientation -->
 					<line x1={CX} y1="20" x2={CX} y2={CY - 18} stroke={reticleColor} stroke-width="0.6" opacity="0.18" />
@@ -204,7 +185,7 @@
 				 Stadia (thick): 140 px from center → scope edge
 				 Dots at 1, 2, 3, 4 MRAD (35, 70, 105, 140 px)
 			================================================================ -->
-			{#if scopeView.reticleType === 'mil-dot'}
+			{#if reticleType === 'mil-dot'}
 				<g clip-path="url(#scope-glass-clip)" fill={reticleColor} stroke={reticleColor}>
 					<!-- Light grey grid below x-axis for wind correction reference -->
 					{#each MIL_DOT_POSITIONS as d}
@@ -257,7 +238,7 @@
 				 Long hash tick: ±10 px perpendicular, every 5 MOA
 				 Stadia start: 150 px from center (15 MOA)
 			================================================================ -->
-			{#if scopeView.reticleType === 'moa'}
+			{#if reticleType === 'moa'}
 				<g clip-path="url(#scope-glass-clip)" stroke={reticleColor} fill="none">
 					<!-- Light grey grid: every 1 MOA; even lines are 1px thicker -->
 					{#each MOA_GRID_LINES as n}
@@ -315,7 +296,7 @@
 			 X-axis ticks: 0.2 MRAD both sides, long at whole MRAD
 			 Stadia start: 140 px from center (4 MRAD)
 		================================================================ -->
-		{#if scopeView.reticleType === 'mrad'}
+		{#if reticleType === 'mrad'}
 			<g clip-path="url(#scope-glass-clip)" stroke={reticleColor} fill="none">
 				<!-- Grid: vertical + horizontal lines — 0.2 MRAD, below center only -->
 				{#each MRAD_SUB_LINES as n}
@@ -374,7 +355,7 @@
 		{/if}
 
 		<!-- ── Red center cross (mil-dot and MOA only — not red-dot) ── -->
-			{#if scopeView.reticleType !== 'red-dot'}
+			{#if reticleType !== 'red-dot'}
 				<g clip-path="url(#scope-glass-clip)">
 					<line x1={CX - 8} y1={CY} x2={CX + 8} y2={CY} stroke="#ff2020" stroke-width="1.5" />
 					<line x1={CX} y1={CY - 8} x2={CX} y2={CY + 8} stroke="#ff2020" stroke-width="1.5" />
@@ -401,7 +382,7 @@
 			{@const lx = CX + signX * 40}
 			{@const ly = CY + signY * 70}
 			{@const anchor = signX > 0 ? 'start' : 'end'}
-			{@const useMrad = scopeView.reticleType === 'mrad' || scopeView.reticleType === 'mil-dot'}
+			{@const useMrad = reticleType === 'mrad' || reticleType === 'mil-dot'}
 			{@const elevVal = useMrad ? (Math.abs(elevMoa) / MOA_PER_MRAD).toFixed(2) : Math.abs(elevMoa).toFixed(1)}
 			{@const windVal = useMrad ? (Math.abs(windMoa) / MOA_PER_MRAD).toFixed(2) : Math.abs(windMoa).toFixed(1)}
 			{@const elevIsUp = elevMoa <= 0}
@@ -437,9 +418,9 @@
 
 		<!-- Reticle scale hint -->
 		<span class="ml-auto">
-			{#if scopeView.reticleType === 'mil-dot' || scopeView.reticleType === 'mrad'}
+			{#if reticleType === 'mil-dot' || reticleType === 'mrad'}
 				1 interval = 1 MRAD
-			{:else if scopeView.reticleType === 'moa'}
+			{:else if reticleType === 'moa'}
 				1 interval = 1 MOA
 			{/if}
 		</span>

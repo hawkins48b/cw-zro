@@ -75,6 +75,12 @@
 	"profile_optic_height_hint": "Abstand von Lauf- zu Optikachse",
 	"profile_optic_zero_dist": "Einschiessentfernung",
 	"profile_optic_zero_dist_hint": "Entfernung, auf die das Gewehr eingeschossen ist",
+	"profile_optic_reticle_type": "Absehen-Typ",
+	"profile_optic_reticle_type_hint": "Typ des Absehens in Ihrer Optik",
+	"profile_optic_click_elevation": "Höhenklick",
+	"profile_optic_click_windage": "Seitenklick",
+	"profile_optic_click_hint": "Verstellung pro Klick Ihrer Türme",
+	"profile_optic_click_link": "Höhen- und Seitenklickwerte verknüpfen",
 
 	"profile_ammo_brand": "Geschossmarke",
 	"profile_ammo_brand_placeholder": "z.B. Sierra, Hornady, Berger",
@@ -156,6 +162,8 @@
 	"scope_view_reticle_mrad": "MRAD",
 	"scope_view_aim_point": "Haltepunkt",
 	"scope_view_aim_out_of_view": "Außerhalb",
+	"scope_view_clicks": "Klicks",
+	"scope_view_click": "Klick",
 	"scope_view_rotation": "Verkantung",
 	"scope_view_rotation_reset": "Verkantung zurücksetzen",
 

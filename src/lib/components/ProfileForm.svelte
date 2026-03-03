@@ -11,7 +11,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { localizeHref } from '$lib/paraglide/runtime.js';
-	import { ToggleLeft, ToggleRight, Search } from '@lucide/svelte';
+	import { ToggleLeft, ToggleRight, Search, Link, Link2Off } from '@lucide/svelte';
 	import UnitField from '$lib/components/UnitField.svelte';
 	import { validateProfile, isValid, buildAmmoString } from '$lib/utils/profileValidation.js';
 	import { ammoSelection } from '$lib/stores/ammoSelection.svelte.js';
@@ -40,7 +40,13 @@
 		velocityUnit: 'fps',
 		temperature: '',
 		temperatureUnit: 'f',
-		tempModifier: ''
+		tempModifier: '',
+		reticleType: 'red-dot',
+		elevationClickValue: '0.5',
+		elevationClickUnit: 'MOA',
+		windageClickValue: '0.5',
+		windageClickUnit: 'MOA',
+		clickLink: true
 	});
 
 	let spinDrift = $state(false);
@@ -69,8 +75,21 @@
 		form.temperature = initialData.temperature != null ? String(initialData.temperature) : '';
 		form.temperatureUnit = initialData.temperatureUnit ?? 'f';
 		form.tempModifier = initialData.tempModifier != null ? String(initialData.tempModifier) : '';
+		form.reticleType = initialData.reticleType ?? 'red-dot';
+		form.elevationClickValue = initialData.elevationClickValue ?? '0.5';
+		form.elevationClickUnit = initialData.elevationClickUnit ?? 'MOA';
+		form.windageClickValue = initialData.windageClickValue ?? '0.5';
+		form.windageClickUnit = initialData.windageClickUnit ?? 'MOA';
+		form.clickLink = initialData.clickLink ?? true;
 		spinDrift = initialData.spinDrift ?? false;
 		tempSensitivity = initialData.tempSensitivity ?? false;
+	});
+
+	$effect(() => {
+		if (form.clickLink) {
+			form.windageClickValue = form.elevationClickValue;
+			form.windageClickUnit = form.elevationClickUnit;
+		}
 	});
 
 	$effect(() => {
@@ -112,14 +131,19 @@
 			return;
 		}
 		errors = {};
-		onSave({
+		const data = {
 			...form,
 			zeroDist: Number(form.zeroDist) || 0,
 			spinDrift,
 			tempSensitivity,
 			ammo: buildAmmoString(form.bulletBrand, form.bulletWeight, form.bulletWeightUnit),
 			optic: form.opticName || '—'
-		});
+		};
+		if (data.clickLink) {
+			data.windageClickValue = data.elevationClickValue;
+			data.windageClickUnit = data.elevationClickUnit;
+		}
+		onSave(data);
 	}
 </script>
 
@@ -214,6 +238,73 @@
 			bind:unit={form.zeroUnit}
 			units={[{ value: 'yd', label: m.unit_yd() }, { value: 'm', label: m.unit_m() }]}
 		/>
+
+		<!-- Reticle type -->
+		<div class="space-y-1.5">
+			<span class="text-sm font-medium block">{m.profile_optic_reticle_type()}</span>
+			<div class="flex gap-1 flex-wrap">
+				{#each [
+					{ value: 'red-dot', label: m.scope_view_reticle_red_dot() },
+					{ value: 'moa', label: m.scope_view_reticle_moa() },
+					{ value: 'mrad', label: m.scope_view_reticle_mrad() },
+					{ value: 'mil-dot', label: m.scope_view_reticle_mil_dot() }
+				] as type}
+					<button
+						type="button"
+						class="chip text-xs {form.reticleType === type.value
+							? 'preset-filled-primary-500'
+							: 'preset-tonal-surface'}"
+						onclick={() => (form.reticleType = type.value)}
+					>
+						{type.label}
+					</button>
+				{/each}
+			</div>
+			<p class="text-xs text-surface-500-400">{m.profile_optic_reticle_type_hint()}</p>
+		</div>
+
+		<!-- Elevation click value -->
+		<UnitField
+			label={m.profile_optic_click_elevation()}
+			hint={m.profile_optic_click_hint()}
+			invalid={fieldError('elevationClickValue')}
+			bind:value={form.elevationClickValue}
+			bind:unit={form.elevationClickUnit}
+			units={[{ value: 'MOA', label: 'MOA' }, { value: 'MRAD', label: 'MRAD' }]}
+			placeholder="0.5"
+		/>
+
+		<!-- Click link toggle -->
+		<div class="flex items-center gap-2">
+			<button
+				type="button"
+				class="btn btn-icon btn-sm {form.clickLink
+					? 'preset-filled-primary-500'
+					: 'preset-tonal-surface'}"
+				title={m.profile_optic_click_link()}
+				onclick={() => (form.clickLink = !form.clickLink)}
+			>
+				{#if form.clickLink}
+					<Link class="size-4" />
+				{:else}
+					<Link2Off class="size-4" />
+				{/if}
+			</button>
+			<span class="text-xs text-surface-500-400">{m.profile_optic_click_link()}</span>
+		</div>
+
+		<!-- Windage click value (only when unlinked) -->
+		{#if !form.clickLink}
+		<UnitField
+			label={m.profile_optic_click_windage()}
+			hint={m.profile_optic_click_hint()}
+			invalid={fieldError('windageClickValue')}
+			bind:value={form.windageClickValue}
+			bind:unit={form.windageClickUnit}
+			units={[{ value: 'MOA', label: 'MOA' }, { value: 'MRAD', label: 'MRAD' }]}
+			placeholder="0.5"
+		/>
+		{/if}
 	</div>
 
 	<!-- ── Ammunition ─────────────────────────────────────────── -->

@@ -5,8 +5,6 @@
 		ArrowDown,
 		ArrowLeft,
 		ArrowRight,
-		Link,
-		Link2Off,
 		Timer,
 		Zap,
 		ChevronDown,
@@ -57,8 +55,17 @@
 		return calculateShotPoint(profile, effectiveRange, atmoParams, scopeView.wind, { cantAngle: scopeView.rotation });
 	});
 
-	let elevValue = $derived(getElevationValue(point, scopeView.adjustments.elevation));
-	let windValue = $derived(getWindageValue(point, scopeView.adjustments.windage));
+	let elevUnit = $derived(activeProfile.profile?.elevationClickUnit ?? 'MOA');
+	let windUnit = $derived(activeProfile.profile?.windageClickUnit ?? 'MOA');
+
+	let elevValue = $derived(getElevationValue(point, elevUnit));
+	let windValue = $derived(getWindageValue(point, windUnit));
+
+	let elevClickVal = $derived(parseFloat(activeProfile.profile?.elevationClickValue) || 0.5);
+	let windClickVal = $derived(parseFloat(activeProfile.profile?.windageClickValue) || 0.5);
+
+	let elevClicks = $derived(elevValue !== null ? Math.round(Math.abs(elevValue) / elevClickVal) : null);
+	let windClicks = $derived(windValue !== null ? Math.round(Math.abs(windValue) / windClickVal) : null);
 
 	// Direction logic (matches v1 convention)
 	let elevDir = $derived(elevValue !== null ? (elevValue <= 0 ? 'up' : 'down') : null);
@@ -81,15 +88,6 @@
 			: { value: Math.round(point.velocity.In(Unit.FPS)), unit: m.unit_fps() };
 	});
 
-	// ── Adjustment unit options ──────────────────────────────────────
-	const adjUnits = [
-		{ value: 'MOA', label: 'MOA' },
-		{ value: 'MRAD', label: 'MRAD' },
-		{ value: 'IN', label: m.unit_in() },
-		{ value: 'FT', label: m.unit_ft() },
-		{ value: 'CM', label: m.unit_cm() },
-		{ value: 'M', label: m.unit_m() }
-	];
 </script>
 
 <svelte:head>
@@ -203,10 +201,13 @@
 					<div class="flex-1">
 						<p class="text-xs text-surface-500-400 uppercase tracking-wide">{m.scope_view_elevation()}</p>
 						<p class="font-bold text-2xl leading-tight">
-							{Math.abs(elevValue ?? 0)}
+							{elevClicks}
 							<span class="text-base font-normal text-surface-500-400">
-								{scopeView.adjustments.elevation}
+								{elevClicks === 1 ? m.scope_view_click() : m.scope_view_clicks()}
 							</span>
+						</p>
+						<p class="text-sm text-surface-500-400">
+							{Math.abs(elevValue ?? 0)} {elevUnit}
 						</p>
 					</div>
 					<span class="text-sm font-semibold uppercase {elevDir === 'up' ? 'text-primary-500' : 'text-secondary-500'}">
@@ -226,10 +227,13 @@
 					<div class="flex-1">
 						<p class="text-xs text-surface-500-400 uppercase tracking-wide">{m.scope_view_windage()}</p>
 						<p class="font-bold text-2xl leading-tight">
-							{Math.abs(windValue ?? 0)}
+							{windClicks}
 							<span class="text-base font-normal text-surface-500-400">
-								{scopeView.adjustments.windage}
+								{windClicks === 1 ? m.scope_view_click() : m.scope_view_clicks()}
 							</span>
+						</p>
+						<p class="text-sm text-surface-500-400">
+							{Math.abs(windValue ?? 0)} {windUnit}
 						</p>
 					</div>
 					<span class="text-sm font-semibold uppercase {windDir === 'left' ? 'text-tertiary-500' : 'text-warning-500'}">
@@ -263,55 +267,7 @@
 				</div>
 			{/if}
 
-			<!-- ── Unit selectors ─────────────────────────────────── -->
-			<div class="border-t border-surface-200-800 pt-4 flex items-center gap-2">
-				<!-- Elevation unit -->
-				<div class="flex-1">
-					<p class="text-xs text-surface-500-400 mb-1">{m.scope_view_elevation()}</p>
-					<select
-						class="select text-sm"
-						value={scopeView.adjustments.elevation}
-						onchange={(e) => scopeView.setAdjustments({ elevation: e.target.value })}
-					>
-						{#each adjUnits as u}
-							<option value={u.value}>{u.label}</option>
-						{/each}
-					</select>
-				</div>
-
-				<!-- Link toggle -->
-				<div class="mt-4">
-					<button
-						type="button"
-						class="btn btn-icon {scopeView.adjustments.link
-							? 'preset-filled-primary-500'
-							: 'preset-tonal-surface'}"
-						title={m.scope_view_link_units()}
-						onclick={() => scopeView.setAdjustments({ link: !scopeView.adjustments.link })}
-					>
-						{#if scopeView.adjustments.link}
-							<Link class="size-4" />
-						{:else}
-							<Link2Off class="size-4" />
-						{/if}
-					</button>
-				</div>
-
-				<!-- Windage unit -->
-				<div class="flex-1">
-					<p class="text-xs text-surface-500-400 mb-1">{m.scope_view_windage()}</p>
-					<select
-						class="select text-sm"
-						value={scopeView.adjustments.windage}
-						onchange={(e) => scopeView.setAdjustments({ windage: e.target.value })}
-					>
-						{#each adjUnits as u}
-							<option value={u.value}>{u.label}</option>
-						{/each}
-					</select>
-				</div>
 			</div>
-		</div>
 
 		<!-- ── Scope Reticle ─────────────────────────────────────── -->
 		<ScopeReticle point={cantedPoint} />

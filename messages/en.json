@@ -75,6 +75,12 @@
 	"profile_optic_height_hint": "Distance from bore center to scope center",
 	"profile_optic_zero_dist": "Zero Distance",
 	"profile_optic_zero_dist_hint": "Range at which your rifle is zeroed",
+	"profile_optic_reticle_type": "Reticle Type",
+	"profile_optic_reticle_type_hint": "Type of reticle in your optic",
+	"profile_optic_click_elevation": "Elevation Click",
+	"profile_optic_click_windage": "Windage Click",
+	"profile_optic_click_hint": "Adjustment per click of your turret",
+	"profile_optic_click_link": "Link elevation and windage click values",
 
 	"profile_ammo_brand": "Bullet Brand",
 	"profile_ammo_brand_placeholder": "e.g. Sierra, Hornady, Berger",
@@ -156,6 +162,8 @@
 	"scope_view_reticle_mrad": "MRAD",
 	"scope_view_aim_point": "Hold point",
 	"scope_view_aim_out_of_view": "Out of view",
+	"scope_view_clicks": "clicks",
+	"scope_view_click": "click",
 	"scope_view_rotation": "Cant",
 	"scope_view_rotation_reset": "Reset cant angle",
 

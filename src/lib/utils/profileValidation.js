@@ -56,6 +56,21 @@ export function validateProfile(form, spinDrift, tempSensitivity) {
 		}
 	}
 
+	// ── Click adjustment fields ─────────────────────────────────────────
+	if (!form.elevationClickValue?.trim()) {
+		errors.elevationClickValue = 'required';
+	} else if (!isPositiveNumber(form.elevationClickValue)) {
+		errors.elevationClickValue = 'invalid_number';
+	}
+
+	if (!form.clickLink) {
+		if (!form.windageClickValue?.trim()) {
+			errors.windageClickValue = 'required';
+		} else if (!isPositiveNumber(form.windageClickValue)) {
+			errors.windageClickValue = 'invalid_number';
+		}
+	}
+
 	// ── Spin drift fields ────────────────────────────────────────────────
 	if (spinDrift) {
 		if (!form.barrelTwist?.trim()) {
