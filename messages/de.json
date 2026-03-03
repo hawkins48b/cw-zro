@@ -275,7 +275,7 @@
 	"mpbr_about_zero": "Einschießen auf die optimale Einschießdistanz. Das Geschoss steigt bis zur oberen Zielzonengrenze und fällt am Ende durch sie hindurch.",
 	"mpbr_about_beyond": "Jenseits des MPBR-Maximums verlässt das Geschoss die Zielzone nach unten. Eine Elevationskorrektur ist erforderlich.",
 	"mpbr_about_ideal": "Ideal für Red-Dot-Visiere und Kimme/Korn, wo schnelle Schüsse keine Zeit für Elevationskorrekturen lassen.",
-	"mpbr_save_zero": "MPBR-Einschussdistanz setzen für {name}",
+	"mpbr_save_zero": "MPBR für aktuelles Profil setzen",
 
 	"traj_val_title": "Trajektorienvalidierung",
 	"traj_val_range": "Beobachtungsdistanz",

@@ -275,7 +275,7 @@
 	"mpbr_about_zero": "Zero at the Optimal Zero distance. The bullet arcs up to the top of the target zone, then falls back through it at the far end.",
 	"mpbr_about_beyond": "Beyond the MPBR maximum, the bullet drops below the target zone. You must hold over or dial elevation to compensate.",
 	"mpbr_about_ideal": "Ideal for red dots and iron sights where quick shots leave no time for elevation adjustments.",
-	"mpbr_save_zero": "Set MPBR Zero for {name}",
+	"mpbr_save_zero": "Set MPBR for current profile",
 
 	"traj_val_title": "Trajectory Validation",
 	"traj_val_range": "Observation Range",

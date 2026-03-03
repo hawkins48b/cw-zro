@@ -275,7 +275,7 @@
 	"mpbr_about_zero": "Zérotez à la distance de Zéro Optimal. La balle monte jusqu'au bord supérieur de la zone cible, puis redescend à travers elle en fin de trajectoire.",
 	"mpbr_about_beyond": "Au-delà du MPBR maximum, la balle sort par le bas de la zone cible. Une compensation en élévation est nécessaire.",
 	"mpbr_about_ideal": "Idéal pour les points rouges et les hausses simples, où les tirs rapides ne laissent pas le temps d'ajuster l'élévation.",
-	"mpbr_save_zero": "Définir le zéro MPBR pour {name}",
+	"mpbr_save_zero": "Définir le MPBR pour le profil actif",
 
 	"traj_val_title": "Validation de trajectoire",
 	"traj_val_range": "Distance d'observation",

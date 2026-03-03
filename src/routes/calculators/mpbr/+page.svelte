@@ -442,7 +442,7 @@
 			<button
 				type="button"
 				class="btn preset-tonal-primary gap-2"
-				title={m.mpbr_save_zero({ name: activeProfile.profile.name })}
+				title={m.mpbr_save_zero()}
 				onclick={() => {
 					profiles.update(activeProfile.id, {
 						zeroDist: mpbrResult.optimalZero,
@@ -452,7 +452,7 @@
 				}}
 			>
 				<BookmarkPlus class="size-5" />
-				{m.mpbr_save_zero({ name: activeProfile.profile.name })}
+				{m.mpbr_save_zero()}
 			</button>
 
 		{:else if !calculating && hasCalculated}
