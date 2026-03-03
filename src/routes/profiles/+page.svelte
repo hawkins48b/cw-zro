@@ -180,6 +180,21 @@
 		return `${profile.zeroDist}\u202f${profile.zeroUnit === 'yd' ? m.unit_yd() : m.unit_m()}`;
 	}
 
+	function velocityLabel(profile) {
+		return `${profile.velocity}\u202f${profile.velocityUnit === 'fps' ? m.unit_fps() : m.unit_mps()}`;
+	}
+
+	const reticleLabels = {
+		'red-dot': () => m.scope_view_reticle_red_dot(),
+		'moa': () => m.scope_view_reticle_moa(),
+		'mrad': () => m.scope_view_reticle_mrad(),
+		'mil-dot': () => m.scope_view_reticle_mil_dot()
+	};
+
+	function reticleLabel(profile) {
+		return reticleLabels[profile.reticleType]?.() ?? profile.reticleType;
+	}
+
 	const sortOptions = [
 		{ value: 'recent', labelKey: 'profiles_sort_recent' },
 		{ value: 'name', labelKey: 'profiles_sort_name' },
@@ -223,7 +238,7 @@
 				<div class="p-4 flex items-start gap-3">
 					<div class="flex-1 min-w-0">
 						<p class="font-semibold text-lg leading-snug">{profile.name}</p>
-						<p class="text-sm mt-0.5 opacity-70">{profile.ammo}</p>
+						<p class="text-sm mt-0.5 opacity-70">{profile.ammo} — {velocityLabel(profile)}</p>
 					</div>
 					<a
 						href={localizeHref(`/profiles/${profile.id}`)}
@@ -233,10 +248,13 @@
 						<Pencil class="size-4" />
 					</a>
 				</div>
-				<div class="border-t border-primary-500/20 px-4 py-2.5 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 text-sm opacity-70">
-					<Crosshair class="size-3.5" />
+				<div class="border-t border-primary-500/20 px-4 py-2.5 flex items-center gap-2.5 text-sm opacity-70">
+					<Crosshair class="size-3.5 shrink-0" />
 					<span class="truncate">{profile.optic}</span>
-					<span class="chip text-xs font-semibold preset-filled-primary-500">
+					<span class="chip text-xs font-semibold preset-filled-primary-500 shrink-0 ml-auto">
+						{reticleLabel(profile)}
+					</span>
+					<span class="chip text-xs font-semibold preset-filled-primary-500 shrink-0">
 						{zeroLabel(profile)}
 					</span>
 				</div>
@@ -343,7 +361,7 @@
 										{/if}
 									</div>
 									<p class="text-sm mt-0.5 {isActive ? 'opacity-70' : 'text-surface-500'}">
-										{profile.ammo}
+										{profile.ammo} — {velocityLabel(profile)}
 									</p>
 								</div>
 
@@ -362,13 +380,19 @@
 								tabindex="0"
 								onclick={() => handleCardTap(profile.id)}
 								onkeydown={(e) => e.key === 'Enter' && handleCardTap(profile.id)}
-								class="border-t px-4 py-2.5 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 text-sm cursor-pointer
+								class="border-t px-4 py-2.5 flex items-center gap-2.5 text-sm cursor-pointer
 									{isActive ? 'border-primary-500/20 opacity-70' : 'border-surface-200-800 text-surface-500'}"
 							>
-								<Crosshair class="size-3.5" />
+								<Crosshair class="size-3.5 shrink-0" />
 								<span class="truncate">{profile.optic}</span>
 								<span
-									class="chip text-xs font-semibold
+									class="chip text-xs font-semibold shrink-0 ml-auto
+										{isActive ? 'preset-filled-primary-500' : 'preset-tonal-primary'}"
+								>
+									{reticleLabel(profile)}
+								</span>
+								<span
+									class="chip text-xs font-semibold shrink-0
 										{isActive ? 'preset-filled-primary-500' : 'preset-tonal-primary'}"
 								>
 									{zeroLabel(profile)}

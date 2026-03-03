@@ -28,7 +28,7 @@ export function calculateTrajectoryValidation(
 		const initialBc = parseFloat(profile.bc);
 
 		if (!isFinite(rangeVal) || rangeVal <= 0) return null;
-		if (!isFinite(targetVal)) return null;
+		if (!isFinite(targetVal) || targetVal === 0) return null;
 		if (!isFinite(initialVelocity) || initialVelocity <= 0) return null;
 		if (!isFinite(initialBc) || initialBc <= 0) return null;
 
@@ -39,10 +39,14 @@ export function calculateTrajectoryValidation(
 		// Convert both distances to yards for comparison
 		const rangeYd = range.unit === 'm' ? rangeVal * 1.09361 : rangeVal;
 		const zeroYd = profile.zeroUnit === 'm' ? zeroVal * 1.09361 : zeroVal;
-		if (rangeYd <= zeroYd) return null;
+		if (rangeYd <= zeroYd) return { error: 'range' };
 
 		const rangeObj = { distance: rangeVal, unit: range.unit };
-		const goal = Math.round(targetVal * 10) / 10;
+
+		// Beyond zero range, js-ballistics returns negative values for both
+		// targetDrop (bullet below LOS) and dropAdjustment (dial-up correction).
+		// Users naturally enter positive values, so negate to match the library.
+		const goal = -Math.abs(Math.round(targetVal * 10) / 10);
 
 		function getMeasure(point) {
 			if (!point) return null;
@@ -102,7 +106,7 @@ export function calculateTrajectoryValidation(
 			currentPoint = newPoint;
 		}
 
-		if (currentParam >= maxParam || currentParam <= minParam) return null;
+		if (currentParam >= maxParam || currentParam <= minParam) return { error: 'no_solution' };
 
 		return {
 			solveFor,

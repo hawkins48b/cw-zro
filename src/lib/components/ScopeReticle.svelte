@@ -4,7 +4,7 @@
 	import { scopeView } from '$lib/stores/scopeView.svelte.js';
 	import { activeProfile } from '$lib/stores/activeProfile.svelte.js';
 	import { settings } from '$lib/stores/settings.svelte.js';
-	import { RotateCcw } from '@lucide/svelte';
+	import { RotateCcw, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from '@lucide/svelte';
 
 	let { point = null } = $props();
 
@@ -99,7 +99,10 @@
 
 <div class="card preset-filled-surface-100-900 p-4 space-y-3">
 	<!-- Header -->
-	<h2 class="h5">{m.scope_view_reticle()}</h2>
+	<h2 class="h5 flex items-center gap-2">
+		{m.scope_view_reticle()}
+		<span class="badge preset-outlined-surface-200-800 text-xs font-normal">{reticleType.toUpperCase()} reticule</span>
+	</h2>
 
 	<!-- SVG Reticle View -->
 	<div class="flex justify-center">
@@ -373,34 +376,30 @@
 			<!-- ── Outer tube inner edge highlight ─────────────────── -->
 			<circle cx={CX} cy={CY} r="196" fill="none" stroke={outerRingColor} stroke-width="1" />
 
-		<!-- ─── Hold value labels (above all overlays) ─── -->
-		{#if aimPoint && !aimPoint.clamped && elevMoa !== null && windMoa !== null}
-			{@const dx = aimPoint.x - CX}
-			{@const dy = aimPoint.y - CY}
-			{@const signX = dx >= 0 ? -1 : 1}
-			{@const signY = dy >= 0 ? -1 : 1}
-			{@const lx = CX + signX * 40}
-			{@const ly = CY + signY * 70}
-			{@const anchor = signX > 0 ? 'start' : 'end'}
-			{@const useMrad = reticleType === 'mrad' || reticleType === 'mil-dot'}
-			{@const elevVal = useMrad ? (Math.abs(elevMoa) / MOA_PER_MRAD).toFixed(2) : Math.abs(elevMoa).toFixed(1)}
-			{@const windVal = useMrad ? (Math.abs(windMoa) / MOA_PER_MRAD).toFixed(2) : Math.abs(windMoa).toFixed(1)}
-			{@const elevIsUp = elevMoa <= 0}
-			{@const windIsLeft = windMoa >= 0}
-			{@const elevArrow = elevIsUp ? '↑' : '↓'}
-			{@const windArrow = windIsLeft ? '←' : '→'}
-			{@const elevWord = elevIsUp ? m.scope_view_up() : m.scope_view_down()}
-			{@const windWord = windIsLeft ? m.scope_view_left() : m.scope_view_right()}
-			{@const elevClass = elevIsUp ? 'fill-primary-500' : 'fill-secondary-500'}
-			{@const windClass = windIsLeft ? 'fill-tertiary-500' : 'fill-warning-500'}
-			<g clip-path="url(#scope-glass-clip)">
-				<text x={lx} y={ly} text-anchor={anchor} font-size="16" font-family="monospace" font-weight="bold" class={elevClass}>{elevArrow} {elevWord} {elevVal}</text>
-				<text x={lx} y={ly + 22} text-anchor={anchor} font-size="16" font-family="monospace" font-weight="bold" class={windClass}>{windArrow} {windWord} {windVal}</text>
-			</g>
-		{/if}
-
-		</svg>
+			</svg>
 	</div>
+
+	<!-- ─── Hold value labels (outside reticle) ─── -->
+	{#if aimPoint && elevMoa !== null && windMoa !== null}
+		{@const useMrad = reticleType === 'mrad' || reticleType === 'mil-dot'}
+		{@const unitLabel = useMrad ? 'MRAD' : 'MOA'}
+		{@const elevVal = useMrad ? (Math.abs(elevMoa) / MOA_PER_MRAD).toFixed(2) : Math.abs(elevMoa).toFixed(1)}
+		{@const windVal = useMrad ? (Math.abs(windMoa) / MOA_PER_MRAD).toFixed(2) : Math.abs(windMoa).toFixed(1)}
+		{@const elevIsUp = elevMoa <= 0}
+		{@const windIsLeft = windMoa >= 0}
+		{@const elevWord = elevIsUp ? m.scope_view_up() : m.scope_view_down()}
+		{@const windWord = windIsLeft ? m.scope_view_left() : m.scope_view_right()}
+		<div class="flex justify-center gap-3 text-sm font-bold font-mono whitespace-nowrap">
+			<span class="flex items-center gap-0.5 {elevIsUp ? 'text-primary-500' : 'text-secondary-500'}">
+				{#if elevIsUp}<ArrowUp class="size-4 shrink-0" />{:else}<ArrowDown class="size-4 shrink-0" />{/if}
+				{elevWord} {elevVal} {unitLabel}
+			</span>
+			<span class="flex items-center gap-0.5 {windIsLeft ? 'text-tertiary-500' : 'text-warning-500'}">
+				{#if windIsLeft}<ArrowLeft class="size-4 shrink-0" />{:else}<ArrowRight class="size-4 shrink-0" />{/if}
+				{windWord} {windVal} {unitLabel}
+			</span>
+		</div>
+	{/if}
 
 	<!-- Legend row below the reticle -->
 	<div class="flex items-center gap-3 text-xs text-surface-500-400 flex-wrap">

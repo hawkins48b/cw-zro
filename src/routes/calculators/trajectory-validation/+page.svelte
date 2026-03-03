@@ -61,7 +61,7 @@
 	// ── Derived: full trajectories for chart ─────────────────────────
 	let chartData = $derived.by(() => {
 		const profile = activeProfile.profile;
-		if (!profile || !validationResult) return null;
+		if (!profile || !validationResult || validationResult.error) return null;
 
 		const rangeDist = parseFloat(trajectoryValidation.range.distance);
 		if (!isFinite(rangeDist) || rangeDist <= 0) return null;
@@ -227,7 +227,7 @@
 
 	function applyResult() {
 		const profile = activeProfile.profile;
-		if (!profile || !validationResult) return;
+		if (!profile || !validationResult || validationResult.error) return;
 		if (solveFor === 'bc') {
 			profiles.update(profile.id, { bc: String(validationResult.validatedBc) });
 		} else {
@@ -378,7 +378,11 @@
 		</div>
 
 		<!-- ═══ Results ══════════════════════════════════════════════════ -->
-		{#if validationResult}
+		{#if validationResult?.error === 'range'}
+			<p class="text-sm text-warning-500 text-center py-2">{m.traj_val_range_error()}</p>
+		{:else if validationResult?.error === 'no_solution'}
+			<p class="text-sm text-warning-500 text-center py-2">{m.traj_val_no_result()}</p>
+		{:else if validationResult && !validationResult.error}
 			<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
 				{#if solveFor === 'velocity'}
 					<!-- Profile velocity -->

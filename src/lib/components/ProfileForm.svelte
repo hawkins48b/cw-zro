@@ -11,10 +11,12 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { localizeHref } from '$lib/paraglide/runtime.js';
+	import { untrack } from 'svelte';
 	import { ToggleLeft, ToggleRight, Search, Link, Link2Off } from '@lucide/svelte';
 	import UnitField from '$lib/components/UnitField.svelte';
 	import { validateProfile, isValid, buildAmmoString } from '$lib/utils/profileValidation.js';
 	import { ammoSelection } from '$lib/stores/ammoSelection.svelte.js';
+	import { formDraft } from '$lib/stores/formDraft.svelte.js';
 
 	let { initialData = {}, onSave, onCancel } = $props();
 
@@ -53,6 +55,17 @@
 	let tempSensitivity = $state(false);
 
 	$effect(() => {
+		// If a draft was saved (e.g. before navigating to ammo-selector), restore it.
+		// Read draft with untrack so that formDraft.clear() below doesn't re-trigger
+		// this effect (which would fall through to the initialData branch and reset fields).
+		const draft = untrack(() => formDraft.pending);
+		if (draft) {
+			Object.assign(form, draft.form);
+			spinDrift = draft.spinDrift;
+			tempSensitivity = draft.tempSensitivity;
+			formDraft.clear();
+			return;
+		}
 		form.name = initialData.name ?? '';
 		form.barrelTwist = initialData.barrelTwist ?? '';
 		form.barrelTwistUnit = initialData.barrelTwistUnit ?? 'in';
@@ -314,7 +327,10 @@
 			<button
 				type="button"
 				class="btn btn-sm preset-tonal-surface"
-				onclick={() => goto(localizeHref('/profiles/ammo-selector') + '?return=' + page.url.pathname)}
+				onclick={() => {
+					formDraft.save({ form: { ...form }, spinDrift, tempSensitivity });
+					goto(localizeHref('/profiles/ammo-selector') + '?return=' + page.url.pathname);
+				}}
 				title={m.ammo_selector_select()}
 			>
 				<Search class="size-4" />
