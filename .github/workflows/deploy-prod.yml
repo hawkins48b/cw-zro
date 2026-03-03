@@ -3,7 +3,7 @@ name: Deploy Prod
 on:
   push:
     branches:
-      - master
+      - main
   workflow_dispatch:
 
 jobs:
@@ -11,24 +11,25 @@ jobs:
     runs-on: ubuntu-latest
     environment: prod
     steps:
-      - name: Setup environment
+      - name: Checkout
         uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Install node dependencies
-        run: npm i -g yarn
-      - run: yarn global add @quasar/cli
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Build Project
-        run: yarn && quasar build -m pwa
+      - name: Build
+        run: npm run build
 
-      - name: Rsync to the host
-        uses: up9cloud/action-rsync@v1.4
-        env:
-          HOST: ${{secrets.SERVER_HOST}}
-          USER: ${{secrets.SSH_USER}}
-          PASSWORD: ${{secrets.SSH_PWD}}
-          TARGET: ${{secrets.SERVER_PATH}}
-          SOURCE: ./dist/pwa/
+      - name: Deploy via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USER }}
+          password: ${{ secrets.FTP_PWD }}
+          local-dir: ./build/
+          server-dir: /
