@@ -136,6 +136,8 @@
 	"scope_view_wind_hint_no_wind": "Kein Wind im Gesicht spürbar",
 	"scope_view_wind_hint_light_wind": "Wind im Gesicht spürbar, Umgebung ruhig",
 	"scope_view_wind_hint_strong_wind": "Die Umgebung wird vom Wind bewegt",
+	"scope_view_wind_target_direction": "Zielrichtung",
+	"scope_view_wind_relative_to_shooter": "Relativ zum Schützen",
 	"scope_view_atmosphere": "Atmosphäre",
 	"scope_view_use_isa": "Standardatmosphäre (ISA)",
 	"scope_view_altitude": "Höhe",

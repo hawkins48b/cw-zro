@@ -136,6 +136,8 @@
 	"scope_view_wind_hint_no_wind": "No wind felt on the face",
 	"scope_view_wind_hint_light_wind": "Wind felt on the face, environment is calm",
 	"scope_view_wind_hint_strong_wind": "Environment is shaken by wind",
+	"scope_view_wind_target_direction": "Target direction",
+	"scope_view_wind_relative_to_shooter": "Relative to shooter",
 	"scope_view_atmosphere": "Atmosphere",
 	"scope_view_use_isa": "Standard Atmosphere (ISA)",
 	"scope_view_altitude": "Altitude",

@@ -26,7 +26,7 @@
 	"dependencies": {
 		"@inlang/paraglide-js": "^2.10.0",
 		"@lucide/svelte": "^0.563.1",
-		"@sveltejs/adapter-node": "^5.5.4",
+		"@sveltejs/adapter-static": "^3.0.10",
 		"apexcharts": "^5.7.0",
 		"js-ballistics": "^2.2.0-beta.2",
 		"pdf-lib": "^1.17.1",

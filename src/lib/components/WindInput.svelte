@@ -88,10 +88,12 @@
 <div class="space-y-3">
 	<div class="flex items-start gap-4">
 		<!-- ── Direction dial ──────────────────────────── -->
+		<div class="shrink-0 flex flex-col items-center gap-1">
+			<span class="text-xs font-semibold text-warning-500">{m.scope_view_wind_target_direction()}</span>
 		<!-- svelte-ignore a11y_interactive_supports_focus -->
 		<div
 			bind:this={dialEl}
-			class="shrink-0 size-28 touch-none select-none {dragging ? 'cursor-grabbing' : 'cursor-grab'}"
+			class="size-28 touch-none select-none {dragging ? 'cursor-grabbing' : 'cursor-grab'}"
 			role="slider"
 			tabindex="0"
 			aria-label={m.scope_view_wind_dir()}
@@ -172,6 +174,8 @@
 					</g>
 				</g>
 			</svg>
+		</div>
+			<span class="text-xs text-surface-500-400">{m.scope_view_wind_relative_to_shooter()}</span>
 		</div>
 
 		<!-- ── Speed & direction inputs ───────────────── -->
