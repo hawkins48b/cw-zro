@@ -1,0 +1,15 @@
+@import 'tailwindcss';
+@import '@skeletonlabs/skeleton';
+@import '@skeletonlabs/skeleton-svelte';
+@import '$lib/themes/zro.css';
+
+@custom-variant dark (&:where(.dark, .dark *));
+@custom-variant landscape (@media (orientation: landscape));
+
+/* Safe area insets for iOS notch/dynamic island — 0px on web/desktop */
+:root {
+	--safe-area-top: env(safe-area-inset-top, 0px);
+	--safe-area-bottom: env(safe-area-inset-bottom, 0px);
+	--safe-area-left: env(safe-area-inset-left, 0px);
+	--safe-area-right: env(safe-area-inset-right, 0px);
+}

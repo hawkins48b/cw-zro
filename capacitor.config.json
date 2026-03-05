@@ -1,0 +1,15 @@
+{
+	"appId": "ch.chocolatewarfare.app.zro",
+	"appName": "ZRO",
+	"webDir": "build",
+	"plugins": {
+		"SplashScreen": {
+			"launchAutoHide": true,
+			"androidScaleType": "CENTER_CROP",
+			"showSpinner": false
+		},
+		"StatusBar": {
+			"overlaysWebView": true
+		}
+	}
+}

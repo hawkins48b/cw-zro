@@ -1,0 +1,322 @@
+<script>
+	import { onMount } from 'svelte';
+	import { m } from '$lib/paraglide/messages.js';
+	import { localizeHref } from '$lib/paraglide/runtime';
+	import { profiles } from '$lib/stores/profiles.svelte.js';
+	import { settings } from '$lib/stores/settings.svelte.js';
+	import { compareTrajectories } from '$lib/stores/compareTrajectories.svelte.js';
+	import { calculateFullTrajectory } from '$lib/utils/ballisticCalculator.js';
+	import { Unit } from 'js-ballistics';
+	import { Plus, X } from '@lucide/svelte';
+
+	// ── ApexCharts (lazy-loaded, browser-only) ───────────────────────
+	let ApexCharts = $state(null);
+	let chartEl = $state(null);
+
+	onMount(async () => {
+		const mod = await import('apexcharts');
+		ApexCharts = mod.default;
+	});
+
+	// ── Chart unit helpers ───────────────────────────────────────────
+	const Y_AXIS_OPTIONS = [
+		{ value: 'in', label: () => m.unit_in() },
+		{ value: 'ft', label: () => m.unit_ft() },
+		{ value: 'yd', label: () => m.unit_yd() },
+		{ value: 'cm', label: () => m.unit_cm() },
+		{ value: 'm', label: () => m.unit_m() }
+	];
+
+	function getYUnit(key) {
+		switch (key) {
+			case 'in': return Unit.Inch;
+			case 'ft': return Unit.Foot;
+			case 'yd': return Unit.Yard;
+			case 'cm': return Unit.Centimeter;
+			case 'm': return Unit.Meter;
+			default: return Unit.Inch;
+		}
+	}
+
+	let isMetric = $derived(compareTrajectories.range.unit === 'm');
+	let distLabel = $derived(isMetric ? m.unit_m() : m.unit_yd());
+	let yAxisKey = $derived(compareTrajectories.yAxis);
+
+	// ── Resolve entries to profiles ──────────────────────────────────
+	let resolvedEntries = $derived(
+		compareTrajectories.entries.map((entry) => {
+			const profile = profiles.get(entry.profileId);
+			if (!profile) return null;
+			const zeroLabel = `${entry.zeroDist}\u202f${entry.zeroUnit === 'm' ? m.unit_m() : m.unit_yd()}`;
+			return {
+				...entry,
+				profile,
+				label: `${profile.name} @ ${zeroLabel}`
+			};
+		}).filter(Boolean)
+	);
+
+	// ── Compute trajectories for all entries ─────────────────────────
+	let chartData = $derived.by(() => {
+		if (resolvedEntries.length === 0) return null;
+
+		const rangeDist = parseFloat(compareTrajectories.range.distance);
+		if (!isFinite(rangeDist) || rangeDist <= 0) return null;
+
+		const step = 1;
+		const rangeObj = { distance: rangeDist, unit: compareTrajectories.range.unit, step };
+
+		const series = [];
+		for (const entry of resolvedEntries) {
+			const overriddenProfile = {
+				...entry.profile,
+				zeroDist: entry.zeroDist,
+				zeroUnit: entry.zeroUnit
+			};
+			const result = calculateFullTrajectory(overriddenProfile, rangeObj, null, null);
+			if (!result) continue;
+
+			const distUnit = isMetric ? Unit.Meter : Unit.Yard;
+			const yUnit = getYUnit(yAxisKey);
+			const data = (result.trajectory ?? []).map((p) => ({
+				x: Math.round(p.distance.In(distUnit) * 10) / 10,
+				y: Math.round(p.targetDrop.In(yUnit) * 100) / 100
+			}));
+			series.push({ name: entry.label, data });
+		}
+
+		return series.length > 0 ? series : null;
+	});
+
+	// ── Chart rendering ──────────────────────────────────────────────
+	const CHART_COLORS = [
+		'#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4',
+		'#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#64748b'
+	];
+
+	function buildChartOptions(series, dark) {
+		const dAxisLabel = isMetric ? m.unit_meters() : m.unit_yards();
+		const dLabel = isMetric ? m.unit_m() : m.unit_yd();
+		const yLabel = Y_AXIS_OPTIONS.find((o) => o.value === yAxisKey)?.label() ?? yAxisKey;
+
+		const maxX = series.reduce((max, s) => {
+			const last = s.data.at(-1)?.x ?? 0;
+			return last > max ? last : max;
+		}, 0);
+
+		return {
+			series,
+			chart: {
+				type: 'line',
+				height: 320,
+				background: 'transparent',
+				toolbar: { show: false },
+				animations: { enabled: false },
+				zoom: { enabled: false },
+				parentHeightOffset: 0
+			},
+			stroke: { width: 2, curve: 'monotoneCubic' },
+			theme: { mode: dark ? 'dark' : 'light' },
+			grid: {
+				borderColor: dark ? '#374151' : '#e5e7eb',
+				strokeDashArray: 3,
+				padding: { left: 10, right: 20, top: 0, bottom: 0 }
+			},
+			xaxis: {
+				type: 'numeric',
+				min: 0,
+				max: maxX || undefined,
+				title: { text: dAxisLabel, style: { fontSize: '12px' } },
+				labels: { formatter: (v) => `${Math.round(v)}` }
+			},
+			yaxis: {
+				title: { text: yLabel, style: { fontSize: '12px' } },
+				labels: { formatter: (v) => `${v}` }
+			},
+			colors: CHART_COLORS.slice(0, series.length),
+			annotations: {
+				yaxis: [
+					{
+						y: 0,
+						borderColor: dark ? '#9ca3af' : '#6b7280',
+						strokeDashArray: 4,
+						borderWidth: 1,
+						label: {
+							text: m.ballistic_legend_los(),
+							position: 'center',
+							style: {
+								fontSize: '10px',
+								color: dark ? '#9ca3af' : '#6b7280',
+								background: 'transparent',
+								border: 'none'
+							}
+						}
+					}
+				]
+			},
+			tooltip: {
+				theme: dark ? 'dark' : 'light',
+				x: { formatter: (v) => `${v} ${dLabel}` },
+				y: { formatter: (v) => `${v} ${yLabel}` }
+			},
+			legend: { show: true, position: 'top', horizontalAlign: 'right' },
+			markers: { size: 0 }
+		};
+	}
+
+	$effect(() => {
+		const ac = ApexCharts;
+		const el = chartEl;
+		const data = chartData;
+		if (!ac || !el || !data) return;
+
+		const opts = buildChartOptions(data, settings.darkMode);
+		const chart = new ac(el, opts);
+		chart.render();
+		return () => chart.destroy();
+	});
+
+	// ── Helper ───────────────────────────────────────────────────────
+	function profileZeroLabel(profile) {
+		return `${profile.zeroDist}\u202f${profile.zeroUnit === 'm' ? m.unit_m() : m.unit_yd()}`;
+	}
+</script>
+
+<svelte:head>
+	<title>{m.compare_title()} — {m.app_name()}</title>
+</svelte:head>
+
+<div class="space-y-6">
+
+	{#if profiles.list.length === 0}
+		<div class="py-12 text-center space-y-3">
+			<p class="text-surface-500-400">{m.compare_no_profiles()}</p>
+			<a href="/profiles" class="btn preset-tonal-primary">{m.nav_profiles()}</a>
+		</div>
+	{:else}
+
+		<!-- ═══ Selected entries ════════════════════════════════════ -->
+		<div class="space-y-2 max-w-2xl">
+			<div class="flex items-center gap-2">
+				<span class="text-sm font-medium flex-1">{m.compare_selected()}</span>
+				{#if resolvedEntries.length > 0}
+					<span class="chip text-xs preset-filled-primary-500">{resolvedEntries.length}</span>
+				{/if}
+				<a
+					href={localizeHref('/calculators/compare-trajectories/add')}
+					class="btn btn-icon preset-filled-primary-500 shrink-0"
+					title={m.compare_add_profile()}
+				>
+					<Plus class="size-5" />
+				</a>
+			</div>
+
+			{#if resolvedEntries.length > 0}
+				<div class="grid gap-2">
+					{#each resolvedEntries as entry, i}
+						<div class="card preset-tonal-primary p-2 sm:p-3 overflow-hidden">
+							<!-- Header: color dot + name + remove -->
+							<div class="flex items-center gap-2">
+								<span
+									class="size-3 rounded-full shrink-0"
+									style="background-color: {CHART_COLORS[i % CHART_COLORS.length]}"
+								></span>
+								<div class="flex-1 min-w-0">
+									<p class="text-sm font-semibold truncate">{entry.profile.name}</p>
+									<p class="text-xs opacity-70 truncate">{entry.profile.ammo}</p>
+								</div>
+								<button
+									type="button"
+									class="btn btn-icon btn-sm preset-tonal-error shrink-0"
+									title={m.compare_remove()}
+									onclick={() => compareTrajectories.removeEntry(entry.id)}
+								>
+									<X class="size-4" />
+								</button>
+							</div>
+
+							<!-- Zero distance override -->
+							<div class="mt-1.5 input !flex !items-center gap-1.5">
+								<input
+									class="flex-1 min-w-0 bg-transparent border-none outline-none shadow-none p-0 text-right"
+									type="text"
+									inputmode="decimal"
+									placeholder={String(entry.profile.zeroDist)}
+									value={entry.zeroDist}
+									oninput={(e) => compareTrajectories.updateEntry(entry.id, { zeroDist: e.target.value })}
+								/>
+								<div class="flex items-center gap-1 shrink-0">
+									{#each [{ value: 'yd', label: m.unit_yd() }, { value: 'm', label: m.unit_m() }] as opt}
+										<button
+											type="button"
+											class="chip text-xs {entry.zeroUnit === opt.value
+												? 'preset-filled-primary-500'
+												: 'preset-tonal-surface'}"
+											onclick={() => compareTrajectories.updateEntry(entry.id, { zeroUnit: opt.value })}
+										>{opt.label}</button>
+									{/each}
+								</div>
+							</div>
+						</div>
+					{/each}
+				</div>
+			{:else}
+				<p class="text-sm text-surface-500-400 text-center py-4">{m.compare_no_entries()}</p>
+			{/if}
+		</div>
+
+		<!-- ═══ Chart controls ═══════════════════════════════════════ -->
+		<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+			<!-- Max distance -->
+			<div class="card preset-filled-surface-100-900 p-4 space-y-1.5">
+				<span class="text-sm font-medium">{m.compare_max_dist()}</span>
+				<div class="input !flex !items-center gap-2">
+					<input
+						class="flex-1 min-w-0 bg-transparent border-none outline-none shadow-none p-0"
+						type="text"
+						inputmode="decimal"
+						placeholder="500"
+						value={compareTrajectories.range.distance}
+						oninput={(e) => compareTrajectories.setRange({ distance: e.target.value })}
+					/>
+					<div class="flex items-center gap-1 shrink-0">
+						{#each [{ value: 'yd', label: m.unit_yd() }, { value: 'm', label: m.unit_m() }] as opt}
+							<button
+								type="button"
+								class="chip text-xs {compareTrajectories.range.unit === opt.value
+									? 'preset-filled-primary-500'
+									: 'preset-tonal-surface'}"
+								onclick={() => compareTrajectories.setRange({ unit: opt.value })}
+							>{opt.label}</button>
+						{/each}
+					</div>
+				</div>
+			</div>
+
+			<!-- Y axis unit -->
+			<div class="card preset-filled-surface-100-900 p-4 space-y-1.5">
+				<span class="text-sm font-medium">{m.compare_y_axis()}</span>
+				<div class="flex flex-wrap gap-1">
+					{#each Y_AXIS_OPTIONS as opt}
+						<button
+							type="button"
+							class="chip text-xs {compareTrajectories.yAxis === opt.value
+								? 'preset-filled-primary-500'
+								: 'preset-tonal-surface'}"
+							onclick={() => compareTrajectories.setYAxis(opt.value)}
+						>{opt.label()}</button>
+					{/each}
+				</div>
+			</div>
+		</div>
+
+		<!-- ═══ Chart ════════════════════════════════════════════════ -->
+		{#if chartData}
+			<div class="space-y-2">
+				<h2 class="font-semibold">{m.compare_chart_title()}</h2>
+				<div bind:this={chartEl}></div>
+			</div>
+		{/if}
+
+	{/if}
+</div>

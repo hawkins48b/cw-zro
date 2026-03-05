@@ -1,0 +1,53 @@
+{
+	"name": "cw-zro",
+	"description": "ZRO — Ballistic calculator for precision shooting sports and long-range marksmanship",
+	"private": true,
+	"version": "2.0.0",
+	"type": "module",
+	"main": "electron/main.js",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"build:mobile": "BUILD_TARGET=capacitor vite build",
+		"preview": "vite preview",
+		"prepare": "svelte-kit sync || echo ''",
+		"test": "vitest",
+		"test:run": "vitest run",
+		"cap:sync": "npm run build:mobile && npx cap sync",
+		"cap:android": "npm run cap:sync && npx cap open android",
+		"cap:ios": "npm run cap:sync && npx cap open ios",
+		"electron:dev": "npm run build && electron .",
+		"electron:build": "npm run build && electron-builder --config electron-builder.json"
+	},
+	"devDependencies": {
+		"@skeletonlabs/skeleton": "^4.12.0",
+		"@skeletonlabs/skeleton-svelte": "^4.12.0",
+		"@sveltejs/kit": "^2.50.2",
+		"@sveltejs/vite-plugin-svelte": "^6.2.4",
+		"@tailwindcss/vite": "^4.1.18",
+		"electron": "^40.6.1",
+		"electron-builder": "^26.8.1",
+		"electron-serve": "^3.0.1",
+		"jsdom": "^28.1.0",
+		"svelte": "^5.49.2",
+		"tailwindcss": "^4.1.18",
+		"vite": "^7.3.1",
+		"vitest": "^4.0.18"
+	},
+	"dependencies": {
+		"@capacitor/android": "^8.1.0",
+		"@capacitor/app": "^8.0.1",
+		"@capacitor/cli": "^8.1.0",
+		"@capacitor/core": "^8.1.0",
+		"@capacitor/ios": "^8.1.0",
+		"@capacitor/splash-screen": "^8.0.1",
+		"@capacitor/status-bar": "^8.0.1",
+		"@inlang/paraglide-js": "^2.10.0",
+		"@lucide/svelte": "^0.563.1",
+		"@sveltejs/adapter-static": "^3.0.10",
+		"apexcharts": "^5.7.0",
+		"js-ballistics": "^2.2.0-beta.2",
+		"pdf-lib": "^1.17.1",
+		"svelte-gestures": "^5.2.2"
+	}
+}
