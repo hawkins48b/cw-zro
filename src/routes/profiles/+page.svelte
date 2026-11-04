@@ -350,8 +350,8 @@
 								class="p-4 flex items-start gap-3 cursor-pointer"
 								role="button"
 								tabindex="0"
-								onclick={() => handleCardTap(profile.id)}
-								onkeydown={(e) => e.key === 'Enter' && handleCardTap(profile.id)}
+								onclick={(e) => !e.target.closest('a') && handleCardTap(profile.id)}
+								onkeydown={(e) => e.key === 'Enter' && !e.target.closest('a') && handleCardTap(profile.id)}
 							>
 								<div class="flex-1 min-w-0">
 									<div class="flex items-center gap-2 flex-wrap">
@@ -369,7 +369,6 @@
 									href={localizeHref(`/profiles/${profile.id}`)}
 									class="btn btn-icon {isActive ? 'preset-tonal-primary' : 'preset-tonal-surface'} hidden sm:flex shrink-0 -mr-1"
 									title={m.common_edit()}
-									onclick={(e) => e.stopPropagation()}
 								>
 									<Pencil class="size-4" />
 								</a>
