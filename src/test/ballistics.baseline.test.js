@@ -41,7 +41,7 @@
  * Known problems in the code are deliberately NOT pinned here. See the todos at the end.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { Unit } from 'js-ballistics';
+import { Calculator, Unit } from 'js-ballistics';
 import {
 	calculateShotPoint,
 	getElevationValue,
@@ -374,7 +374,7 @@ describe('trajectory conventions', () => {
 	});
 
 	it('raises velocity when the air is warmer than the powder reference', () => {
-		// Direction only. The size is not recorded: see the powder todo at the end of this file.
+		// Direction only. The size is tested in the powder sensitivity block below.
 		const profile = { ...P308_G1, tempSensitivity: true, tempModifier: '1', temperature: '40' };
 		const point = calculateShotPoint(profile, { distance: 1, unit: 'yd' }, null, null);
 		const plain = calculateShotPoint(P308_G1, { distance: 1, unit: 'yd' }, null, null);
@@ -586,11 +586,133 @@ describe('trajectory validation baseline', () => {
 });
 
 /**
+ * The profile setting is fps per degree of the profile's temperature unit (#81), measured from
+ * the profile temperature to the air temperature. The ICAO atmosphere used here is 59 °F, 15 °C.
+ * The first table row is the muzzle, so these read the velocity change itself, before any drag.
+ */
+describe('powder sensitivity', () => {
+	const muzzleFps = (profile, atmosphere = null) =>
+		calculateFullTrajectory(profile, { distance: 100, unit: 'yd', step: 100 }, atmosphere, null)
+			.trajectory[0].velocity.In(Unit.FPS);
+	const sensitive = (profile, tempModifier, temperature, temperatureUnit = 'f') => ({
+		...profile,
+		tempSensitivity: true,
+		tempModifier,
+		temperature,
+		temperatureUnit
+	});
+
+	it.each([1000, 2650, 3200])('gives +20 fps for 1 fps/°F over 20 °F at %i fps', (fps) => {
+		const plain = { ...P308_G1, velocity: String(fps) };
+		near(muzzleFps(sensitive(plain, '1', '39')) - fps, 20, 0.001, 'velocity change');
+	});
+
+	it.each([1000, 2650, 3200])('gives +11.1 fps for 1 fps/°C over 11.1 °C at %i fps', (fps) => {
+		const plain = { ...P308_G1, velocity: String(fps) };
+		near(muzzleFps(sensitive(plain, '1', '3.9', 'c')) - fps, 11.1, 0.001, 'velocity change');
+	});
+
+	it('scales with the entered value and lowers velocity in colder air', () => {
+		near(muzzleFps(sensitive(P308_G1, '1.5', '39')) - 2650, 30, 0.001, 'warmer air');
+		near(muzzleFps(sensitive(P308_G1, '1', '79')) - 2650, -20, 0.001, 'colder air');
+	});
+
+	it('accepts a negative value, for a load that slows down when warm', () => {
+		near(muzzleFps(sensitive(P308_G1, '-1', '39')) - 2650, -20, 0.001, 'velocity change');
+	});
+
+	it('keeps the value in fps per degree when the velocity is entered in m/s', () => {
+		const expected = (change) => 807.72 * 3.2808399 + change;
+		near(muzzleFps(sensitive(P308_G1_METRIC_EXACT, '1', '39')), expected(20), 0.001, '°F profile');
+		near(muzzleFps(sensitive(P308_G1_METRIC_EXACT, '1', '3.9', 'c')), expected(11.1), 0.001, '°C profile');
+	});
+
+	it('measures to the air temperature, whatever unit the atmosphere uses', () => {
+		const celsiusAir = { ...ATMO_HOT_ALTITUDE, temperature: '25', temperatureUnit: 'c' };
+		near(muzzleFps(sensitive(P308_G1, '1', '59'), celsiusAir) - 2650, 18, 0.001, '°F profile, °C air');
+		near(muzzleFps(sensitive(P308_G1, '1', '15', 'c'), ATMO_HOT_ALTITUDE) - 2650, 14.4444, 0.001, '°C profile, °F air');
+	});
+
+	it('flies like the same load entered 20 fps faster, in both calculator paths', () => {
+		const faster = { ...P308_G1, velocity: '2670' };
+		const hot = sensitive(P308_G1, '1', '39');
+		const range = { distance: 1000, unit: 'yd' };
+		const shot = calculateShotPoint(hot, range, null, null);
+		const reference = calculateShotPoint(faster, range, null, null);
+		near(shot.velocity.In(Unit.FPS), reference.velocity.In(Unit.FPS), 0.001, 'shot velocity');
+		near(shot.targetDrop.In(Unit.Inch), reference.targetDrop.In(Unit.Inch), 0.001, 'shot drop');
+
+		const rows = calculateFullTrajectory(hot, YD_1000, null, null).trajectory;
+		const fasterRows = calculateFullTrajectory(faster, YD_1000, null, null).trajectory;
+		expect(rows).toHaveLength(fasterRows.length);
+		rows.forEach((p, i) => {
+			near(p.velocity.In(Unit.FPS), fasterRows[i].velocity.In(Unit.FPS), 0.001, 'row velocity');
+			near(p.targetDrop.In(Unit.Inch), fasterRows[i].targetDrop.In(Unit.Inch), 0.001, 'row drop');
+		});
+	});
+
+	/**
+	 * At these velocities the library's loop can run forever, and a test timeout cannot stop
+	 * synchronous code. So the solver entry point is stubbed: without the guard these tests
+	 * fail on the spy instead of stalling the run.
+	 */
+	describe('when the velocity at the air temperature is unusable', () => {
+		const range = { distance: 100, unit: 'yd', step: 100 };
+		const paths = [
+			['calculateShotPoint', calculateShotPoint],
+			['calculateFullTrajectory', calculateFullTrajectory]
+		];
+		/** Run a path with the solver stubbed; returns its result and whether it got there. */
+		function guarded(calculate, profile) {
+			const solver = vi.spyOn(Calculator.prototype, 'setWeaponZero').mockImplementation(() => {
+				throw new Error('reached the solver');
+			});
+			const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+			const result = calculate(profile, range, null, null);
+			const reachedSolver = solver.mock.calls.length > 0;
+			solver.mockRestore();
+			log.mockRestore();
+			return { result, reachedSolver };
+		}
+
+		describe.each(paths)('%s', (_, calculate) => {
+			it.each([
+				['1000', '-50', 'exactly 0'],
+				['3000', '-150', 'exactly 0'],
+				['2650', '-132.5', 'exactly 0'],
+				['1e-300', '1e10', 'NaN'],
+				['2650', '1e308', 'infinite'],
+				['2650', '-200', 'negative'],
+				['2650', '-130.005', 'just under the 50 fps minimum']
+			])('returns null for %s fps with %s fps/°F (%s)', (velocity, tempModifier) => {
+				const profile = sensitive({ ...P308_G1, velocity }, tempModifier, '39');
+				expect(guarded(calculate, profile)).toEqual({ result: null, reachedSolver: false });
+			});
+
+			it('lets a velocity just over the minimum through to the solver', () => {
+				const profile = sensitive(P308_G1, '-129.995', '39');
+				expect(guarded(calculate, profile).reachedSolver).toBe(true);
+			});
+		});
+
+		it('keeps a slow load that the solver can zero', () => {
+			const slow = sensitive(P308_G1, '-125', '39');
+			near(muzzleFps(slow), 150, 0.001, 'velocity');
+			expect(calculateShotPoint(slow, range, null, null)).not.toBeNull();
+		});
+	});
+
+	it('is off when the toggle is off or the value is empty', () => {
+		near(muzzleFps({ ...sensitive(P308_G1, '1', '39'), tempSensitivity: false }), 2650, 0.001, 'toggle off');
+		near(muzzleFps(sensitive(P308_G1, '', '39')), 2650, 0.001, 'empty value');
+	});
+});
+
+/**
  * Found while writing these tests and left out of the baseline on purpose, so that recording
  * today's number does not make a bug look correct. Each one needs a decision, then a test.
  */
 describe('known problems, not pinned', () => {
-	it.todo('powder sensitivity: the form asks for fps per degree, the code uses % per 15 C');
 	it.todo('humidity of 1 % or less is read as a fraction: 1 % gives 100 %');
 	it.todo('validation forces the goal below line of sight, wrong inside a short zero');
 	it.todo('validation returns a velocity when the solver stops on a failed shot');

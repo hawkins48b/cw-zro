@@ -79,11 +79,11 @@ Yes. Mutation runs during development showed the tests fail when the calculation
 
 ### Open calculation problems
 
-None of these is fixed. They are deliberately not pinned, so a test does not make a bug look correct. Each one needs a decision, then a test. The first six are `it.todo` entries at the end of the baseline test file.
+None of these is fixed, except powder sensitivity (first row). They are deliberately not pinned, so a test does not make a bug look correct. Each one needs a decision, then a test. Rows 2 to 6 are `it.todo` entries at the end of the baseline test file.
 
 | Problem | Where |
 |---------|-------|
-| Powder sensitivity unit mismatch: the form asks for fps per degree, the code uses % per 15 C | `ballisticCalculator.js:74`, `:280` |
+| **Fixed by [#81](https://github.com/hawkins48b/cw-zro/issues/81)** ([delivery doc](2026-11-04-81-powder-sensitivity.md)): powder sensitivity unit mismatch, the form asked for fps per degree and the code used % per 15 C | `powderSensitivity()` in `ballisticCalculator.js` |
 | Validation solver goal sign: the goal is forced below line of sight, which is wrong inside a short zero | `trajectoryValidation.js:51` |
 | Validation reports success after a failed shot: the solver stops and still returns a result | `trajectoryValidation.js:97`, `:100` |
 | Humidity of 1 % or less is read as a fraction: 1 % gives 100 % | `ballisticCalculator.js:106`, `:309` |
@@ -107,3 +107,4 @@ For these, the baseline only shows that results did not change.
 ## Changelog
 
 - 2026-11-04: initial delivery
+- 2026-11-04: powder sensitivity marked as fixed by #81. The other `ballisticCalculator.js` line numbers in the table date from before that change

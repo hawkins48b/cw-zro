@@ -1,4 +1,64 @@
-import { Calculator, Weapon, DragModel, Ammo, Atmo, Wind, Shot, UNew, Table, Unit, TrajFlag } from 'js-ballistics';
+import {
+	Calculator,
+	Weapon,
+	DragModel,
+	Ammo,
+	Atmo,
+	Wind,
+	Shot,
+	UNew,
+	Table,
+	Unit,
+	TrajFlag,
+	defaultEngineConfig
+} from 'js-ballistics';
+
+/**
+ * Build the powder sensitivity options of Ammo from a profile.
+ *
+ * profile.tempModifier is fps per degree of profile.temperatureUnit, also when the muzzle
+ * velocity is entered in m/s, and profile.temperature is the temperature that velocity was
+ * measured at. js-ballistics (Ammo.getVelocityForTemp) computes, in m/s and °C:
+ *
+ *   v = tempModifier / (15 / v0) * (current - powderTemp) + v0
+ *
+ * so its modifier scales with v0. The same line in fps is
+ * change = tempModifier * mvFps / 15 * degreesC, so the value below gives a change that does
+ * not depend on velocity. One °C is 1.8 °F, so a fps/°F value counts 1.8 times per °C.
+ *
+ * @param {object} profile - flat v2 profile
+ * @param {Velocity} mv    - muzzle velocity at profile.temperature
+ * @returns {{ tempModifier: number, powderTemp: Temperature|null, usePowderSensitivity: boolean }}
+ */
+function powderSensitivity(profile, mv) {
+	if (!profile.tempSensitivity || !profile.tempModifier) {
+		return { tempModifier: 0, powderTemp: null, usePowderSensitivity: false };
+	}
+	const isCelsius = profile.temperatureUnit === 'c';
+	const fpsPerCelsius = parseFloat(profile.tempModifier) * (isCelsius ? 1 : 1.8);
+	const temperature = parseFloat(profile.temperature);
+	return {
+		tempModifier: (fpsPerCelsius * 15) / mv.In(Unit.FPS),
+		powderTemp: isCelsius ? UNew.Celsius(temperature) : UNew.Fahrenheit(temperature),
+		usePowderSensitivity: true
+	};
+}
+
+/**
+ * Whether the muzzle velocity at the current temperature is one the solver can work with.
+ *
+ * A sensitivity setting can take it to 0 or NaN, and js-ballistics then never leaves its
+ * integration loop (the zero search returns NaN instead of throwing), which try/catch cannot
+ * stop. Below cMinimumVelocity (fps) the engine stops on its first step anyway.
+ *
+ * @param {Ammo} ammo
+ * @param {Atmo} atmo
+ * @returns {boolean}
+ */
+function hasFlyableVelocity(ammo, atmo) {
+	const fps = ammo.getVelocityForTemp(atmo.powderTemp).In(Unit.FPS);
+	return Number.isFinite(fps) && fps >= defaultEngineConfig.cMinimumVelocity;
+}
 
 /**
  * Compute a single trajectory point for scope view.
@@ -66,20 +126,7 @@ export function calculateShotPoint(profile, range, atmosphere, wind, options = {
 				? UNew.MPS(parseFloat(profile.velocity))
 				: UNew.FPS(parseFloat(profile.velocity));
 
-		// --- Powder temperature sensitivity ---
-		let tempModifier = 0;
-		let powderTemp = null;
-		let usePowderSensitivity = false;
-		if (profile.tempSensitivity && profile.tempModifier) {
-			tempModifier = parseFloat(profile.tempModifier) / 100;
-			usePowderSensitivity = true;
-			powderTemp =
-				profile.temperatureUnit === 'c'
-					? UNew.Celsius(parseFloat(profile.temperature))
-					: UNew.Fahrenheit(parseFloat(profile.temperature));
-		}
-
-		const ammo = new Ammo({ dm, mv, tempModifier, powderTemp, usePowderSensitivity });
+		const ammo = new Ammo({ dm, mv, ...powderSensitivity(profile, mv) });
 
 		// --- Atmosphere ---
 		let atmo;
@@ -130,6 +177,7 @@ export function calculateShotPoint(profile, range, atmosphere, wind, options = {
 			range.unit === 'm' ? UNew.Meter(dist) : UNew.Yard(dist);
 
 		// --- Compute ---
+		if (!hasFlyableVelocity(ammo, atmo)) return null;
 		const cantDeg = options.cantAngle ?? 0;
 		const shot = new Shot({ weapon, ammo, atmo, winds, cantAngle: cantDeg !== 0 ? UNew.Degree(cantDeg) : undefined });
 		const calc = new Calculator();
@@ -272,19 +320,7 @@ export function calculateFullTrajectory(profile, range, atmosphere, wind) {
 				? UNew.MPS(parseFloat(profile.velocity))
 				: UNew.FPS(parseFloat(profile.velocity));
 
-		// --- Powder temperature sensitivity ---
-		let tempModifier = 0;
-		let powderTemp = null;
-		let usePowderSensitivity = false;
-		if (profile.tempSensitivity && profile.tempModifier) {
-			tempModifier = parseFloat(profile.tempModifier) / 100;
-			usePowderSensitivity = true;
-			powderTemp =
-				profile.temperatureUnit === 'c'
-					? UNew.Celsius(parseFloat(profile.temperature))
-					: UNew.Fahrenheit(parseFloat(profile.temperature));
-		}
-		const ammo = new Ammo({ dm, mv, tempModifier, powderTemp, usePowderSensitivity });
+		const ammo = new Ammo({ dm, mv, ...powderSensitivity(profile, mv) });
 
 		// --- Atmosphere ---
 		let atmo;
@@ -334,6 +370,7 @@ export function calculateFullTrajectory(profile, range, atmosphere, wind) {
 		const trajectoryStep = isMetric ? UNew.Meter(stepVal) : UNew.Yard(stepVal);
 
 		// --- Compute ---
+		if (!hasFlyableVelocity(ammo, atmo)) return null;
 		const shot = new Shot({ weapon, ammo, atmo, winds });
 		const calc = new Calculator();
 		calc.setWeaponZero(shot, zeroDistance);
