@@ -326,6 +326,7 @@
 	"compare_select_profile": "Select a profile",
 	"compare_zero_override": "Zero Distance",
 	"compare_zero_hint": "Override zero distance for this entry",
+	"compare_zero_invalid": "Enter a zero distance greater than 0",
 	"compare_remove": "Remove trajectory",
 	"compare_no_profiles": "No profiles available. Create a profile first.",
 	"compare_no_entries": "Add profiles to compare their trajectories.",

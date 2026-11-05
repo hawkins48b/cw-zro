@@ -1,6 +1,7 @@
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { Calculator, Weapon, DragModel, Ammo, Atmo, Wind, Shot, UNew, Unit, Table, TrajectoryRangeError } from 'js-ballistics';
 import { findZeroCrossings, ZERO_SEARCH_RANGE, isFlyableZeroElevation } from './dopeCardZeros.js';
+import { isUsableZeroDistance } from './zeroDistance.js';
 
 const PDF_UNIT = 1 / 72;
 const PDF_PRIMARY_COLOR = rgb(0.03529411764705882, 0.47843137254901963, 0.20392156862745098);
@@ -175,6 +176,8 @@ export async function generateMetricDopeCard(profile) {
 
 function computeTrajectory(profile, range, windSpeedMps, forZeros = false) {
 	try {
+		if (!isUsableZeroDistance(profile.zeroDist)) return null;
+
 		const sightHeight = profile.opticHeightUnit === 'cm'
 			? UNew.Centimeter(parseFloat(profile.opticHeight))
 			: UNew.Inch(parseFloat(profile.opticHeight));

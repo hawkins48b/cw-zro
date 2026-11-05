@@ -7,6 +7,7 @@
 	import { compareTrajectories } from '#lib/stores/compareTrajectories.svelte.js';
 	import { calculateFullTrajectory } from '#lib/utils/ballisticCalculator.js';
 	import { escapeHtmlText } from '#lib/utils/format.js';
+	import { isUsableZeroDistance } from '#lib/utils/zeroDistance.js';
 	import { Unit } from 'js-ballistics';
 	import { Plus, X } from '@lucide/svelte';
 
@@ -68,7 +69,7 @@
 		const rangeObj = { distance: rangeDist, unit: compareTrajectories.range.unit, step };
 
 		const series = [];
-		for (const entry of resolvedEntries) {
+		for (const [i, entry] of resolvedEntries.entries()) {
 			const overriddenProfile = {
 				...entry.profile,
 				zeroDist: entry.zeroDist,
@@ -83,7 +84,9 @@
 				x: Math.round(p.distance.In(distUnit) * 10) / 10,
 				y: Math.round(p.targetDrop.In(yUnit) * 100) / 100
 			}));
-			series.push({ name: escapeHtmlText(entry.label), data });
+			// An entry without a result has no series, so the color comes from the entry's position:
+			// a line must keep the color of the dot on its card.
+			series.push({ name: escapeHtmlText(entry.label), data, color: entryColor(i) });
 		}
 
 		return series.length > 0 ? series : null;
@@ -94,6 +97,10 @@
 		'#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4',
 		'#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#64748b'
 	];
+
+	function entryColor(index) {
+		return CHART_COLORS[index % CHART_COLORS.length];
+	}
 
 	function buildChartOptions(series, dark) {
 		const dAxisLabel = isMetric ? m.unit_meters() : m.unit_yards();
@@ -134,7 +141,7 @@
 				title: { text: yLabel, style: { fontSize: '12px' } },
 				labels: { formatter: (v) => `${v}` }
 			},
-			colors: CHART_COLORS.slice(0, series.length),
+			colors: series.map((s) => s.color),
 			annotations: {
 				yaxis: [
 					{
@@ -220,7 +227,7 @@
 							<div class="flex items-center gap-2">
 								<span
 									class="size-3 rounded-full shrink-0"
-									style="background-color: {CHART_COLORS[i % CHART_COLORS.length]}"
+									style="background-color: {entryColor(i)}"
 								></span>
 								<div class="flex-1 min-w-0">
 									<p class="text-sm font-semibold truncate">{entry.profile.name}</p>
@@ -244,6 +251,8 @@
 									inputmode="decimal"
 									placeholder={String(entry.profile.zeroDist)}
 									value={entry.zeroDist}
+									aria-invalid={!isUsableZeroDistance(entry.zeroDist)}
+									aria-describedby={isUsableZeroDistance(entry.zeroDist) ? undefined : `zero-error-${i}`}
 									oninput={(e) => compareTrajectories.updateEntry(entry.id, { zeroDist: e.target.value })}
 								/>
 								<div class="flex items-center gap-1 shrink-0">
@@ -258,6 +267,9 @@
 									{/each}
 								</div>
 							</div>
+							{#if !isUsableZeroDistance(entry.zeroDist)}
+								<p id={`zero-error-${i}`} class="mt-1 text-xs text-error-500">{m.compare_zero_invalid()}</p>
+							{/if}
 						</div>
 					{/each}
 				</div>

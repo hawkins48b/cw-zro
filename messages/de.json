@@ -326,6 +326,7 @@
 	"compare_select_profile": "Profil auswählen",
 	"compare_zero_override": "Nulldistanz",
 	"compare_zero_hint": "Nulldistanz für diesen Eintrag überschreiben",
+	"compare_zero_invalid": "Geben Sie eine Nulldistanz über 0 ein",
 	"compare_remove": "Trajektorie entfernen",
 	"compare_no_profiles": "Keine Profile vorhanden. Erstellen Sie zuerst ein Profil.",
 	"compare_no_entries": "Fügen Sie Profile hinzu, um deren Trajektorien zu vergleichen.",

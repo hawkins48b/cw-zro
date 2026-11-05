@@ -13,6 +13,7 @@ import {
 	TrajectoryRangeError,
 	defaultEngineConfig
 } from 'js-ballistics';
+import { isUsableZeroDistance } from './zeroDistance.js';
 
 /**
  * Relative humidity for Atmo, as a fraction: 0 is 0 %, 1 is 100 %.
@@ -87,6 +88,7 @@ export function calculateShotPoint(profile, range, atmosphere, wind, options = {
 	try {
 		const dist = Math.abs(parseFloat(range.distance));
 		if (!dist || dist <= 0) return null;
+		if (!isUsableZeroDistance(profile.zeroDist)) return null;
 
 		// --- Optic height ---
 		const sightHeight =
@@ -288,6 +290,7 @@ export function calculateFullTrajectory(profile, range, atmosphere, wind) {
 		const maxDist = Math.abs(parseFloat(range.distance));
 		const stepVal = Math.max(1, Math.abs(parseFloat(range.step)) || 25);
 		if (!maxDist || maxDist <= 0 || maxDist > 3000) return null;
+		if (!isUsableZeroDistance(profile.zeroDist)) return null;
 
 		// --- Optic height ---
 		const sightHeight =
