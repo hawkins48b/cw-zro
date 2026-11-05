@@ -23,6 +23,17 @@
 	// ── Derived: measure type/unit shortcuts ─────────────────────────
 	let solveFor = $derived(trajectoryValidation.solveFor);
 	let measureType = $derived(trajectoryValidation.measure.type);
+	let measureDirection = $derived(trajectoryValidation.direction);
+	let measureHint = $derived.by(() => {
+		if (measureType === 'angle') {
+			return measureDirection === 'above'
+				? m.traj_val_measure_hint_angle_above()
+				: m.traj_val_measure_hint_angle();
+		}
+		return measureDirection === 'above'
+			? m.traj_val_measure_hint_distance_above()
+			: m.traj_val_measure_hint_distance();
+	});
 	let measureUnit = $derived(
 		measureType === 'distance'
 			? trajectoryValidation.measure.distanceUnit
@@ -60,7 +71,8 @@
 			measureValue,
 			measureUnit,
 			solveFor,
-			atmoParams
+			atmoParams,
+			measureDirection
 		);
 	});
 
@@ -340,6 +352,23 @@
 					</div>
 				</div>
 
+				<!-- Direction toggle -->
+				<div class="flex items-center justify-between gap-2">
+					<span id="traj-val-direction" class="text-sm font-medium">{m.traj_val_direction()}</span>
+					<div class="flex gap-1 shrink-0" role="group" aria-labelledby="traj-val-direction">
+						{#each [{ value: 'below', label: m.traj_val_direction_below() }, { value: 'above', label: m.traj_val_direction_above() }] as opt}
+							<button
+								type="button"
+								class="chip text-xs {measureDirection === opt.value
+									? 'preset-filled-primary-500'
+									: 'preset-tonal-surface'}"
+								aria-pressed={measureDirection === opt.value}
+								onclick={() => trajectoryValidation.setMeasure({ direction: opt.value })}
+							>{opt.label}</button>
+						{/each}
+					</div>
+				</div>
+
 				<!-- Value + unit -->
 				<div class="space-y-1.5">
 					<div class="flex items-center justify-between">
@@ -386,9 +415,7 @@
 						/>
 						<span class="text-sm text-surface-500-400 shrink-0">{measureLabel}</span>
 					</div>
-					<p class="text-xs text-surface-500-400">
-						{measureType === 'angle' ? m.traj_val_measure_hint_angle() : m.traj_val_measure_hint_distance()}
-					</p>
+					<p class="text-xs text-surface-500-400">{measureHint}</p>
 				</div>
 			</div>
 		</div>
@@ -401,9 +428,9 @@
 
 		<!-- ═══ Results ══════════════════════════════════════════════════ -->
 		{#if validationResult?.error === 'range'}
-			<p class="text-sm text-warning-500 text-center py-2">{m.traj_val_range_error()}</p>
+			<p class="text-sm text-warning-800-200 text-center py-2">{m.traj_val_range_error()}</p>
 		{:else if validationResult?.error === 'no_solution'}
-			<p class="text-sm text-warning-500 text-center py-2">{m.traj_val_no_result()}</p>
+			<p class="text-sm text-warning-800-200 text-center py-2">{m.traj_val_no_result()}</p>
 		{:else if validationResult && !validationResult.error}
 			<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
 				{#if solveFor === 'velocity'}
@@ -464,6 +491,9 @@
 			</div>
 		{:else}
 			<p class="text-sm text-surface-500-400 text-center py-2">{m.traj_val_hint()}</p>
+		{/if}
+		{#if validationResult?.suggestAbove}
+			<p class="text-xs text-warning-800-200 text-center">{m.traj_val_above_los_notice()}</p>
 		{/if}
 
 		<!-- ═══ Comparison chart ═════════════════════════════════════════ -->

@@ -18,6 +18,7 @@ const defaults = {
 	},
 	measure: {
 		type: 'angle',      // 'angle' | 'distance'
+		direction: 'below', // 'below' | 'above': bullet relative to line of sight
 		distanceValue: '0',
 		distanceUnit: 'in', // 'in' | 'cm'
 		angleValue: '0',
@@ -32,6 +33,8 @@ const _store = localStore('zro-traj-validation', defaults);
 export const trajectoryValidation = {
 	get range() { return _store.value.range; },
 	get measure() { return _store.value.measure; },
+	// State saved before this field existed has no direction: read it as below.
+	get direction() { return _store.value.measure.direction === 'above' ? 'above' : 'below'; },
 	get solveFor() { return _store.value.solveFor ?? 'velocity'; },
 	get atmosphere() { return _store.value.atmosphere ?? { ...ISA_DEFAULTS }; },
 	setRange(patch) {

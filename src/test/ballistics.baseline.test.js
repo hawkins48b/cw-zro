@@ -40,7 +40,7 @@
  *
  * Known problems in the code are deliberately NOT pinned here. See the todos at the end.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Calculator, Unit } from 'js-ballistics';
 import {
 	calculateShotPoint,
@@ -52,6 +52,7 @@ import {
 import { calculateTrajectoryValidation } from '$lib/utils/trajectoryValidation.js';
 import {
 	P223_G1,
+	P223_SHORT_ZERO,
 	P308_G1,
 	P65_G7,
 	P338_G7_METRIC,
@@ -503,15 +504,15 @@ describe('MPBR behaviour', () => {
 describe('trajectory validation baseline', () => {
 	/**
 	 * Solved values are exact: the search runs on a fixed ladder of steps and rounds its
-	 * output. Observed drop and adjustment are the measure the search stopped on, in the
+	 * output. Observed drop and adjustment are those of the shot at the rounded value, in the
 	 * unit asked for, so they sit within about one step of the goal, not on it.
 	 */
 	it.each([
-		['velocity from inches, yd', P308_G1, { distance: 600, unit: 'yd' }, 'distance', '110', 'in', 'velocity', null, 2567, 0.462, -110.072],
+		['velocity from inches, yd', P308_G1, { distance: 600, unit: 'yd' }, 'distance', '110', 'in', 'velocity', null, 2567, 0.462, -110.091],
 		['velocity from angle in mrad, yd', P65_G7, { distance: 800, unit: 'yd' }, 'angle', '6.5', 'mrad', 'velocity', null, 2660, 0.305, -6.55],
-		['BC from inches, yd', P223_G1, { distance: 500, unit: 'yd' }, 'distance', '75', 'in', 'bc', null, 3240, 0.172, -75.317],
-		['BC from angle in MOA, yd', P308_G1, { distance: 600, unit: 'yd' }, 'angle', '17.5', 'moa', 'bc', null, 2650, 0.399, -17.529],
-		['velocity from cm, metric profile', P338_G7_METRIC, { distance: 1000, unit: 'm' }, 'distance', '750', 'cm', 'velocity', null, 943, 0.322, -748.944],
+		['BC from inches, yd', P223_G1, { distance: 500, unit: 'yd' }, 'distance', '75', 'in', 'bc', null, 3240, 0.172, -75.425],
+		['BC from angle in MOA, yd', P308_G1, { distance: 600, unit: 'yd' }, 'angle', '17.5', 'moa', 'bc', null, 2650, 0.399, -17.542],
+		['velocity from cm, metric profile', P338_G7_METRIC, { distance: 1000, unit: 'm' }, 'distance', '750', 'cm', 'velocity', null, 943, 0.322, -747.988],
 		['BC from angle in mrad, metric profile', P338_G7_METRIC, { distance: 1000, unit: 'm' }, 'angle', '7.9', 'mrad', 'bc', null, 905, 0.347, -7.911],
 		['velocity in a custom atmosphere', P308_G1, { distance: 600, unit: 'yd' }, 'distance', '110', 'in', 'velocity', ATMO_HOT_ALTITUDE, 2464, 0.462, -109.965],
 		['BC in a custom metric atmosphere', P338_G7_METRIC, { distance: 800, unit: 'm' }, 'angle', '5', 'mrad', 'bc', ATMO_COLD_METRIC, 905, 0.397, -4.994]
@@ -582,6 +583,207 @@ describe('trajectory validation baseline', () => {
 		const run = (value) => calculateTrajectoryValidation(P308_G1, range, 'distance', value, 'in', 'bc');
 		expect(run('1')).toEqual({ error: 'no_solution' });
 		expect(run('99999')).toEqual({ error: 'no_solution' });
+	});
+});
+
+/** Height of a shot relative to the line of sight, in the unit of the measure. */
+function measured(point, measureType, unit) {
+	const units = { in: Unit.Inch, cm: Unit.Centimeter, moa: Unit.MOA, mrad: Unit.MRad };
+	const value = measureType === 'distance' ? point.targetDrop : point.dropAdjustment;
+	return value.In(units[unit]);
+}
+
+/**
+ * Failed shots are part of these searches and calculateShotPoint logs each one. Every search
+ * here stays inside the velocity and BC bounds, where the library always returns: see the
+ * guard tests under powder sensitivity for what happens outside them.
+ */
+function silenceShotErrors() {
+	beforeEach(() => {
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+	});
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+}
+
+describe('trajectory validation above the line of sight (#82)', () => {
+	silenceShotErrors();
+	const yd100 = { distance: 100, unit: 'yd' };
+	const solve = (profile, range, measureType, value, unit, solveFor, direction) =>
+		calculateTrajectoryValidation(profile, range, measureType, value, unit, solveFor, null, direction);
+
+	it('solves 3 in above on the default profile', () => {
+		const result = solve(P223_SHORT_ZERO, yd100, 'distance', '3', 'in', 'velocity', 'above');
+		expect(result.error).toBeUndefined();
+		expect(result.validatedVelocity).toBeGreaterThan(1200);
+		expect(result.validatedVelocity).toBeLessThan(1500);
+		near(result.validatedPoint.targetDrop.In(Unit.Inch), 3, 0.05, 'height at the solved velocity');
+	});
+
+	it('still reads 3 in below as below, and says the bullet is above there', () => {
+		const result = solve(P223_SHORT_ZERO, yd100, 'distance', '3', 'in', 'velocity', 'below');
+		near(result.validatedVelocity, 1016, 2, 'velocity');
+		near(result.validatedPoint.targetDrop.In(Unit.Inch), -3, 0.05, 'drop at the solved velocity');
+		expect(result.suggestAbove).toBe(true);
+	});
+
+	/** Solve a goal taken from a real shot, from a profile that is deliberately off. */
+	it.each([
+		['velocity', 'distance', 'in', '1800', 8],
+		['velocity', 'distance', 'cm', '1800', 20],
+		['velocity', 'angle', 'moa', '1800', 8],
+		['velocity', 'angle', 'mrad', '1800', 8],
+		['bc', 'distance', 'in', '0.05', 0.01],
+		['bc', 'distance', 'cm', '0.05', 0.01],
+		['bc', 'angle', 'moa', '0.05', 0.01],
+		['bc', 'angle', 'mrad', '0.05', 0.01]
+	])('recovers a known %s from a %s above in %s', (solveFor, measureType, unit, truth, tolerance) => {
+		const key = solveFor === 'velocity' ? 'velocity' : 'bc';
+		const shot = calculateShotPoint({ ...P223_SHORT_ZERO, [key]: truth }, yd100, null, null);
+		const value = measured(shot, measureType, unit);
+		expect(value, 'the shot is above the line of sight').toBeGreaterThan(0);
+
+		const result = solve(P223_SHORT_ZERO, yd100, measureType, value, unit, solveFor, 'above');
+		const solved = solveFor === 'velocity' ? result.validatedVelocity : result.validatedBc;
+		// The measure is rounded to 0.1, and the curve flattens as velocity and BC rise.
+		near(solved, parseFloat(truth), solveFor === 'velocity' ? 30 : tolerance, 'solved value');
+		near(measured(result.validatedPoint, measureType, unit), value, 0.15, 'height at the solved value');
+		expect(measured(result.validatedPoint, measureType, unit)).toBeGreaterThan(0);
+	});
+
+	it('gives dropAdjustment the sign of targetDrop on both sides of the line of sight', () => {
+		const high = calculateShotPoint(P223_SHORT_ZERO, yd100, null, null);
+		const low = calculateShotPoint({ ...P223_SHORT_ZERO, velocity: '1000' }, yd100, null, null);
+		expect(high.targetDrop.In(Unit.Inch)).toBeGreaterThan(0);
+		expect(high.dropAdjustment.In(Unit.MOA)).toBeGreaterThan(0);
+		expect(low.targetDrop.In(Unit.Inch)).toBeLessThan(0);
+		expect(low.dropAdjustment.In(Unit.MOA)).toBeLessThan(0);
+	});
+
+	/** The search relies on this order, and on a short zero the zero angle moves with it. */
+	it.each([
+		['velocity', 'velocity', [70, 100, 200, 400, 700, 1000, 1200, 1500, 2000, 3000, 5000, 9900]],
+		['BC', 'bc', [0.011, 0.02, 0.05, 0.1, 0.2, 0.285, 0.5, 1, 1.9]]
+	])('height at range rises with %s inside a short zero', (_, key, values) => {
+		const heights = values.map((value) =>
+			calculateShotPoint({ ...P223_SHORT_ZERO, [key]: String(value) }, yd100, null, null).targetDrop.In(Unit.Inch)
+		);
+		expect(heights).toEqual([...heights].sort((a, b) => a - b));
+	});
+
+	it('reports no solution above the highest the bullet can be', () => {
+		// As velocity and BC grow the height tends to about 10.5 in and 8.9 in here.
+		expect(solve(P223_SHORT_ZERO, yd100, 'distance', '12', 'in', 'velocity', 'above').error).toBe('no_solution');
+		expect(solve(P223_SHORT_ZERO, yd100, 'distance', '9.5', 'in', 'bc', 'above').error).toBe('no_solution');
+	});
+
+	it('takes a positive or a negative observed value alike when above', () => {
+		const a = solve(P223_SHORT_ZERO, yd100, 'distance', '3', 'in', 'velocity', 'above');
+		const b = solve(P223_SHORT_ZERO, yd100, 'distance', '-3', 'in', 'velocity', 'above');
+		expect(b.validatedVelocity).toBe(a.validatedVelocity);
+	});
+
+	it('does not change anything for a range beyond the far zero crossing', () => {
+		const range = { distance: 600, unit: 'yd' };
+		const plain = calculateTrajectoryValidation(P223_SHORT_ZERO, range, 'distance', '40', 'in', 'velocity');
+		const below = solve(P223_SHORT_ZERO, range, 'distance', '40', 'in', 'velocity', 'below');
+		expect(below.validatedVelocity).toBe(plain.validatedVelocity);
+		expect(below.validatedVelocity).toBe(3002);
+		expect(below.suggestAbove).toBe(false);
+	});
+
+	it('suggests above only for a below goal on a bullet that is above', () => {
+		const suggest = (range, value, direction) =>
+			solve(P223_SHORT_ZERO, range, 'distance', value, 'in', 'velocity', direction).suggestAbove;
+		expect(suggest(yd100, '3', 'above')).toBe(false);
+		expect(suggest({ distance: 600, unit: 'yd' }, '30', 'below')).toBe(false);
+		expect(suggest(yd100, '3', 'below')).toBe(true);
+	});
+
+	it('still suggests above when the below goal has no solution', () => {
+		const result = solve(P223_SHORT_ZERO, yd100, 'distance', '99999', 'in', 'velocity', 'below');
+		expect(result).toEqual({ error: 'no_solution', suggestAbove: true });
+	});
+});
+
+describe('trajectory validation failures (#83)', () => {
+	silenceShotErrors();
+	const yd600 = { distance: 600, unit: 'yd' };
+	const solve = (profile, value, solveFor, direction = 'below', range = yd600) =>
+		calculateTrajectoryValidation(profile, range, 'distance', value, 'in', solveFor, null, direction);
+
+	it('reports an unreachable goal instead of the last good shot', () => {
+		expect(solve(P223_SHORT_ZERO, '100000', 'velocity')).toEqual({ error: 'no_solution' });
+		expect(solve(P223_SHORT_ZERO, '100000', 'bc')).toEqual({ error: 'no_solution' });
+		expect(solve(P308_G1, '100000', 'velocity')).toEqual({ error: 'no_solution' });
+	});
+
+	it('reports a goal past the fastest velocity', () => {
+		expect(solve(P223_SHORT_ZERO, '500', 'velocity', 'above')).toEqual({ error: 'no_solution' });
+	});
+
+	it('reports a profile whose own shot fails', () => {
+		const slow = { ...P308_G1, velocity: '60' };
+		expect(calculateShotPoint(slow, yd600, null, null)).toBeNull();
+		expect(solve(slow, '100', 'velocity')).toEqual({ error: 'no_solution' });
+	});
+
+	it('reports a search that runs into the powder sensitivity guard', () => {
+		// 39 °F profile in 59 °F air takes 2000 fps off, so the guard fails shots under about 2050.
+		const profile = { ...P308_G1, tempSensitivity: true, tempModifier: '-100', temperature: '39' };
+		const firing = vi.spyOn(Calculator.prototype, 'fire');
+		expect(solve(profile, '100000', 'velocity')).toEqual({ error: 'no_solution' });
+		expect(firing.mock.calls.length).toBeGreaterThan(0);
+	});
+
+	it('finds a goal that lies between the last good shot and a failed one', () => {
+		// The ladder goes 3000, 2900, ... 300, then fails at 200, and the answer is past 300.
+		const shot = calculateShotPoint({ ...P223_SHORT_ZERO, velocity: '250' }, yd600, null, null);
+		const drop = Math.abs(shot.targetDrop.In(Unit.Inch));
+		const result = solve(P223_SHORT_ZERO, drop, 'velocity');
+		expect(calculateShotPoint({ ...P223_SHORT_ZERO, velocity: '200' }, yd600, null, null)).toBeNull();
+		near(result.validatedVelocity, 250, 1, 'velocity');
+	});
+
+	it('finds a goal that lies between the last good shot and the lower bound', () => {
+		// The ladder goes 0.285, 0.185, 0.085, then -0.015 is out of bounds.
+		const shot = calculateShotPoint({ ...P223_SHORT_ZERO, bc: '0.05' }, yd600, null, null);
+		const result = solve(P223_SHORT_ZERO, Math.abs(shot.targetDrop.In(Unit.Inch)), 'bc');
+		near(result.validatedBc, 0.05, 0.001, 'BC');
+	});
+
+	it('accepts a goal the search can only reach to within its last step', () => {
+		// 1 fps moves the drop by over 0.1 in here, so no shot measures exactly 110.0.
+		const result = solve(P308_G1, '110', 'velocity');
+		expect(result.error).toBeUndefined();
+		near(result.validatedPoint.targetDrop.In(Unit.Inch), -110, 0.5, 'drop');
+	});
+
+	it.each([
+		['velocity', P308_G1, yd600, 'distance', '110', 'in', 'below'],
+		['velocity', P338_G7_METRIC, { distance: 1000, unit: 'm' }, 'distance', '750', 'cm', 'below'],
+		['velocity', P223_SHORT_ZERO, { distance: 100, unit: 'yd' }, 'distance', '3', 'in', 'above'],
+		['velocity', { ...P308_G1, velocity: '2650.4' }, yd600, 'distance', '102.2', 'in', 'below'],
+		['bc', P223_G1, { distance: 500, unit: 'yd' }, 'distance', '75', 'in', 'below'],
+		['bc', P308_G1, yd600, 'angle', '17.5', 'moa', 'below'],
+		['bc', P223_SHORT_ZERO, { distance: 100, unit: 'yd' }, 'angle', '7', 'moa', 'above']
+	])('returns the point of the returned %s', (solveFor, profile, range, measureType, value, unit, direction) => {
+		const result = calculateTrajectoryValidation(profile, range, measureType, value, unit, solveFor, null, direction);
+		const solved =
+			solveFor === 'velocity'
+				? { ...profile, velocity: String(result.validatedVelocity) }
+				: { ...profile, bc: String(result.validatedBc) };
+		const shot = calculateShotPoint(solved, range, null, null);
+		expect(result.validatedPoint.targetDrop.In(Unit.Inch)).toBe(shot.targetDrop.In(Unit.Inch));
+		expect(result.validatedPoint.velocity.In(Unit.FPS)).toBe(shot.velocity.In(Unit.FPS));
+	});
+
+	it('stops within a bounded number of shots on the longest walk', () => {
+		const firing = vi.spyOn(Calculator.prototype, 'fire');
+		solve({ ...P223_SHORT_ZERO, velocity: '60' }, '10', 'velocity', 'above', { distance: 100, unit: 'yd' });
+		expect(firing.mock.calls.length).toBeLessThanOrEqual(200 + 1);
+		expect(firing.mock.calls.length).toBeGreaterThan(50);
 	});
 });
 
@@ -714,8 +916,6 @@ describe('powder sensitivity', () => {
  */
 describe('known problems, not pinned', () => {
 	it.todo('humidity of 1 % or less is read as a fraction: 1 % gives 100 %');
-	it.todo('validation forces the goal below line of sight, wrong inside a short zero');
-	it.todo('validation returns a velocity when the solver stops on a failed shot');
 	it.todo('max apex comes from recorded rows only, so it depends on the table step');
 	it.todo('MPBR under-reports large targets: the zero search stops at 200');
 });

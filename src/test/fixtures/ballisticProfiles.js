@@ -37,6 +37,24 @@ export const P223_G1 = {
 	velocity: '3240'
 };
 
+/**
+ * The app's default example profile: 25 yd zero, tall optic. The bullet stays above the line of
+ * sight far past the zero: 8.8 in high at 100 yd, crossing back down near 500 yd.
+ */
+export const P223_SHORT_ZERO = {
+	...imperialProfile,
+	name: '.223 55 gr G1, short zero',
+	barrelTwist: '',
+	opticHeight: '3.5',
+	zeroDist: 25,
+	bulletDiameter: '0.223',
+	bulletWeight: '55',
+	bcType: 'G1',
+	bc: '0.285',
+	bulletLength: '',
+	velocity: '3000'
+};
+
 /** .308, 168 gr, G1, imperial inputs. */
 export const P308_G1 = {
 	...imperialProfile,
