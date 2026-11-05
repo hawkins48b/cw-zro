@@ -24,6 +24,7 @@
 		"electron:build": "npm run build && electron-builder --config electron-builder.json"
 	},
 	"devDependencies": {
+		"@inlang/plugin-message-format": "4.6.0",
 		"@skeletonlabs/skeleton": "^4.15.2",
 		"@skeletonlabs/skeleton-svelte": "^4.15.2",
 		"@sveltejs/kit": "^3.1.1",
@@ -46,7 +47,7 @@
 		"@capacitor/ios": "^8.6.0",
 		"@capacitor/splash-screen": "^8.0.2",
 		"@capacitor/status-bar": "^8.0.4",
-		"@inlang/paraglide-js": "^2.29.3",
+		"@inlang/paraglide-js": "^3.1.0",
 		"@lucide/svelte": "^0.577.0",
 		"@sveltejs/adapter-static": "^4.0.1",
 		"apexcharts": "^5.16.0",
