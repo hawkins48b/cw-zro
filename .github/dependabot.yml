@@ -1,0 +1,51 @@
+# Read by GitHub from the default branch only: this file does nothing until it
+# reaches main.
+#
+# target-branch keeps version update pull requests off main, which deploys to
+# production. It does not cover security updates: they always go to the default
+# branch and ignore every option below. See "Dependency Updates" in README.md.
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # Anything outside this group gets its own pull request: major updates,
+      # and js-ballistics at any level.
+      npm-minor-patch:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
+        exclude-patterns:
+          # Calculation results depend on it, and any change to them needs owner
+          # approval (#77), so it must not hide among other updates.
+          - js-ballistics
+    ignore:
+      # Every update, not only majors. The licence changed at 7.4.0, 7.7.0 and
+      # 8.7.0, so its terms move within a major, and the target version is an
+      # owner decision (#75). Remove this only with that decision.
+      - dependency-name: apexcharts
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      actions-minor-patch:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
+        exclude-patterns:
+          # It runs with the FTP password of the production server, so any update
+          # gets its own pull request and its own review.
+          - SamKirkland/FTP-Deploy-Action

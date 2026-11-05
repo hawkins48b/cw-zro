@@ -18,6 +18,7 @@
 		"prepare": "svelte-kit sync || echo ''",
 		"test": "vitest",
 		"test:run": "vitest run",
+		"audit:check": "node scripts/audit-check.js",
 		"cap:sync": "npm run build:mobile && npx cap sync",
 		"cap:android": "npm run cap:sync && npx cap open android",
 		"cap:ios": "npm run cap:sync && npx cap open ios",

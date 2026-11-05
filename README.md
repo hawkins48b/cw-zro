@@ -33,6 +33,7 @@ npm run dev        # Start dev server at localhost:5173
 | `npm run preview` | Preview production build |
 | `npm run test` | Run tests in watch mode |
 | `npm run test:run` | Run tests once (CI) |
+| `npm run audit:check` | Fail on high or critical audit findings (CI) |
 
 ## Features
 
@@ -119,6 +120,51 @@ npm run build     # Output: /build/
 - **Web**: Deploy `/build/` to any static hosting
 - **Mobile**: Copy build output into Capacitor project
 - **Desktop**: Load build output in Electron
+
+## Dependency Updates
+
+Dependabot (`.github/dependabot.yml`) checks npm and GitHub Actions every week and opens pull requests against `develop`, never `main`. Minor and patch updates are grouped into one pull request per ecosystem. Major updates come one by one.
+
+- **`js-ballistics`** always gets its own pull request. Merge it only with owner approval of the results (#77).
+- **`apexcharts`** gets no pull requests at all until the owner decides on its licence (#75).
+- **`SamKirkland/FTP-Deploy-Action`** always gets its own pull request, because it runs with the FTP password. Review each update on its own.
+
+Dependabot *security updates*, a repository setting, must stay off: they always target `main` and skip the rules above. Dependabot alerts are fine. No file in this repository can enforce this, so the owner has to confirm it in the repository settings.
+
+### Audit
+
+The `audit` job in CI runs `npm run audit:check`. It audits all dependencies, dev ones included, and fails on any high or critical advisory without a live exception. Moderate and low findings do not fail it.
+
+| Exit code | Meaning | What to do |
+|-----------|---------|------------|
+| 0 | No unaccepted high or critical finding | Nothing |
+| 1 | `AUDIT FAILED`: at least one finding is listed | Update the package, or add an exception |
+| 2 | `AUDIT COULD NOT RUN` or `AUDIT NOT DECIDED`: the registry gave no report, the audit covered no dependencies, or the exceptions file is invalid | Rerun the job once the registry is back, or fix the lockfile or the exceptions file |
+
+`npm audit` is retried three times when the registry gives no report. A check that could not run counts as failed, never as passed.
+
+**CI runs inside the production deploy** (`deploy-prod.yml`), so either failure also blocks a deploy, even with no change to the dependencies. An exception is the way out of a finding. It does not help with a registry outage: rerun the job.
+
+### Accepting an exception
+
+Prefer a fix. If there is none yet, or the advisory does not affect ZRO, add it to `.github/audit-exceptions.json` through a pull request to `develop`. A deploy only sees it once it is on `main`.
+
+```json
+{
+	"exceptions": [
+		{
+			"id": "GHSA-xxxx-xxxx-xxxx",
+			"reason": "Why it is safe to ship, and what would remove the need for this.",
+			"expires": "2026-12-31"
+		}
+	]
+}
+```
+
+- All three fields are required, and an invalid file fails the check. `id` is the GHSA ID printed by the check.
+- An exception covers that advisory only, on every package it reaches. Other advisories on the same package still fail.
+- It applies through its `expires` date (UTC), then stops applying and the finding fails again. Keep it within 92 days and renew it with a new reason. A later date still works, but gives a warning.
+- An exception that no longer matches a high or critical finding gives a warning: remove it.
 
 ## License
 
