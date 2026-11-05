@@ -1,125 +1,75 @@
 # ZRO — Ballistic Calculator
 
-ZRO is a precision shooting sports and long-range marksmanship calculator. It computes bullet trajectories, dope cards, MPBR, and provides an interactive scope view for field use. This is the v2 rewrite, targeting web, mobile (Capacitor), and desktop (Electron) from a single codebase.
+ZRO is a ballistic calculator for precision shooting sports and long-range marksmanship. It computes bullet trajectories, dope cards and maximum point-blank range, and it has an interactive scope view. One codebase builds a static web app, a mobile app (Capacitor) and a desktop app (Electron). All calculations run on the device. There is no backend and there are no accounts.
 
-## Tech Stack
+Results are estimates from a point-mass model. Read the [assumptions, limits and accuracy](docs/ballistics-model.md) before relying on them.
 
-| Layer | Technology |
-|-------|-----------|
-| Framework | Svelte 5 (runes) + SvelteKit 3 |
-| Language | JavaScript (no TypeScript) |
-| UI | Skeleton UI v5 + Tailwind CSS v4 |
-| Icons | Lucide Svelte |
-| Ballistics | js-ballistics |
-| Charts | ApexCharts (lazy-loaded) |
-| PDF | pdf-lib |
-| i18n | Paraglide JS (English, French, German) |
-| Testing | Vitest (jsdom) |
-| Package Manager | npm |
+## State of the project
 
-## Getting Started
+- **Production:** a push to `main` deploys the web app over FTPS. Nothing delivered since the last release is in production yet, and the last deploy stopped before uploading. See [Deployment](docs/deployment.md#current-state).
+- **`develop`:** the integration branch. It runs CI and deploys nowhere ([#69](https://github.com/hawkins48b/cw-zro/issues/69)).
+- **Desktop and mobile:** built by hand. No workflow builds them ([#79](https://github.com/hawkins48b/cw-zro/issues/79)).
+- **Held for the owner:** `js-ballistics` stays on 2.2.0-beta.2 ([#77](https://github.com/hawkins48b/cw-zro/issues/77)) and ApexCharts on 5.16.0 ([#75](https://github.com/hawkins48b/cw-zro/issues/75)).
+
+## Quick start
+
+You need Node 22.22.2 or later on the 22 line (`.nvmrc` says 22, and `.npmrc` makes npm refuse an older version). Work happens on `develop`, not on the default branch.
 
 ```bash
-npm install
-npm run dev        # Start dev server at localhost:5173
+git clone https://github.com/hawkins48b/cw-zro.git
+cd cw-zro
+git checkout develop
+npm ci
+npm run test:run
+npm run dev        # http://localhost:5173
 ```
+
+The [development guide](docs/development.md) covers the production, mobile and desktop builds.
 
 ## Scripts
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start development server |
-| `npm run build` | Production build (static SPA) |
-| `npm run preview` | Preview production build |
-| `npm run test` | Run tests in watch mode |
-| `npm run test:run` | Run tests once (CI) |
-| `npm run audit:check` | Fail on high or critical audit findings (CI) |
+| Command | What it does |
+|---------|--------------|
+| `npm run dev` | Starts the Vite dev server on port 5173 |
+| `npm run build` | Builds the web app into `build/` |
+| `npm run build:mobile` | Builds the Capacitor bundle into the same `build/` |
+| `npm run preview` | Serves `build/` locally |
+| `npm run prepare` | Runs `svelte-kit sync`. npm runs it after install |
+| `npm run test` | Runs the tests in watch mode |
+| `npm run test:run` | Runs the tests once, as CI does |
+| `npm run audit:check` | Fails on high or critical audit findings, as CI does |
+| `npm run cap:sync` | Runs `build:mobile`, then `npx cap sync` |
+| `npm run cap:android` | Runs `cap:sync`, then opens the Android project |
+| `npm run cap:ios` | Runs `cap:sync`, then opens the iOS project |
+| `npm run electron:dev` | Runs `build`, then opens the app in Electron |
+| `npm run electron:build` | Runs `build`, then packages the desktop app into `dist-electron/` |
+
+## Documentation
+
+| Guide | Content |
+|-------|---------|
+| [Architecture](docs/architecture.md) | Stack and versions, code layout, routes, stores, build targets |
+| [Ballistics model](docs/ballistics-model.md) | Inputs and units, what is modelled, input limits, accuracy |
+| [Development](docs/development.md) | Setup, daily work, web, mobile and desktop builds, common problems |
+| [Testing](docs/testing.md) | Test layers, baselines, tolerances, and the rule for changed results |
+| [Deployment](docs/deployment.md) | Branch flow, environments, secret names, releases, known gaps |
+| [Translations](docs/translations.md) | Adding messages and languages, locale URLs |
+| [Data and privacy](docs/data-and-privacy.md) | What is stored, where, and what leaves the device |
+
+The [docs index](docs/README.md) lists these guides and the dated delivery documents, which record why things were done. Rules for coding agents are in [`CLAUDE.md`](CLAUDE.md).
 
 ## Features
 
-### Scope View
-Live field calculator — enter distance, wind, and elevation angle to get real-time click adjustments. Interactive reticle display supports red-dot, MOA, MRAD, and mil-dot optics.
-
-### Ballistic Calculator
-Full trajectory table with customizable columns, CSV export, elevation chart with zero-crossing annotations, and velocity chart with speed-of-sound reference.
-
-### MPBR Calculator
-Computes Maximum Point-Blank Range for a given target size. Shows optimal zero distance, near/far zero, and a visual chart of the point-blank envelope.
-
-### Trajectory Validation
-Binary search solver — given a known impact point, solve for muzzle velocity or ballistic coefficient. Results can be saved back to the active profile.
-
-### Trajectory Comparison
-Overlay multiple profiles on a single chart to compare loads, calibers, or configurations.
-
-### Dope Cards
-Generate downloadable PDF dope cards in imperial or metric units.
-
-### Profile Management
-Create, edit, duplicate, and delete ballistic profiles (rifle + optic + ammo configuration). Profiles persist in localStorage. Includes an ammunition library with 50+ loads for quick setup.
-
-### Settings
-Dark/light mode (follows OS preference), language switching (EN/FR/DE), about page, and privacy policy.
-
-## Project Structure
-
-```
-src/
-├── routes/                  # SvelteKit pages
-│   ├── +layout.svelte       # Root layout (navigation, header)
-│   ├── scope-view/          # Live scope calculator
-│   ├── calculators/         # Calculator hub
-│   │   ├── ballistic/       # Trajectory table & charts
-│   │   ├── mpbr/            # Max point-blank range
-│   │   ├── trajectory-validation/
-│   │   ├── compare-trajectories/
-│   │   └── dope-cards/      # PDF generator
-│   ├── profiles/            # Profile CRUD & ammo selector
-│   └── settings/            # Preferences, about, privacy
-├── lib/
-│   ├── components/          # Reusable Svelte components
-│   ├── stores/              # Reactive state (.svelte.js)
-│   ├── utils/               # Pure business logic (testable)
-│   ├── data/                # Static data (ammo library)
-│   ├── paraglide/           # Generated i18n runtime
-│   └── themes/              # Skeleton theme (zro.css)
-├── test/                    # Vitest test files
-└── app.css                  # Tailwind + Skeleton imports
-```
-
-## Architecture
-
-### Responsive Layout
-
-| Target | Navigation | Layout |
-|--------|-----------|--------|
-| Mobile (Capacitor) | Bottom bar | Single column |
-| Tablet | Side rail | Two-column |
-| Desktop (Electron/Web) | Full sidebar | Multi-column |
-
-### Data Storage
-
-All data is stored client-side in localStorage — no backend, no accounts. Profiles, calculator state, and preferences persist across sessions.
-
-### Store Pattern
-
-Stores use Svelte 5 runes (`$state`, `$derived`, `$effect`) in `.svelte.js` files. Business logic is extracted into pure utility functions in `src/lib/utils/` and tested independently. Stores are thin reactive wrappers around those functions.
-
-### Internationalization
-
-All user-facing strings go through Paraglide JS. Translation files live in `messages/{lang}.json`. The app supports URL-based locale switching (`/en/`, `/fr/`, `/de/`).
-
-## Deployment
-
-The app builds as a static SPA (`@sveltejs/adapter-static` with `fallback: 'index.html'`):
-
-```bash
-npm run build     # Output: /build/
-```
-
-- **Web**: Deploy `/build/` to any static hosting
-- **Mobile**: Copy build output into Capacitor project
-- **Desktop**: Load build output in Electron
+| Feature | What it does |
+|---------|--------------|
+| Scope view | Live field calculator: distance, wind and angle give click adjustments, on a red-dot, MOA, MRAD or mil-dot reticle |
+| Ballistic calculator | Trajectory table with selectable columns, CSV export, elevation and velocity charts |
+| MPBR | Maximum point-blank range for a target size, with the zero to use and a chart |
+| Trajectory validation | Solves muzzle velocity or BC from an observed impact, and can save it to the profile |
+| Compare trajectories | Several profiles on one chart |
+| Dope cards | PDF cards in imperial or metric |
+| Profiles | Rifle, optic and ammunition sets, with a library of 41 loads |
+| Settings | Dark mode, language (English, French, German), about and privacy pages |
 
 ## Dependency Updates
 

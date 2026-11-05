@@ -1,5 +1,20 @@
-# Delivery documentation
+# Documentation
 
+## Guides
+
+Living documents. They describe the current state of `develop`.
+
+- [Architecture](architecture.md): stack and versions, code layout, routes, stores, build targets
+- [Ballistics model](ballistics-model.md): inputs and units, what is modelled, input limits, accuracy
+- [Development](development.md): setup, daily work, web, mobile and desktop builds, common problems
+- [Testing](testing.md): test layers, baselines, tolerances, and the rule for changed results
+- [Deployment](deployment.md): branch flow, environments, secret names, releases, known gaps
+- [Translations](translations.md): adding messages and languages, locale URLs
+- [Data and privacy](data-and-privacy.md): what is stored, where, and what leaves the device
+
+## Delivery documentation
+
+- [2026-11-05: Project documentation](2026-11-05-80-project-docs.md): README rewritten as an entry point, guides and `CLAUDE.md` added; describes the state on `develop` and names what is unfinished
 - [2026-11-05: Automated dependency checks](2026-11-05-78-dependency-checks.md): weekly Dependabot configuration and a CI audit that fails on high or critical findings and blocks deploys; Dependabot only starts after a release, so the issue stays open
 - [2026-11-05: Electron 45 and a working desktop package](2026-11-05-76-electron.md): Electron on 45.2.3, the packaged app now starts and the window stays inside the app; checked on Linux only, Windows and macOS not run
 - [2026-11-05: Skeleton 5 and Lucide 1](2026-11-05-74-skeleton-lucide.md): UI library and icons on their new majors; defaults that Skeleton 5 changed without notice are restored, and the small visible changes that remain are listed

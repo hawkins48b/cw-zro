@@ -35,4 +35,3 @@ vite.config.ts.timestamp-*
 
 # AI configuration
 .claude
-CLAUDE.md
