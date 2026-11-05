@@ -7,16 +7,16 @@
 	 * @prop {Function} onSave(data) - Called with the assembled profile object on submit.
 	 * @prop {Function} onCancel()   - Called when the user cancels or presses back.
 	 */
-	import { m } from '$lib/paraglide/messages.js';
+	import { m } from '#lib/paraglide/messages.js';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { localizeHref } from '$lib/paraglide/runtime.js';
+	import { localizeHref } from '#lib/paraglide/runtime.js';
 	import { untrack } from 'svelte';
 	import { ToggleLeft, ToggleRight, Search, Link, Link2Off } from '@lucide/svelte';
-	import UnitField from '$lib/components/UnitField.svelte';
-	import { validateProfile, isValid, buildAmmoString } from '$lib/utils/profileValidation.js';
-	import { ammoSelection } from '$lib/stores/ammoSelection.svelte.js';
-	import { formDraft } from '$lib/stores/formDraft.svelte.js';
+	import UnitField from '#lib/components/UnitField.svelte';
+	import { validateProfile, isValid, buildAmmoString } from '#lib/utils/profileValidation.js';
+	import { ammoSelection } from '#lib/stores/ammoSelection.svelte.js';
+	import { formDraft } from '#lib/stores/formDraft.svelte.js';
 
 	let { initialData = {}, onSave, onCancel } = $props();
 

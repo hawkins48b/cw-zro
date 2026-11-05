@@ -16,7 +16,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { Unit } from 'js-ballistics';
-import { calculateFullTrajectory } from '$lib/utils/ballisticCalculator.js';
+import { calculateFullTrajectory } from '#lib/utils/ballisticCalculator.js';
 import { WIND_10MPH } from './fixtures/ballisticProfiles.js';
 
 // ── Source A: Federal Gold Medal Match GM308M ───────────────────────────────

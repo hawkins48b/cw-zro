@@ -1,12 +1,12 @@
 <script>
-	import { m } from '$lib/paraglide/messages.js';
-	import { localizeHref } from '$lib/paraglide/runtime';
-	import { profiles } from '$lib/stores/profiles.svelte.js';
-	import { activeProfile } from '$lib/stores/activeProfile.svelte.js';
+	import { m } from '#lib/paraglide/messages.js';
+	import { localizeHref } from '#lib/paraglide/runtime.js';
+	import { profiles } from '#lib/stores/profiles.svelte.js';
+	import { activeProfile } from '#lib/stores/activeProfile.svelte.js';
 	import { Plus, Pencil, Trash2, Crosshair, Copy, ArrowUp, ArrowDown, Search } from '@lucide/svelte';
 	import { fly, fade } from 'svelte/transition';
 	import { usePress } from 'svelte-gestures';
-	import { swipe } from '$lib/actions/swipe.js';
+	import { swipe } from '#lib/actions/swipe.js';
 
 	let sortBy = $state('recent');
 	let sortDesc = $state(true);

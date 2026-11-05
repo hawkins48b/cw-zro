@@ -1,5 +1,5 @@
 <script>
-	import { m } from '$lib/paraglide/messages.js';
+	import { m } from '#lib/paraglide/messages.js';
 	import {
 		ArrowUp,
 		ArrowDown,
@@ -12,13 +12,13 @@
 	} from '@lucide/svelte';
 
 	let showElevation = $state(false);
-	import DistanceInput from '$lib/components/DistanceInput.svelte';
-	import WindInput from '$lib/components/WindInput.svelte';
-	import AtmosphereCard from '$lib/components/AtmosphereCard.svelte';
-	import ScopeReticle from '$lib/components/ScopeReticle.svelte';
-	import { activeProfile } from '$lib/stores/activeProfile.svelte.js';
-	import { scopeView } from '$lib/stores/scopeView.svelte.js';
-	import { calculateShotPoint, getElevationValue, getWindageValue } from '$lib/utils/ballisticCalculator.js';
+	import DistanceInput from '#lib/components/DistanceInput.svelte';
+	import WindInput from '#lib/components/WindInput.svelte';
+	import AtmosphereCard from '#lib/components/AtmosphereCard.svelte';
+	import ScopeReticle from '#lib/components/ScopeReticle.svelte';
+	import { activeProfile } from '#lib/stores/activeProfile.svelte.js';
+	import { scopeView } from '#lib/stores/scopeView.svelte.js';
+	import { calculateShotPoint, getElevationValue, getWindageValue } from '#lib/utils/ballisticCalculator.js';
 	import { Unit } from 'js-ballistics';
 
 	// ── Derived computation ─────────────────────────────────────────

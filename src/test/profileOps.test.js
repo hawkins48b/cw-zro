@@ -4,8 +4,9 @@ import {
 	updateProfile,
 	removeProfile,
 	getProfile,
-	duplicateProfile
-} from '$lib/utils/profileOps.js';
+	duplicateProfile,
+	safeReturnPath
+} from '#lib/utils/profileOps.js';
 
 const makeProfile = (overrides = {}) => ({
 	name: 'Remington 700',
@@ -178,5 +179,32 @@ describe('duplicateProfile', () => {
 		const { list } = duplicateProfile(seed, 'bad-id');
 		expect(list).toHaveLength(1);
 		expect(list[0].name).toBe('Stays');
+	});
+});
+
+describe('safeReturnPath', () => {
+	it.each([
+		'/profiles',
+		'/profiles/new',
+		'/fr/profiles/new',
+		'/de/profiles/7f3c1a2e-91b4-4c60-8d2e-5a1b9c0d3e4f'
+	])('keeps the profile page %s', (path) => {
+		expect(safeReturnPath(path)).toBe(path);
+	});
+
+	it.each([
+		[null],
+		[''],
+		['/nope'],
+		['/xx/profiles'],
+		['/profiles/a/b'],
+		['/profiles/../settings'],
+		['//evil.com/profiles'],
+		['/\\evil.com'],
+		['https://evil.com/profiles'],
+		['javascript:alert(1)'],
+		['/profiles\n']
+	])('falls back to the list for %j', (value) => {
+		expect(safeReturnPath(value)).toBe('/profiles');
 	});
 });

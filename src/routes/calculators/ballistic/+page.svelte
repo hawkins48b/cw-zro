@@ -1,12 +1,12 @@
 <script>
 	import { onMount } from 'svelte';
-	import { m } from '$lib/paraglide/messages.js';
-	import { activeProfile } from '$lib/stores/activeProfile.svelte.js';
-	import { ballistic } from '$lib/stores/ballistic.svelte.js';
-	import { settings } from '$lib/stores/settings.svelte.js';
-	import { calculateFullTrajectory } from '$lib/utils/ballisticCalculator.js';
-	import WindInput from '$lib/components/WindInput.svelte';
-	import AtmosphereCard from '$lib/components/AtmosphereCard.svelte';
+	import { m } from '#lib/paraglide/messages.js';
+	import { activeProfile } from '#lib/stores/activeProfile.svelte.js';
+	import { ballistic } from '#lib/stores/ballistic.svelte.js';
+	import { settings } from '#lib/stores/settings.svelte.js';
+	import { calculateFullTrajectory } from '#lib/utils/ballisticCalculator.js';
+	import WindInput from '#lib/components/WindInput.svelte';
+	import AtmosphereCard from '#lib/components/AtmosphereCard.svelte';
 	import {
 		ChevronDown,
 		ChevronRight,

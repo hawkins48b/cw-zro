@@ -1,10 +1,12 @@
 import { paraglideVitePlugin } from '@inlang/paraglide-js';
+import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
 import { readFileSync } from 'fs';
 import { defineConfig } from 'vite';
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
+const isCapacitor = process.env.BUILD_TARGET === 'capacitor';
 
 export default defineConfig({
 	define: {
@@ -17,7 +19,16 @@ export default defineConfig({
 			outdir: './src/lib/paraglide',
 			strategy: ['url', 'cookie', 'baseLocale']
 		}),
-		sveltekit()
+		sveltekit({
+			adapter: adapter({
+				fallback: 'index.html'
+			}),
+			...(isCapacitor && {
+				output: {
+					bundleStrategy: 'single'
+				}
+			})
+		})
 	],
 	ssr: {
 		// js-ballistics uses extensionless ESM imports which Node.js strict ESM can't resolve.

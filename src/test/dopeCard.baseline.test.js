@@ -12,10 +12,10 @@
  * 500 units, so ballistics.baseline.test.js is the finer check of the same library.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { generateImperialDopeCard } from '$lib/utils/dopeCardImperial.js';
-import { generateMetricDopeCard } from '$lib/utils/dopeCardMetric.js';
-import { calculateFullTrajectory, calculateMPBR } from '$lib/utils/ballisticCalculator.js';
-import { findZeroCrossings, isFlyableZeroElevation } from '$lib/utils/dopeCardZeros.js';
+import { generateImperialDopeCard } from '#lib/utils/dopeCardImperial.js';
+import { generateMetricDopeCard } from '#lib/utils/dopeCardMetric.js';
+import { calculateFullTrajectory, calculateMPBR } from '#lib/utils/ballisticCalculator.js';
+import { findZeroCrossings, isFlyableZeroElevation } from '#lib/utils/dopeCardZeros.js';
 import { Calculator, UNew, Unit } from 'js-ballistics';
 import { P223_G1, P223_SHORT_ZERO, P308_G1, P338_G7_METRIC } from './fixtures/ballisticProfiles.js';
 

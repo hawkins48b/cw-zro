@@ -1,6 +1,6 @@
 <script>
-	import { m } from '$lib/paraglide/messages.js';
-	import { localizeHref } from '$lib/paraglide/runtime';
+	import { m } from '#lib/paraglide/messages.js';
+	import { localizeHref } from '#lib/paraglide/runtime.js';
 	import {
 		CalculatorIcon,
 		TargetIcon,

@@ -1,12 +1,12 @@
 <script>
 	import { onMount } from 'svelte';
-	import { m } from '$lib/paraglide/messages.js';
-	import { activeProfile } from '$lib/stores/activeProfile.svelte.js';
-	import { mpbr } from '$lib/stores/mpbr.svelte.js';
-	import { settings } from '$lib/stores/settings.svelte.js';
-	import { calculateMPBR } from '$lib/utils/ballisticCalculator.js';
+	import { m } from '#lib/paraglide/messages.js';
+	import { activeProfile } from '#lib/stores/activeProfile.svelte.js';
+	import { mpbr } from '#lib/stores/mpbr.svelte.js';
+	import { settings } from '#lib/stores/settings.svelte.js';
+	import { calculateMPBR } from '#lib/utils/ballisticCalculator.js';
 	import { goto } from '$app/navigation';
-	import { profiles } from '$lib/stores/profiles.svelte.js';
+	import { profiles } from '#lib/stores/profiles.svelte.js';
 	import { Calculator, MapPin, Crosshair, Ruler, TrendingUp, Info, ChevronDown, BookmarkPlus } from '@lucide/svelte';
 	import { Unit } from 'js-ballistics';
 

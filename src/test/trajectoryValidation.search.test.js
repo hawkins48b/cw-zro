@@ -4,10 +4,10 @@
  * nothing reaches the library, so none of these searches can stall the run.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { calculateShotPoint } from '$lib/utils/ballisticCalculator.js';
-import { calculateTrajectoryValidation } from '$lib/utils/trajectoryValidation.js';
+import { calculateShotPoint } from '#lib/utils/ballisticCalculator.js';
+import { calculateTrajectoryValidation } from '#lib/utils/trajectoryValidation.js';
 
-vi.mock('$lib/utils/ballisticCalculator.js', () => ({ calculateShotPoint: vi.fn() }));
+vi.mock('#lib/utils/ballisticCalculator.js', () => ({ calculateShotPoint: vi.fn() }));
 
 const profile = { velocity: '3000', bc: '0.3', zeroDist: 25, zeroUnit: 'yd' };
 const range = { distance: 100, unit: 'yd' };

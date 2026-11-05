@@ -1,9 +1,9 @@
 <script>
-	import { m } from '$lib/paraglide/messages.js';
-	import { getElevationValue, getWindageValue } from '$lib/utils/ballisticCalculator.js';
-	import { scopeView } from '$lib/stores/scopeView.svelte.js';
-	import { activeProfile } from '$lib/stores/activeProfile.svelte.js';
-	import { settings } from '$lib/stores/settings.svelte.js';
+	import { m } from '#lib/paraglide/messages.js';
+	import { getElevationValue, getWindageValue } from '#lib/utils/ballisticCalculator.js';
+	import { scopeView } from '#lib/stores/scopeView.svelte.js';
+	import { activeProfile } from '#lib/stores/activeProfile.svelte.js';
+	import { settings } from '#lib/stores/settings.svelte.js';
 	import { RotateCcw, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from '@lucide/svelte';
 
 	let { point = null } = $props();

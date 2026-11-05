@@ -1,5 +1,5 @@
 <script>
-	import { m } from '$lib/paraglide/messages.js';
+	import { m } from '#lib/paraglide/messages.js';
 	import { Wind } from '@lucide/svelte';
 
 	let { speed, speedUnit, direction, onchange } = $props();

@@ -1,8 +1,8 @@
 <script>
 	import { MoonIcon, SunIcon } from '@lucide/svelte';
 	import { Switch } from '@skeletonlabs/skeleton-svelte';
-	import { m } from '$lib/paraglide/messages.js';
-	import { settings } from '$lib/stores/settings.svelte.js';
+	import { m } from '#lib/paraglide/messages.js';
+	import { settings } from '#lib/stores/settings.svelte.js';
 </script>
 
 <Switch

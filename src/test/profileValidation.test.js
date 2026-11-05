@@ -3,7 +3,7 @@ import {
 	validateProfile,
 	isValid,
 	buildAmmoString
-} from '$lib/utils/profileValidation.js';
+} from '#lib/utils/profileValidation.js';
 
 // A fully valid form (all visible fields populated, no toggles)
 const validForm = {

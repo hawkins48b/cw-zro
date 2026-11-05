@@ -1,7 +1,7 @@
 <script>
-	import { m } from '$lib/paraglide/messages.js';
-	import { localizeHref } from '$lib/paraglide/runtime';
-	import LanguageSwitcher from '$lib/components/LanguageSwitcher.svelte';
+	import { m } from '#lib/paraglide/messages.js';
+	import { localizeHref } from '#lib/paraglide/runtime.js';
+	import LanguageSwitcher from '#lib/components/LanguageSwitcher.svelte';
 	import { InfoIcon, ShieldIcon, ChevronRightIcon } from '@lucide/svelte';
 </script>
 

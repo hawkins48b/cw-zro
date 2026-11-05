@@ -1,6 +1,6 @@
 <script>
 	import { page } from '$app/state';
-	import { localizeHref, locales, getLocale } from '$lib/paraglide/runtime';
+	import { localizeHref, locales, getLocale } from '#lib/paraglide/runtime.js';
 
 	const localeLabels = { en: 'EN', fr: 'FR', de: 'DE' };
 </script>

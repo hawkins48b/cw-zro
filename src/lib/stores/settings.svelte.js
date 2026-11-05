@@ -1,4 +1,4 @@
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 import { localStore } from './localStore.svelte.js';
 
 const store = localStore(

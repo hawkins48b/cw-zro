@@ -1,9 +1,9 @@
 <script>
 	import '../app.css';
-	import favicon from '$lib/assets/favicon.svg';
+	import favicon from '#lib/assets/favicon.svg';
 	import { page } from '$app/state';
-	import { m } from '$lib/paraglide/messages.js';
-	import { localizeHref, deLocalizeHref } from '$lib/paraglide/runtime';
+	import { m } from '#lib/paraglide/messages.js';
+	import { localizeHref, deLocalizeHref } from '#lib/paraglide/runtime.js';
 	import { Navigation } from '@skeletonlabs/skeleton-svelte';
 	import {
 		ArrowLeftIcon,
@@ -11,10 +11,10 @@
 		CalculatorIcon,
 		SettingsIcon
 	} from '@lucide/svelte';
-	import ReticleIcon from '$lib/components/ReticleIcon.svelte';
-	import DarkModeToggle from '$lib/components/DarkModeToggle.svelte';
-	import { settings, applyDarkMode } from '$lib/stores/settings.svelte.js';
-	import { browser } from '$app/environment';
+	import ReticleIcon from '#lib/components/ReticleIcon.svelte';
+	import DarkModeToggle from '#lib/components/DarkModeToggle.svelte';
+	import { settings, applyDarkMode } from '#lib/stores/settings.svelte.js';
+	import { browser } from '$app/env';
 
 	let { children } = $props();
 

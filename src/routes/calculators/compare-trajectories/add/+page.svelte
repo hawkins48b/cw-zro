@@ -1,8 +1,8 @@
 <script>
-	import { m } from '$lib/paraglide/messages.js';
-	import { localizeHref } from '$lib/paraglide/runtime';
-	import { profiles } from '$lib/stores/profiles.svelte.js';
-	import { compareTrajectories } from '$lib/stores/compareTrajectories.svelte.js';
+	import { m } from '#lib/paraglide/messages.js';
+	import { localizeHref } from '#lib/paraglide/runtime.js';
+	import { profiles } from '#lib/stores/profiles.svelte.js';
+	import { compareTrajectories } from '#lib/stores/compareTrajectories.svelte.js';
 	import { goto } from '$app/navigation';
 	import { Crosshair, ArrowUp, ArrowDown, Search, Plus } from '@lucide/svelte';
 	import { fly } from 'svelte/transition';

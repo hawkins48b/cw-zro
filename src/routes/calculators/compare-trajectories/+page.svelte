@@ -1,11 +1,11 @@
 <script>
 	import { onMount } from 'svelte';
-	import { m } from '$lib/paraglide/messages.js';
-	import { localizeHref } from '$lib/paraglide/runtime';
-	import { profiles } from '$lib/stores/profiles.svelte.js';
-	import { settings } from '$lib/stores/settings.svelte.js';
-	import { compareTrajectories } from '$lib/stores/compareTrajectories.svelte.js';
-	import { calculateFullTrajectory } from '$lib/utils/ballisticCalculator.js';
+	import { m } from '#lib/paraglide/messages.js';
+	import { localizeHref } from '#lib/paraglide/runtime.js';
+	import { profiles } from '#lib/stores/profiles.svelte.js';
+	import { settings } from '#lib/stores/settings.svelte.js';
+	import { compareTrajectories } from '#lib/stores/compareTrajectories.svelte.js';
+	import { calculateFullTrajectory } from '#lib/utils/ballisticCalculator.js';
 	import { Unit } from 'js-ballistics';
 	import { Plus, X } from '@lucide/svelte';
 

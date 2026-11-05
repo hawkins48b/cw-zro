@@ -1,7 +1,7 @@
 <script>
 	import { goto } from '$app/navigation';
-	import { localizeHref } from '$lib/paraglide/runtime';
-	import { m } from '$lib/paraglide/messages.js';
+	import { localizeHref } from '#lib/paraglide/runtime.js';
+	import { m } from '#lib/paraglide/messages.js';
 	import { onMount } from 'svelte';
 
 	let visible = $state(true);
@@ -21,7 +21,7 @@
 			fading = true;
 			setTimeout(() => {
 				visible = false;
-				goto(localizeHref('/scope-view'), { replaceState: true });
+				goto(localizeHref('/scope-view'), { replace: true });
 			}, 400);
 		}, 2500);
 

@@ -1,6 +1,6 @@
 <script>
 	import { Plus, Minus } from '@lucide/svelte';
-	import { m } from '$lib/paraglide/messages.js';
+	import { m } from '#lib/paraglide/messages.js';
 
 	/**
 	 * Mobile-optimised 4-digit distance input.

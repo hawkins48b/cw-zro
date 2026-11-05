@@ -1,13 +1,14 @@
 <script>
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { localizeHref } from '$lib/paraglide/runtime.js';
-	import { m } from '$lib/paraglide/messages.js';
-	import { profiles } from '$lib/stores/profiles.svelte.js';
-	import { ammoSelection } from '$lib/stores/ammoSelection.svelte.js';
-	import ammoData from '$lib/data/ammo.json';
+	import { localizeHref } from '#lib/paraglide/runtime.js';
+	import { m } from '#lib/paraglide/messages.js';
+	import { profiles } from '#lib/stores/profiles.svelte.js';
+	import { ammoSelection } from '#lib/stores/ammoSelection.svelte.js';
+	import { safeReturnPath } from '#lib/utils/profileOps.js';
+	import ammoData from '#lib/data/ammo.json';
 
-	const returnPath = page.url.searchParams.get('return') ?? '/profiles';
+	const returnPath = safeReturnPath(page.url.searchParams.get('return'));
 
 	// Extract unique ammo from existing profiles
 	const profileAmmo = [...new Map(

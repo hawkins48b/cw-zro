@@ -72,7 +72,7 @@ None of the 6 production findings reaches code shipped to browsers. The app has 
 
 **402 passed, 1 todo**, no baselines touched. `npm ci` is clean on Node 22 with `engine-strict`, and `build` and `build:mobile` pass. The test run, `npm audit` and the npm 10 behaviour below were rerun for this document; `npm ci` only as a dry run. The builds and browser checks were not rerun.
 
-Browser smoke test, 49 checks per build: 48 of 49 on the branch and on `origin/develop` alike, and 49 of 49 on the mobile build. The one failure is the same on both: the script left a page while a chart chunk was loading.
+Browser smoke test, 49 checks per build: 48 of 49 on the branch and on `origin/develop` alike, and 49 of 49 on the mobile build. The one failure is the same on both: an ApexCharts chunk request is aborted on a deep reload, with charts still rendering. Its cause is unknown.
 
 Pages covered: scope view, ballistic, compare, trajectory validation, MPBR, profiles, PDF dope card, language switch, and reload on localized URLs.
 
@@ -80,12 +80,14 @@ Pages covered: scope view, ballistic, compare, trajectory validation, MPBR, prof
 
 ## npm version
 
-`vitest` 4.1 or later with `vite` crashes the resolver of npm 10.9.9 (`Cannot read properties of null (reading 'edgesOut')`).
+**Cleared by [#72](https://github.com/hawkins48b/cw-zro/issues/72).** After the upgrade to `vitest` 5 and `vite` 8, stock npm 10.9.9 runs `npm update`, adds a package and installs without a lockfile, and npm 11 is no longer needed to regenerate the lockfile. The rest of this section describes the state at #71.
 
-- **Works on npm 10, including CI:** `npm ci`, `npm audit` and adding a package.
-- **Fails on npm 10:** `npm update` and installing without a lockfile.
+`vitest` 4.1 or later with `vite` crashed the resolver of npm 10.9.9 (`Cannot read properties of null (reading 'edgesOut')`).
 
-The lockfile was generated with npm 11.21.2. Use npm 11 to regenerate it until [#72](https://github.com/hawkins48b/cw-zro/issues/72) is done.
+- **Worked on npm 10, including CI:** `npm ci`, `npm audit` and adding a package.
+- **Failed on npm 10:** `npm update` and installing without a lockfile.
+
+The #71 lockfile was generated with npm 11.21.2.
 
 ## Deployment notes
 
@@ -108,3 +110,5 @@ Nothing to run or configure.
 ## Changelog
 
 - 2026-11-05: initial delivery
+- 2026-11-05: npm crash cleared by #72
+- 2026-11-05: smoke test failure explanation corrected by #72

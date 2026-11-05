@@ -62,3 +62,16 @@ export function duplicateProfile(list, id) {
 	const { id: _srcId, ...rest } = src;
 	return addProfile(list, { ...rest, name: `${rest.name} - Copy` });
 }
+
+/**
+ * The page to go back to from the ammo selector, read from its `return` query parameter. Only a
+ * profile page, with or without a locale prefix, is accepted: the value comes from the URL, and
+ * goto rejects a path that leaves the site or matches no route, which would leave the selection
+ * button doing nothing.
+ *
+ * @param {string|null} value
+ * @returns {string}
+ */
+export function safeReturnPath(value) {
+	return /^(\/(fr|de))?\/profiles(\/[\w-]+)?$/.test(value ?? '') ? value : '/profiles';
+}

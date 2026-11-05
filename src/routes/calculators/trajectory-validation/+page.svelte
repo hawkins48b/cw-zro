@@ -1,15 +1,15 @@
 <script>
 	import { onMount } from 'svelte';
-	import { m } from '$lib/paraglide/messages.js';
-	import { activeProfile } from '$lib/stores/activeProfile.svelte.js';
-	import { profiles } from '$lib/stores/profiles.svelte.js';
-	import { settings } from '$lib/stores/settings.svelte.js';
-	import { trajectoryValidation } from '$lib/stores/trajectoryValidation.svelte.js';
-	import { calculateTrajectoryValidation } from '$lib/utils/trajectoryValidation.js';
-	import { calculateFullTrajectory } from '$lib/utils/ballisticCalculator.js';
+	import { m } from '#lib/paraglide/messages.js';
+	import { activeProfile } from '#lib/stores/activeProfile.svelte.js';
+	import { profiles } from '#lib/stores/profiles.svelte.js';
+	import { settings } from '#lib/stores/settings.svelte.js';
+	import { trajectoryValidation } from '#lib/stores/trajectoryValidation.svelte.js';
+	import { calculateTrajectoryValidation } from '#lib/utils/trajectoryValidation.js';
+	import { calculateFullTrajectory } from '#lib/utils/ballisticCalculator.js';
 	import { Unit } from 'js-ballistics';
 	import { CheckCircle } from '@lucide/svelte';
-	import AtmosphereCard from '$lib/components/AtmosphereCard.svelte';
+	import AtmosphereCard from '#lib/components/AtmosphereCard.svelte';
 
 	// ── ApexCharts (lazy-loaded, browser-only) ───────────────────────
 	let ApexCharts = $state(null);

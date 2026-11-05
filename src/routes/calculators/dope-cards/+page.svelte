@@ -1,6 +1,6 @@
 <script>
-	import { m } from '$lib/paraglide/messages.js';
-	import { activeProfile } from '$lib/stores/activeProfile.svelte.js';
+	import { m } from '#lib/paraglide/messages.js';
+	import { activeProfile } from '#lib/stores/activeProfile.svelte.js';
 	import { ChevronDown, ChevronRight, Download, Loader } from '@lucide/svelte';
 
 	// ── Download state ────────────────────────────────────────────────
@@ -12,11 +12,11 @@
 		loading[type] = true;
 		try {
 			if (type === 'imperial') {
-				const { generateImperialDopeCard } = await import('$lib/utils/dopeCardImperial.js');
+				const { generateImperialDopeCard } = await import('#lib/utils/dopeCardImperial.js');
 				const pdfDoc = await generateImperialDopeCard(profile);
 				await savePDF(pdfDoc, 'mid-range-dope-card-imperial.pdf');
 			} else {
-				const { generateMetricDopeCard } = await import('$lib/utils/dopeCardMetric.js');
+				const { generateMetricDopeCard } = await import('#lib/utils/dopeCardMetric.js');
 				const pdfDoc = await generateMetricDopeCard(profile);
 				await savePDF(pdfDoc, 'mid-range-dope-card-metric.pdf');
 			}

@@ -14,10 +14,10 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { UNew, Unit } from 'js-ballistics';
-import { formatNumber, formatFixed } from '$lib/utils/format.js';
+import { formatNumber, formatFixed } from '#lib/utils/format.js';
 
 const locale = vi.hoisted(() => ({ value: 'en' }));
-vi.mock('$lib/paraglide/runtime', () => ({ getLocale: () => locale.value }));
+vi.mock('#lib/paraglide/runtime.js', () => ({ getLocale: () => locale.value }));
 
 const expectRatio = (actual, expected, relative = 1e-8) => {
 	expect(Math.abs(actual - expected)).toBeLessThanOrEqual(Math.abs(expected) * relative);

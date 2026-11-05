@@ -60,8 +60,8 @@ import {
 	getWindageValue,
 	calculateFullTrajectory,
 	calculateMPBR
-} from '$lib/utils/ballisticCalculator.js';
-import { calculateTrajectoryValidation } from '$lib/utils/trajectoryValidation.js';
+} from '#lib/utils/ballisticCalculator.js';
+import { calculateTrajectoryValidation } from '#lib/utils/trajectoryValidation.js';
 import {
 	P223_G1,
 	P223_SHORT_ZERO,
