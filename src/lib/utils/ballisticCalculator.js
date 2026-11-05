@@ -402,9 +402,34 @@ export function calculateFullTrajectory(profile, range, atmosphere, wind) {
 		const nearZero = nearZeroPoint ? round1(nearZeroPoint.distance.In(distUnit)) : null;
 		const farZero = farZeroPoint ? round1(farZeroPoint.distance.In(distUnit)) : null;
 
-		// Max ordinate: highest positive targetDrop (bullet above line of sight)
+		// Max ordinate: highest positive targetDrop (bullet above line of sight), or null if the
+		// bullet stays below it within the range.
+		//
+		// The table rows cannot give this: they depend on the step, and flagged rows run past the
+		// range. js-ballistics has no apex point either: TrajFlag.APEX exists but the engine never
+		// sets it. So the same shot is fired again on a grid of one unit that depends only on the
+		// range. It costs about as much as the main fire per yard, and stopping at the far zero
+		// (the apex always comes before it) makes that about 0.3 ms for a 100 yd zero.
+		//
+		// Tolerance against a step 1 calculation: 1 distance unit and 0.05 in or cm, the rounding
+		// of the elevation. A whole range gives the very rows of step 1. A fractional one gives a
+		// step just under 1, so that the grid ends on the range and this fire never goes further
+		// than the main one, which could otherwise fail on a bullet that stops just past it.
+		// Against a 0.05 unit grid, step 1 is within 0.5 unit and 0.0002 in or cm of the top.
+		const toDistance = isMetric ? UNew.Meter : UNew.Yard;
+		const apexRange = farZeroPoint
+			? Math.min(maxDist, farZeroPoint.distance.In(distUnit))
+			: maxDist;
+		const apexRows = calc.fire({
+			shot,
+			trajectoryRange: toDistance(apexRange),
+			trajectoryStep: toDistance(maxDist / Math.ceil(maxDist)),
+			// Keeps the zero crossing rows: an arc under a unit wide can fall between grid rows.
+			extraData: true
+		}).trajectory;
+
 		let maxOrdPoint = null;
-		for (const p of allPoints) {
+		for (const p of apexRows) {
 			const elev = p.targetDrop.In(elevUnit);
 			if (elev > 0 && (maxOrdPoint === null || elev > maxOrdPoint.targetDrop.In(elevUnit))) {
 				maxOrdPoint = p;

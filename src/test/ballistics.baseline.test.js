@@ -35,8 +35,9 @@
  * move one of these by a full grid step, which is a change users see, so it should fail.
  *
  * Key points are rounded to 0.1 by the app, so: 0.2 on near/far zero, max drop distance and
- * subsonic distance, 0.1 on apex and max drop elevation, and one 5 unit step on the apex
- * distance, because the apex is picked from recorded rows.
+ * subsonic distance, 0.1 on apex and max drop elevation, and 5 units on the apex distance,
+ * because these apex values were recorded from step 5 rows. The apex no longer depends on the
+ * step (#85), and the max apex block below holds it to 1 unit.
  *
  * Known problems in the code are deliberately NOT pinned here. See the todos at the end.
  */
@@ -280,7 +281,6 @@ describe.each(PROFILES)('trajectory baseline: %s', (_, ref) => {
 		['yd', 'keyPointsYd'],
 		['m', 'keyPointsM']
 	])('records key trajectory points in %s', (unit, field) => {
-		// Step 5 keeps the sampled apex meaningful; see the todo on large steps.
 		const result = calculateFullTrajectory(ref.profile, { distance: 1000, unit, step: 5 }, null, null);
 		const expected = ref[field];
 		near(result.nearZero, expected.nearZero, 0.2, 'near zero');
@@ -958,10 +958,129 @@ describe('humidity', () => {
 });
 
 /**
+ * The apex comes from a fine fire of its own, not from the table rows (#85).
+ *
+ * Tolerance against a step 1 calculation, as in calculateFullTrajectory: 1 distance unit and
+ * 0.05 in or cm. The recorded values below were read from step 1 rows.
+ *
+ * Every case is an ordinary load at an ordinary range, with a velocity the solver can work with
+ * and a step of at least 1, like the baseline above, so none can stall the run.
+ */
+describe('max apex (#85)', () => {
+	const ZERO_200 = { ...P308_G1, zeroDist: 200 };
+	const STEPS = [1, 5, 7, 25, 100, 250, 300, 1000];
+
+	/** [name, profile, apex in yd and in, apex in m and cm] */
+	const LOADS = [
+		['the load of the issue', ZERO_200, { distance: 115, elevation: 2.2 }, { distance: 106, elevation: 5.6 }],
+		['a short zero', P223_SHORT_ZERO, { distance: 266, elevation: 17.7 }, { distance: 243, elevation: 45.1 }],
+		['a tiny arc past the zero', P223_G1, { distance: 112, elevation: 0 }, { distance: 103, elevation: 0.1 }],
+		['metric inputs', P338_G7_METRIC, { distance: 97, elevation: 0 }, { distance: 89, elevation: 0.1 }]
+	];
+	const BY_UNIT = LOADS.flatMap(([name, profile, yd, m]) => [
+		[name, 'yd', profile, yd],
+		[name, 'm', profile, m]
+	]);
+
+	const apex = (profile, unit, step, distance = 1000, atmosphere = null, wind = null) =>
+		calculateFullTrajectory(profile, { distance, unit, step }, atmosphere, wind).maxApex;
+
+	/** The highest row of a step 1 table inside the range, unrounded. */
+	function step1Top(profile, unit, distance = 1000, atmosphere = null, wind = null) {
+		const distanceUnit = unit === 'm' ? Unit.Meter : Unit.Yard;
+		const heightUnit = unit === 'm' ? Unit.Centimeter : Unit.Inch;
+		const rows = calculateFullTrajectory(profile, { distance, unit, step: 1 }, atmosphere, wind)
+			.chartPoints.map((p) => ({ distance: p.distance.In(distanceUnit), elevation: p.targetDrop.In(heightUnit) }))
+			.filter((p) => p.distance <= distance);
+		return rows.reduce((top, p) => (p.elevation > top.elevation ? p : top));
+	}
+
+	function expectStep1Match(actual, top) {
+		near(actual.distance, top.distance, 1, 'apex distance');
+		near(actual.elevation, top.elevation, 0.05, 'apex elevation');
+	}
+
+	it.each(BY_UNIT)('gives the same apex at every step for %s in %s', (_, unit, profile, recorded) => {
+		const first = apex(profile, unit, STEPS[0]);
+		near(first.distance, recorded.distance, 1, 'recorded distance');
+		near(first.elevation, recorded.elevation, 0.1, 'recorded elevation');
+		for (const step of STEPS) expect(apex(profile, unit, step), `step ${step}`).toEqual(first);
+	});
+
+	it.each(BY_UNIT)('matches a step 1 calculation for %s in %s', (_, unit, profile) => {
+		const top = step1Top(profile, unit);
+		for (const step of STEPS) expectStep1Match(apex(profile, unit, step), top);
+	});
+
+	it('fixes the values of the issue', () => {
+		// Before: 2.2 in at 125 yd, 2.1 in at 100 yd and 0 in at 27 yd.
+		const expected = { distance: 115, elevation: 2.2 };
+		for (const step of [25, 100, 250]) expect(apex(ZERO_200, 'yd', step)).toEqual(expected);
+	});
+
+	it('flies the same shot as the table, with its air and wind', () => {
+		const wind = { speed: '10', speedUnit: 'mph', direction: '45' };
+		const top = step1Top(ZERO_200, 'yd', 1000, ATMO_HOT_ALTITUDE, wind);
+		// Thin air needs less elevation to reach the zero, by more than the tolerance.
+		expect(top.elevation).toBeLessThan(step1Top(ZERO_200, 'yd').elevation - 0.05);
+		for (const step of [25, 250]) {
+			expectStep1Match(apex(ZERO_200, 'yd', step, 1000, ATMO_HOT_ALTITUDE, wind), top);
+		}
+	});
+
+	it.each([
+		['yd', 20],
+		['m', 18]
+	])('is null at every step for a shot that stays below the line of sight, in %s', (unit, distance) => {
+		// Near zero is 27 yd. Flagged rows past the range used to give 0 at the near zero.
+		for (const step of STEPS) expect(apex(ZERO_200, unit, step, distance), `step ${step}`).toBeNull();
+	});
+
+	it('stays inside the range when the bullet is still rising there', () => {
+		// The top is at 115 yd. Rows past the range used to give 2.1 in at 100 yd.
+		const expected = { distance: 50, elevation: 1 };
+		for (const step of STEPS) expect(apex(ZERO_200, 'yd', step, 50), `step ${step}`).toEqual(expected);
+	});
+
+	it.each([[50.5], [1000.5], [333.3]])('does not depend on the step for a range of %s', (distance) => {
+		const first = apex(ZERO_200, 'yd', 1, distance);
+		for (const step of STEPS) expect(apex(ZERO_200, 'yd', step, distance), `step ${step}`).toEqual(first);
+		expectStep1Match(first, step1Top(ZERO_200, 'yd', distance));
+	});
+
+	it('ends the fine fire on a fractional range, not past it', () => {
+		// Going further could fail on a bullet that stops just past the range.
+		const firing = vi.spyOn(Calculator.prototype, 'fire');
+		apex(ZERO_200, 'yd', 25, 50.5);
+		const lastRow = firing.mock.results[1].value.trajectory.at(-1);
+		firing.mockRestore();
+		near(lastRow.distance.In(Unit.Yard), 50.5, 0.01, 'last fine row');
+	});
+
+	it('keeps an arc narrower than one unit', () => {
+		// Zeroed near the tangent point: near zero 111.2 yd, far zero 111.9 yd.
+		const profile = { ...P223_G1, zeroDist: 111 };
+		const result = calculateFullTrajectory(profile, { distance: 400, unit: 'yd', step: 25 }, null, null);
+		expect(result.farZero - result.nearZero).toBeLessThan(1);
+		near(result.maxApex.distance, 111.5, 1, 'apex distance');
+		expect(result.maxApex.elevation).toBe(0);
+	});
+
+	it('fires once more, and only as far as the far zero', () => {
+		const firing = vi.spyOn(Calculator.prototype, 'fire');
+		apex(ZERO_200, 'yd', 25);
+		const ranges = firing.mock.calls.map(([options]) => options.trajectoryRange.In(Unit.Yard));
+		firing.mockRestore();
+		expect(ranges).toHaveLength(2);
+		expect(ranges[0]).toBe(1000);
+		near(ranges[1], 200.2, 0.2, 'fine fire range');
+	});
+});
+
+/**
  * Found while writing these tests and left out of the baseline on purpose, so that recording
  * today's number does not make a bug look correct. Each one needs a decision, then a test.
  */
 describe('known problems, not pinned', () => {
-	it.todo('max apex comes from recorded rows only, so it depends on the table step');
 	it.todo('MPBR under-reports large targets: the zero search stops at 200');
 });

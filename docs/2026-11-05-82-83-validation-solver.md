@@ -3,7 +3,7 @@
 - **Date:** 2026-11-05
 - **Branch:** task/82-83-validation-solver
 - **Issues:** [#82](https://github.com/hawkins48b/cw-zro/issues/82), [#83](https://github.com/hawkins48b/cw-zro/issues/83)
-- **Status:** Delivered with known issues (on the task branch, not merged yet)
+- **Status:** Delivered with known issues (on `develop`, not in production yet)
 
 ## Summary
 

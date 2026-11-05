@@ -3,7 +3,7 @@
 - **Date:** 2026-11-04
 - **Branch:** task/81-powder-sensitivity
 - **Issue:** [#81](https://github.com/hawkins48b/cw-zro/issues/81)
-- **Status:** Delivered with known issues (on the task branch, not merged yet)
+- **Status:** Delivered with known issues (on `develop`, not in production yet)
 
 ## Summary
 
