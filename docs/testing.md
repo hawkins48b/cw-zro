@@ -11,7 +11,7 @@ npx vitest run -t "MPBR search"                        # By name
 
 Vitest is configured in [`vite.config.js`](../vite.config.js): `src/**/*.test.js`, jsdom, globals on. The tests need no build.
 
-On 2026-11-05: **541 passed, 1 todo**, in 10 files.
+On 2026-11-05: **554 passed, 1 todo**, in 12 files.
 
 | File | Tests | Covers |
 |------|-------|--------|
@@ -25,6 +25,8 @@ On 2026-11-05: **541 passed, 1 todo**, in 10 files.
 | [`auditCheck.test.js`](../src/test/auditCheck.test.js) | 84 | The audit check |
 | [`electronNavigation.test.js`](../src/test/electronNavigation.test.js) | 34 | Electron URL rules |
 | [`messages.test.js`](../src/test/messages.test.js) | 6 | Message catalogs |
+| [`format.test.js`](../src/test/format.test.js) | 6 | Escaping of text for chart labels |
+| [`yAxisUnit.test.js`](../src/test/yAxisUnit.test.js) | 7 | Stored unit of the compare chart |
 
 The todo is the check of the G7 path against a table published for a G7 BC. The Federal table cannot do this.
 

@@ -1,3 +1,4 @@
+import { normalizeYAxisUnit } from '#lib/utils/yAxisUnit.js';
 import { localStore } from './localStore.svelte.js';
 
 const defaults = {
@@ -11,7 +12,7 @@ const _store = localStore('zro-compare-traj', defaults);
 export const compareTrajectories = {
 	get entries() { return _store.value.entries; },
 	get range() { return _store.value.range; },
-	get yAxis() { return _store.value.yAxis ?? 'in'; },
+	get yAxis() { return normalizeYAxisUnit(_store.value.yAxis); },
 
 	addEntry(profileId, zeroDist, zeroUnit) {
 		const id = crypto.randomUUID();

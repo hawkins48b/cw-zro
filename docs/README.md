@@ -14,6 +14,7 @@ Living documents. They describe the current state of `develop`.
 
 ## Delivery documentation
 
+- [2026-11-05: Escaping profile names in the compare chart](2026-11-05-103-chart-name-escaping.md): names with markup and a bad stored chart unit no longer run as HTML; screen readers get entities in some labels for names with `&`, `<` or `>`
 - [2026-11-05: Project documentation](2026-11-05-80-project-docs.md): README rewritten as an entry point, guides and `CLAUDE.md` added; describes the state on `develop` and names what is unfinished
 - [2026-11-05: Automated dependency checks](2026-11-05-78-dependency-checks.md): weekly Dependabot configuration and a CI audit that fails on high or critical findings and blocks deploys; Dependabot only starts after a release, so the issue stays open
 - [2026-11-05: Electron 45 and a working desktop package](2026-11-05-76-electron.md): Electron on 45.2.3, the packaged app now starts and the window stays inside the app; checked on Linux only, Windows and macOS not run

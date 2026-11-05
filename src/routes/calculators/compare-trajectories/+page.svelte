@@ -6,6 +6,7 @@
 	import { settings } from '#lib/stores/settings.svelte.js';
 	import { compareTrajectories } from '#lib/stores/compareTrajectories.svelte.js';
 	import { calculateFullTrajectory } from '#lib/utils/ballisticCalculator.js';
+	import { escapeHtmlText } from '#lib/utils/format.js';
 	import { Unit } from 'js-ballistics';
 	import { Plus, X } from '@lucide/svelte';
 
@@ -82,7 +83,7 @@
 				x: Math.round(p.distance.In(distUnit) * 10) / 10,
 				y: Math.round(p.targetDrop.In(yUnit) * 100) / 100
 			}));
-			series.push({ name: entry.label, data });
+			series.push({ name: escapeHtmlText(entry.label), data });
 		}
 
 		return series.length > 0 ? series : null;
@@ -97,7 +98,7 @@
 	function buildChartOptions(series, dark) {
 		const dAxisLabel = isMetric ? m.unit_meters() : m.unit_yards();
 		const dLabel = isMetric ? m.unit_m() : m.unit_yd();
-		const yLabel = Y_AXIS_OPTIONS.find((o) => o.value === yAxisKey)?.label() ?? yAxisKey;
+		const yLabel = Y_AXIS_OPTIONS.find((o) => o.value === yAxisKey)?.label();
 
 		const maxX = series.reduce((max, s) => {
 			const last = s.data.at(-1)?.x ?? 0;

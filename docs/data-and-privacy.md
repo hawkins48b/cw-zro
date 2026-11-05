@@ -75,5 +75,5 @@ Calculations run on the device, as the privacy page says. But the web app has no
 
 - The app sets no Content-Security-Policy, in any target. What headers the web host adds was not checked.
 - The desktop window cannot leave the app, and opens `https:` links only in the system browser. See [Architecture](architecture.md#desktop).
-- Saved values are not validated when read. See [Input guards](ballistics-model.md#input-guards).
+- Saved values are not validated when read, apart from the chart unit of compare trajectories. See [Input guards](ballistics-model.md#input-guards).
 - The app's [privacy page](../src/routes/settings/privacy/+page.svelte) does not mention `localStorage`, the language cookie or host logs.
