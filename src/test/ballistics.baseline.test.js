@@ -911,11 +911,57 @@ describe('powder sensitivity', () => {
 });
 
 /**
+ * Atmo divides humidity above 1 by 100 and reads the rest as a fraction, so a percentage of
+ * 1 or less used to be taken for a fraction: 1 % gave the same result as 100 % (#84).
+ *
+ * Every case here is the P308_G1 hotAltitude shot of the baseline with only the humidity
+ * changed, which moves air density by under 2 %, so none of them can stall the run.
+ */
+describe('humidity', () => {
+	const atmosphere = (humidity) => ({ ...ATMO_HOT_ALTITUDE, humidity });
+	const shotPoint = (humidity) =>
+		calculateShotPoint(P308_G1, { distance: 1000, unit: 'yd' }, atmosphere(humidity), null);
+	const lastRow = (humidity) =>
+		calculateFullTrajectory(P308_G1, YD_1000, atmosphere(humidity), null).trajectory.at(-1);
+	const fps = (point) => point.velocity.In(Unit.FPS);
+
+	/** [humidity, velocity fps, drop in] at 1000 yd. 0 %, 2 % and 100 % predate the fix (#84). */
+	const RECORDED = [
+		['0', 1355.823, -359.676],
+		['0.5', 1355.908, -359.656],
+		['1', 1355.993, -359.635],
+		['2', 1356.163, -359.593],
+		['100', 1373.025, -355.559]
+	];
+
+	it.each(RECORDED)('gives the recorded result on both paths at humidity %s', (humidity, velocity, drop) => {
+		for (const point of [shotPoint(humidity), lastRow(humidity)]) {
+			near(fps(point), velocity, TOL.fps, `${humidity} % velocity`);
+			near(point.height.In(Unit.Inch), drop, TOL.inch, `${humidity} % drop`);
+		}
+	});
+
+	it.each([
+		['shot point', shotPoint],
+		['full trajectory', lastRow]
+	])('has no jump at 1 % in the %s', (_, point) => {
+		const at = (humidity) => fps(point(humidity));
+		expect(at('0')).toBeLessThan(at('0.5'));
+		expect(at('0.5')).toBeLessThan(at('1'));
+		expect(at('1')).toBeLessThan(at('2'));
+		expect(at('2')).toBeLessThan(at('100'));
+		// 1 % sits next to the values on either side of the library's branch, far from 100 %.
+		near(at('1'), at('1.0001'), 0.001, '1 % against just above 1 %');
+		near(at('0.5'), at('2'), 0.5, '0.5 % against 2 %');
+		expect(at('100') - at('1')).toBeGreaterThan(10);
+	});
+});
+
+/**
  * Found while writing these tests and left out of the baseline on purpose, so that recording
  * today's number does not make a bug look correct. Each one needs a decision, then a test.
  */
 describe('known problems, not pinned', () => {
-	it.todo('humidity of 1 % or less is read as a fraction: 1 % gives 100 %');
 	it.todo('max apex comes from recorded rows only, so it depends on the table step');
 	it.todo('MPBR under-reports large targets: the zero search stops at 200');
 });

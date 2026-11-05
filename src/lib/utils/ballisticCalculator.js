@@ -14,6 +14,17 @@ import {
 } from 'js-ballistics';
 
 /**
+ * Relative humidity for Atmo, as a fraction: 0 is 0 %, 1 is 100 %.
+ *
+ * Atmo divides values above 1 by 100 and keeps the rest as they are, so a percentage of 1 or
+ * less would be read as a fraction: 1 % would give 100 %. Always passing the fraction avoids
+ * that branch, and percentages above 1 give the same value as before.
+ */
+function humidityFraction(percent) {
+	return percent / 100;
+}
+
+/**
  * Build the powder sensitivity options of Ammo from a profile.
  *
  * profile.tempModifier is fps per degree of profile.temperatureUnit, also when the muzzle
@@ -150,7 +161,7 @@ export function calculateShotPoint(profile, range, atmosphere, wind, options = {
 				atmosphere.pressureUnit === 'hpa' ? UNew.hPa(pressVal) : UNew.InHg(pressVal);
 			const temperature =
 				atmosphere.temperatureUnit === 'c' ? UNew.Celsius(tempVal) : UNew.Fahrenheit(tempVal);
-			atmo = new Atmo({ altitude, pressure, temperature, humidity: humVal });
+			atmo = new Atmo({ altitude, pressure, temperature, humidity: humidityFraction(humVal) });
 		} else {
 			atmo = new Atmo(); // ICAO standard atmosphere
 		}
@@ -342,7 +353,7 @@ export function calculateFullTrajectory(profile, range, atmosphere, wind) {
 				atmosphere.pressureUnit === 'hpa' ? UNew.hPa(pressVal) : UNew.InHg(pressVal);
 			const temperature =
 				atmosphere.temperatureUnit === 'c' ? UNew.Celsius(tempVal) : UNew.Fahrenheit(tempVal);
-			atmo = new Atmo({ altitude, pressure, temperature, humidity: humVal });
+			atmo = new Atmo({ altitude, pressure, temperature, humidity: humidityFraction(humVal) });
 		} else {
 			atmo = new Atmo();
 		}

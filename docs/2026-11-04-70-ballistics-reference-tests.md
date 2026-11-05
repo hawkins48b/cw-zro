@@ -9,7 +9,7 @@
 
 Users rely on the ballistic numbers in the field, and the calculations had no tests. `js-ballistics` is about to go from 2.2.0-beta.2 to 3.x ([#77](https://github.com/hawkins48b/cw-zro/issues/77)), so a change in results could have gone unnoticed.
 
-This task adds tests only. No production code changed. The tests found calculation problems, listed below. This task fixed none of them. Later tasks fixed the first three.
+This task adds tests only. No production code changed. The tests found calculation problems, listed below. This task fixed none of them. Later tasks fixed the first four.
 
 ## How to use
 
@@ -79,14 +79,14 @@ Yes. Mutation runs during development showed the tests fail when the calculation
 
 ### Open calculation problems
 
-Rows 1 to 3 are fixed and have tests. The others are not fixed. They are deliberately not pinned, so a test does not make a bug look correct. Each one needs a decision, then a test. Rows 4 to 6 are `it.todo` entries at the end of the baseline test file.
+Rows 1 to 4 are fixed and have tests. The others are not fixed. They are deliberately not pinned, so a test does not make a bug look correct. Each one needs a decision, then a test. Rows 5 and 6 are `it.todo` entries at the end of the baseline test file.
 
 | Problem | Where |
 |---------|-------|
 | **Fixed by [#81](https://github.com/hawkins48b/cw-zro/issues/81)** ([delivery doc](2026-11-04-81-powder-sensitivity.md)): powder sensitivity unit mismatch, the form asked for fps per degree and the code used % per 15 C | `powderSensitivity()` in `ballisticCalculator.js` |
 | **Fixed by [#82](https://github.com/hawkins48b/cw-zro/issues/82)** ([delivery doc](2026-11-05-82-83-validation-solver.md)): validation solver goal sign, the goal was forced below line of sight, which is wrong inside a short zero | `calculateTrajectoryValidation()` in `trajectoryValidation.js` |
 | **Fixed by [#83](https://github.com/hawkins48b/cw-zro/issues/83)** ([delivery doc](2026-11-05-82-83-validation-solver.md)): validation reported success after a failed shot, the solver stopped and still returned a result | `calculateTrajectoryValidation()` in `trajectoryValidation.js` |
-| Humidity of 1 % or less is read as a fraction: 1 % gives 100 % | `ballisticCalculator.js:106`, `:309` |
+| **Fixed by [#84](https://github.com/hawkins48b/cw-zro/issues/84)** ([delivery doc](2026-11-05-84-humidity-fraction.md)): humidity of 1 % or less was read as a fraction, 1 % gave 100 % | `humidityFraction()` in `ballisticCalculator.js` |
 | Max apex comes from recorded rows only, so it depends on the table step | `ballisticCalculator.js:359` |
 | MPBR under-reports on large targets: the zero search stops at 200 | `ballisticCalculator.js:477` |
 | Per-shot re-zero is a modelling limit | `ballisticCalculator.js:136`, `:339` |
@@ -109,3 +109,4 @@ For these, the baseline only shows that results did not change.
 - 2026-11-04: initial delivery
 - 2026-11-04: powder sensitivity marked as fixed by #81. The other `ballisticCalculator.js` line numbers in the table date from before that change
 - 2026-11-05: validation goal sign and success after a failed shot marked as fixed by #82 and #83. Summary and the `it.todo` row numbers corrected
+- 2026-11-05: humidity marked as fixed by #84. Summary and the `it.todo` row numbers corrected
