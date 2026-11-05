@@ -3,13 +3,13 @@
 - **Date:** 2026-11-04
 - **Branch:** task/70-ballistics-reference-tests
 - **Issue:** [#70](https://github.com/hawkins48b/cw-zro/issues/70)
-- **Status:** Delivered with known issues (on the task branch, not merged yet)
+- **Status:** Delivered with known issues, on `develop` and `main`
 
 ## Summary
 
 Users rely on the ballistic numbers in the field, and the calculations had no tests. `js-ballistics` is about to go from 2.2.0-beta.2 to 3.x ([#77](https://github.com/hawkins48b/cw-zro/issues/77)), so a change in results could have gone unnoticed.
 
-This task adds tests only. No production code changed. The tests found calculation problems, listed below. This task fixed none of them. Later tasks fixed the first five.
+This task adds tests only. No production code changed. The tests found calculation problems, listed below. This task fixed none of them. Later tasks fixed all but one, the per-shot re-zero.
 
 ## How to use
 
@@ -79,7 +79,7 @@ Yes. Mutation runs during development showed the tests fail when the calculation
 
 ### Open calculation problems
 
-Rows 1 to 5 are fixed and have tests. The others are not fixed. They are deliberately not pinned, so a test does not make a bug look correct. Each one needs a decision, then a test. Row 6 is an `it.todo` entry at the end of the baseline test file.
+All rows except row 7 are fixed and have tests. Row 7 is not fixed. It is deliberately not pinned, so a test does not make a bug look correct. It needs a decision, then a test.
 
 | Problem | Where |
 |---------|-------|
@@ -88,9 +88,9 @@ Rows 1 to 5 are fixed and have tests. The others are not fixed. They are deliber
 | **Fixed by [#83](https://github.com/hawkins48b/cw-zro/issues/83)** ([delivery doc](2026-11-05-82-83-validation-solver.md)): validation reported success after a failed shot, the solver stopped and still returned a result | `calculateTrajectoryValidation()` in `trajectoryValidation.js` |
 | **Fixed by [#84](https://github.com/hawkins48b/cw-zro/issues/84)** ([delivery doc](2026-11-05-84-humidity-fraction.md)): humidity of 1 % or less was read as a fraction, 1 % gave 100 % | `humidityFraction()` in `ballisticCalculator.js` |
 | **Fixed by [#85](https://github.com/hawkins48b/cw-zro/issues/85)** ([delivery doc](2026-11-05-85-max-apex.md)): max apex came from recorded rows only, so it depended on the table step | `calculateFullTrajectory()` in `ballisticCalculator.js` |
-| MPBR under-reports on large targets: the zero search stops at 200 | `ballisticCalculator.js:477` |
+| **Fixed by [#86](https://github.com/hawkins48b/cw-zro/issues/86)** ([delivery doc](2026-11-05-86-mpbr-search.md)): MPBR under-reported on large targets, the zero search stopped at 200 | `calculateMPBR()` in `ballisticCalculator.js` |
 | Per-shot re-zero is a modelling limit | `ballisticCalculator.js:136`, `:339` |
-| Dope card near zero prints the zero distance, not the computed near zero | `dopeCardImperial.js:42` (`dopeCardMetric.js:42` has the same code) |
+| **Fixed by [#86](https://github.com/hawkins48b/cw-zro/issues/86)** ([delivery doc](2026-11-05-86-mpbr-search.md)): dope card near zero printed the zero distance, not the computed near zero | `findZeroCrossings()` in `dopeCardZeros.js`, used by `dopeCardImperial.js` and `dopeCardMetric.js` |
 
 ### Not covered
 
@@ -111,3 +111,4 @@ For these, the baseline only shows that results did not change.
 - 2026-11-05: validation goal sign and success after a failed shot marked as fixed by #82 and #83. Summary and the `it.todo` row numbers corrected
 - 2026-11-05: humidity marked as fixed by #84. Summary and the `it.todo` row numbers corrected
 - 2026-11-05: max apex marked as fixed by #85. Summary, the `it.todo` row and the apex tolerance note corrected
+- 2026-11-05: MPBR and dope card near zero marked as fixed by #86. Status, summary and the open problems introduction corrected, and the `it.todo` sentence removed

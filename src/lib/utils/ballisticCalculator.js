@@ -10,6 +10,7 @@ import {
 	Table,
 	Unit,
 	TrajFlag,
+	TrajectoryRangeError,
 	defaultEngineConfig
 } from 'js-ballistics';
 
@@ -471,11 +472,89 @@ export function calculateFullTrajectory(profile, range, atmosphere, wind) {
 }
 
 /**
+ * Steepest barrel elevation the MPBR search tries, in radians (about 29 degrees). A higher arc
+ * carries further only up to about 0.6 rad (measured on a 300 fps load). Past that, an apex on
+ * the top of the zone would no longer give the longest range, so the search stops short of it.
+ */
+const MPBR_MAX_ELEVATION = 0.5;
+
+/**
+ * Longest flight the MPBR search follows, in yd or m. The engine ends every flight 1410 ft below
+ * the muzzle, long before this on any rifle load, so this only bounds the work on absurd inputs.
+ * A shot that gets here is reported as no result, never as a capped distance.
+ */
+const MPBR_MAX_RANGE = 20000;
+
+/**
+ * Limits of the inputs the MPBR search fires, the same as the validation solver's. Far outside
+ * them an engine step overshoots and js-ballistics can stay in its loop for good: it does at a
+ * BC of 0.00001 or 1e15 fps, while values on either side return. A hang cannot be caught.
+ */
+const MPBR_MIN_BC = 0.01;
+const MPBR_MAX_VELOCITY_FPS = 10000;
+
+/** Fire a shot and return its rows, up to where the engine stopped it if it stopped early. */
+function flightRows(calc, shot, trajectoryRange, trajectoryStep, extraData = false) {
+	try {
+		return calc.fire({ shot, trajectoryRange, trajectoryStep, extraData }).trajectory;
+	} catch (e) {
+		if (e instanceof TrajectoryRangeError) return e.incompleteTrajectory;
+		throw e;
+	}
+}
+
+/** Rows as plain numbers in mm, for the searches below: { x: distance, y: height over LoS }. */
+function heightRows(rows) {
+	return rows.map((p) => ({ x: p.distance.In(Unit.Millimeter), y: p.targetDrop.In(Unit.Millimeter) }));
+}
+
+/** Index of the highest row. */
+function apexIndex(rows) {
+	let top = 0;
+	rows.forEach((row, i) => {
+		if (row.y > rows[top].y) top = i;
+	});
+	return top;
+}
+
+/** Distance at which the line between two rows reaches a height. */
+function crossingDistance(a, b, height) {
+	return a.x + ((height - a.y) / (b.y - a.y)) * (b.x - a.x);
+}
+
+/** Distance where the bullet comes down through a height after the apex, or null. */
+function descentCrossing(rows, top, height) {
+	for (let i = top + 1; i < rows.length; i++) {
+		if (rows[i].y < height) return crossingDistance(rows[i - 1], rows[i], height);
+	}
+	return null;
+}
+
+/**
  * Compute Maximum Point Blank Range for a given target size.
  *
- * Tries zero distances from 1 to 200 yd/m and finds the one that maximises the
- * point-blank range (farthest distance where the bullet stays within ±targetSize/2
- * of the line of sight).
+ * Raising the barrel lifts the whole flight, so the bullet stays in the zone longest on the
+ * highest arc that does not leave the top of the zone: the one whose apex touches halfTarget.
+ * That elevation is found by bisection, as apex height rises steadily with it. Measured, this is
+ * about 10 times faster than the old walk over 200 zeros, and it has no limit on the zero.
+ *
+ * The zero is always the far crossing, in whole units, rounded down so the apex stays inside the
+ * zone. It also moves the shot far less per unit than a near crossing does: on a 30 in target,
+ * 1 yd of near zero moves the arc by inches. Every value returned describes the shot zeroed at
+ * optimalZero, the one the user saves to the profile, so optimalZero equals farZero.
+ *
+ * Tolerance: mpbrMax is at most 1 distance unit under the best any zero can give, and that is
+ * the cost of a whole unit zero. Distances come from step 1 rows, read between rows, which adds
+ * under 0.01 unit, and the output is rounded to 0.1.
+ *
+ * Returns null when no shot fits: the arc cannot reach the top of the zone within
+ * MPBR_MAX_ELEVATION, the flight ends inside the zone, or the zone is so thin that no whole
+ * unit zero stays inside it.
+ *
+ * Cost, as a hard bound: at most 54 fires (10 doublings, 40 halvings, the arc, two zeroed shots,
+ * the chart) and two zero solves of up to 60 integrations each, so 174 integrations. Each one
+ * ends with the flight or at MPBR_MAX_RANGE, so a call takes about 40 ms on an ordinary target
+ * and seconds on an absurd input. There is no time limit: this only runs from a button.
  *
  * @param {object} profile      - flat v2 profile
  * @param {string} targetSizeStr - target vital-zone diameter (string)
@@ -494,7 +573,6 @@ export function calculateMPBR(profile, targetSizeStr, targetUnit) {
 		const halfTargetMM = (targetSize / 2) * mmPerElev;
 
 		const distUnitEnum = useMetric ? Unit.Meter : Unit.Yard;
-		const elevUnitEnum = useMetric ? Unit.Centimeter : Unit.Inch;
 
 		// ── Build weapon (shared across all iterations) ──────────────────
 		const sightHeight =
@@ -508,6 +586,8 @@ export function calculateMPBR(profile, targetSizeStr, targetUnit) {
 					? UNew.Millimeter(parseFloat(profile.barrelTwist))
 					: UNew.Inch(parseFloat(profile.barrelTwist));
 		}
+		// An empty height is NaN, which the engine never leaves its loop on.
+		if (!Number.isFinite(sightHeight.In(Unit.Inch))) return null;
 		const weapon = new Weapon({ sightHeight, twist });
 
 		// ── Build ammo ───────────────────────────────────────────────────
@@ -527,7 +607,7 @@ export function calculateMPBR(profile, targetSizeStr, targetUnit) {
 					: UNew.Inch(parseFloat(profile.bulletLength));
 		}
 		const bc = parseFloat(profile.bc);
-		if (!bc || bc <= 0) return null;
+		if (!(bc >= MPBR_MIN_BC)) return null;
 		const dragTable = profile.bcType === 'G7' ? Table.G7 : Table.G1;
 		const dm = new DragModel({ bc, dragTable, weight, diameter, length });
 
@@ -540,87 +620,87 @@ export function calculateMPBR(profile, targetSizeStr, targetUnit) {
 		// ── Standard atmosphere (ISA) ────────────────────────────────────
 		const atmo = new Atmo();
 
-		// ── Search: try zeros from 1 to 200 yd/m with 5-unit step ────────
-		const searchRange = useMetric ? UNew.Meter(900) : UNew.Yard(900);
-		const searchStep = useMetric ? UNew.Meter(5) : UNew.Yard(5);
+		if (!hasFlyableVelocity(ammo, atmo)) return null;
+		const muzzleFps = ammo.getVelocityForTemp(atmo.powderTemp).In(Unit.FPS);
+		if (muzzleFps >= MPBR_MAX_VELOCITY_FPS) return null;
 
-		let bestResult = null;
-		let bestMaxDistMM = 0;
+		const toDistance = useMetric ? UNew.Meter : UNew.Yard;
+		const oneUnit = toDistance(1);
+		const longestFlight = toDistance(MPBR_MAX_RANGE);
+		const shot = new Shot({ weapon, ammo, atmo, winds: [] });
+		const calc = new Calculator();
 
-		for (let zeroI = 1; zeroI <= 200; zeroI++) {
-			const zeroDistance = useMetric ? UNew.Meter(zeroI) : UNew.Yard(zeroI);
-			let points;
-			try {
-				const shot = new Shot({ weapon, ammo, atmo, winds: [] });
-				const calc = new Calculator();
-				calc.setWeaponZero(shot, zeroDistance);
-				const result = calc.fire({ shot, trajectoryRange: searchRange, trajectoryStep: searchStep });
-				if (!result || result.length === 0) continue;
-				points = Array.isArray(result) ? result : (result.trajectory ?? result);
-			} catch {
-				continue;
-			}
-			if (!points || points.length === 0) continue;
+		// ── Search: the elevation that puts the apex on the top of the zone ──
+		// The apex of the same shot in a vacuum is further out than with drag, so firing that far
+		// is enough, and it saves following the bullet down on every try.
+		const gravity = Math.abs(defaultEngineConfig.cGravityConstant);
+		const apexHeight = (elevation) => {
+			weapon.zeroElevation = UNew.Radian(elevation);
+			const vacuumApexFeet = (muzzleFps ** 2 * Math.sin(2 * elevation)) / (2 * gravity);
+			const reach = Math.min(UNew.Foot(vacuumApexFeet).In(distUnitEnum) + 1, MPBR_MAX_RANGE);
+			const rows = heightRows(flightRows(calc, shot, toDistance(reach), oneUnit));
+			return rows[apexIndex(rows)].y;
+		};
 
-			// Find max ordinate (highest targetDrop = bullet farthest above LoS)
-			let maxOrdMM = -Infinity;
-			let maxOrdDistMM = 0;
-			for (const p of points) {
-				const dropMM = p.targetDrop.In(Unit.Millimeter);
-				if (dropMM > maxOrdMM) {
-					maxOrdMM = dropMM;
-					maxOrdDistMM = p.distance.In(Unit.Millimeter);
-				}
-			}
-
-			// Bullet must not rise above the top edge of the target zone
-			if (maxOrdMM > halfTargetMM) continue;
-
-			// Find MPBR bounds
-			let mpbrMinDistMM = 0;
-			let mpbrMaxDistMM = 0;
-			for (const p of points) {
-				const dropMM = p.targetDrop.In(Unit.Millimeter);
-				const distMM = p.distance.In(Unit.Millimeter);
-				// Before apex: track where bullet is still below the target zone
-				if (distMM < maxOrdDistMM && dropMM < -halfTargetMM) {
-					mpbrMinDistMM = distMM;
-				}
-				// After apex: track the farthest distance still inside the target zone
-				if (distMM > maxOrdDistMM && dropMM > -halfTargetMM) {
-					mpbrMaxDistMM = distMM;
-				}
-			}
-
-			if (mpbrMaxDistMM > bestMaxDistMM) {
-				bestMaxDistMM = mpbrMaxDistMM;
-				bestResult = { optimalZero: zeroI, maxOrdMM, maxOrdDistMM, mpbrMinDistMM, mpbrMaxDistMM };
-			}
+		// Both loops have a hard bound, part of the cost above: the elevation limit stops the first.
+		let low = 0;
+		let high = 0.001;
+		while (apexHeight(high) < halfTargetMM) {
+			if (high >= MPBR_MAX_ELEVATION) return null;
+			low = high;
+			high = Math.min(high * 2, MPBR_MAX_ELEVATION);
+		}
+		// 1e-8 rad moves the far crossing of a 30 in target by under 0.01 yd.
+		for (let i = 0; i < 40 && high - low > 1e-8; i++) {
+			const middle = (low + high) / 2;
+			if (apexHeight(middle) > halfTargetMM) high = middle;
+			else low = middle;
 		}
 
-		if (!bestResult) return null;
+		// ── Zero: the far crossing of that arc, down to a whole unit ─────
+		weapon.zeroElevation = UNew.Radian(low);
+		const arc = heightRows(flightRows(calc, shot, longestFlight, oneUnit));
+		const farCrossingMM = descentCrossing(arc, apexIndex(arc), 0);
+		if (farCrossingMM === null) return null;
+		let optimalZero = Math.floor(farCrossingMM / mmPerDist);
+
+		// ── The shot the user gets at that zero ──────────────────────────
+		// Starting from no elevation, as every other calculation does on a saved zero.
+		const zeroedRows = (zero) => {
+			weapon.zeroElevation = UNew.Radian(0);
+			calc.setWeaponZero(shot, toDistance(zero));
+			return heightRows(flightRows(calc, shot, longestFlight, oneUnit));
+		};
+		// A zero of 0 would hang the solver.
+		if (optimalZero < 1) return null;
+		let rows = zeroedRows(optimalZero);
+		// The solver zeroes on its first step past the distance, about 0.1 yd further out, so a far
+		// crossing just over a whole unit can put the apex over the top: take the unit below.
+		if (rows[apexIndex(rows)].y > halfTargetMM) {
+			optimalZero -= 1;
+			if (optimalZero < 1) return null;
+			rows = zeroedRows(optimalZero);
+		}
+		const top = apexIndex(rows);
+		const maxOrdMM = rows[top].y;
+		const maxOrdDistMM = rows[top].x;
+		// No whole unit lies inside a zone this thin.
+		if (maxOrdMM > halfTargetMM) return null;
+
+		// The flight can end inside the zone, on a slow load or a huge target.
+		const mpbrMaxDistMM = descentCrossing(rows, top, -halfTargetMM);
+		if (mpbrMaxDistMM === null) return null;
+
+		// The bullet enters the zone on the way up, unless the muzzle is already inside it.
+		const firstInside = rows.findIndex((row) => row.y >= -halfTargetMM);
+		const mpbrMinDistMM =
+			firstInside > 0
+				? crossingDistance(rows[firstInside - 1], rows[firstInside], -halfTargetMM)
+				: 0;
 
 		// ── Final detailed trajectory for chart ──────────────────────────
-		const chartMaxDist =
-			Math.ceil((bestResult.mpbrMaxDistMM / mmPerDist) * 1.2 / 50) * 50;
-		const chartRange = useMetric ? UNew.Meter(chartMaxDist) : UNew.Yard(chartMaxDist);
-		const chartStep = useMetric ? UNew.Meter(5) : UNew.Yard(5);
-		const zeroFinal = useMetric
-			? UNew.Meter(bestResult.optimalZero)
-			: UNew.Yard(bestResult.optimalZero);
-
-		const finalShot = new Shot({ weapon, ammo, atmo, winds: [] });
-		const finalCalc = new Calculator();
-		finalCalc.setWeaponZero(finalShot, zeroFinal);
-		const finalResult = finalCalc.fire({
-			shot: finalShot,
-			trajectoryRange: chartRange,
-			trajectoryStep: chartStep,
-			extraData: true
-		});
-		if (!finalResult || finalResult.length === 0) return null;
-
-		const chartPoints = finalResult.trajectory ?? (Array.isArray(finalResult) ? finalResult : []);
+		const chartMaxDist = Math.ceil((mpbrMaxDistMM / mmPerDist) * 1.2 / 50) * 50;
+		const chartPoints = flightRows(calc, shot, toDistance(chartMaxDist), toDistance(5), true);
 		if (!chartPoints || chartPoints.length === 0) return null;
 
 		// Near/far zero via flags, with manual fallback
@@ -642,16 +722,19 @@ export function calculateMPBR(profile, targetSizeStr, targetUnit) {
 			}
 		}
 
+		// On a zone a few thousandths of an inch thin, the whole unit can land on the rising side.
+		if (farZero !== optimalZero) return null;
+
 		const r1 = (v) => Math.round(v * 10) / 10;
 		return {
-			optimalZero: bestResult.optimalZero,
+			optimalZero,
 			nearZero,
 			farZero,
-			mpbrMin: r1(bestResult.mpbrMinDistMM / mmPerDist),
-			mpbrMax: r1(bestResult.mpbrMaxDistMM / mmPerDist),
+			mpbrMin: r1(mpbrMinDistMM / mmPerDist),
+			mpbrMax: r1(mpbrMaxDistMM / mmPerDist),
 			maxOrdinate: {
-				elevation: r1(bestResult.maxOrdMM / mmPerElev),
-				distance: r1(bestResult.maxOrdDistMM / mmPerDist)
+				elevation: r1(maxOrdMM / mmPerElev),
+				distance: r1(maxOrdDistMM / mmPerDist)
 			},
 			halfTarget: r1(halfTargetMM / mmPerElev),
 			trajectory: chartPoints,

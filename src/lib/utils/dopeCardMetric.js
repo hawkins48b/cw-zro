@@ -1,5 +1,6 @@
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
-import { Calculator, Weapon, DragModel, Ammo, Atmo, Wind, Shot, UNew, Unit, Table } from 'js-ballistics';
+import { Calculator, Weapon, DragModel, Ammo, Atmo, Wind, Shot, UNew, Unit, Table, TrajectoryRangeError } from 'js-ballistics';
+import { findZeroCrossings, ZERO_SEARCH_RANGE, isFlyableZeroElevation } from './dopeCardZeros.js';
 
 const PDF_UNIT = 1 / 72;
 const PDF_PRIMARY_COLOR = rgb(0.03529411764705882, 0.47843137254901963, 0.20392156862745098);
@@ -28,6 +29,9 @@ export async function generateMetricDopeCard(profile) {
 
 	if (!shot1 || !shot25 || !shot25Wind3 || !shot25Wind9) return pdfDoc;
 
+	// The crossings can lie past the 500 units of the card, so this one goes further.
+	const shotZeros = computeTrajectory(profile, { distance: ZERO_SEARCH_RANGE, unit: 'm', step: 1 }, 0, true);
+
 	fillHeader();
 	fillGraph();
 	fillPointsOfAim();
@@ -39,10 +43,9 @@ export async function generateMetricDopeCard(profile) {
 		drawText(profile.name ?? '', 1.88, 0.59, 11);
 		// Ammo brand
 		drawText(profile.bulletBrand ?? '', 4, 0.59, 11);
-		// Near zero (in meters)
-		let nearZero = parseFloat(profile.zeroDist);
-		if (profile.zeroUnit === 'yd') nearZero = Math.round(UNew.Yard(nearZero).In(Unit.Meter) * 10) / 10;
-		drawText(String(nearZero), 7.34, 0.59, 11);
+		// Near zero, from the trajectory: the saved zero can be either crossing
+		const zeros = findZeroCrossings(shotZeros, Unit.Meter);
+		if (zeros.near !== null) drawText(String(Math.round(zeros.near * 10) / 10), 7.34, 0.59, 11);
 		// 25 m impact
 		const p25 = findPoint(shot1, Unit.Meter, 25);
 		if (p25) {
@@ -54,8 +57,7 @@ export async function generateMetricDopeCard(profile) {
 		// BC
 		drawText(`${profile.bc ?? ''} ${profile.bcType ?? ''}`, 4.41, 0.97, 11);
 		// Far zero from trajectory
-		const farZeroDist = findFarZero(shot1, Unit.Meter);
-		if (farZeroDist !== null) drawText(String(Math.round(farZeroDist * 10) / 10), 7.34, 0.97, 11);
+		if (zeros.far !== null) drawText(String(Math.round(zeros.far * 10) / 10), 7.34, 0.97, 11);
 		// 100 m impact
 		const p100 = findPoint(shot1, Unit.Meter, 100);
 		if (p100) {
@@ -171,7 +173,7 @@ export async function generateMetricDopeCard(profile) {
 
 // ── Shared helpers ───────────────────────────────────────────────────────────
 
-function computeTrajectory(profile, range, windSpeedMps) {
+function computeTrajectory(profile, range, windSpeedMps, forZeros = false) {
 	try {
 		const sightHeight = profile.opticHeightUnit === 'cm'
 			? UNew.Centimeter(parseFloat(profile.opticHeight))
@@ -211,10 +213,13 @@ function computeTrajectory(profile, range, windSpeedMps) {
 		const shot = new Shot({ weapon, ammo, atmo, winds });
 		const calc = new Calculator();
 		calc.setWeaponZero(shot, zeroDist);
-		const result = calc.fire({ shot, trajectoryRange: trajRange, trajectoryStep: trajStep });
+		if (forZeros && !isFlyableZeroElevation(weapon.zeroElevation)) return null;
+		const result = calc.fire({ shot, trajectoryRange: trajRange, trajectoryStep: trajStep, extraData: forZeros });
 		if (!result || result.length === 0) return null;
 		return Array.isArray(result) ? result : (result.trajectory ?? []);
-	} catch {
+	} catch (e) {
+		// A search for crossings can use the flight up to where the engine stopped it.
+		if (forZeros && e instanceof TrajectoryRangeError) return e.incompleteTrajectory;
 		return null;
 	}
 }
@@ -222,18 +227,6 @@ function computeTrajectory(profile, range, windSpeedMps) {
 function findPoint(trajectory, unitEnum, targetDist) {
 	if (!trajectory) return null;
 	return trajectory.find((p) => Math.round(p.distance.In(unitEnum)) === targetDist) ?? null;
-}
-
-function findFarZero(trajectory, unitEnum) {
-	if (!trajectory) return null;
-	let crossed = false;
-	for (let i = 1; i < trajectory.length; i++) {
-		const prev = trajectory[i - 1].targetDrop.In(Unit.Millimeter);
-		const curr = trajectory[i].targetDrop.In(Unit.Millimeter);
-		if (!crossed && prev < 0 && curr >= 0) { crossed = true; continue; }
-		if (crossed && prev >= 0 && curr < 0) return trajectory[i].distance.In(unitEnum);
-	}
-	return null;
 }
 
 function fmtSigned(v) {

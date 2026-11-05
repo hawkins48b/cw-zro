@@ -29,20 +29,31 @@
  * and drop is 30 times. At 100 yd the same changes are much smaller, so the long-range rows
  * carry the detection.
  *
- * Exact values, no tolerance: the quantized results. MPBR distances sit on the 5 unit search
- * grid and zero on the 1 unit grid, the validation solver returns whole fps and 0.001 BC, and
+ * Exact values, no tolerance: the quantized results. MPBR zeros are whole units and MPBR
+ * distances are rounded to 0.1, the validation solver returns whole fps and 0.001 BC, and
  * getElevationValue/getWindageValue return display-rounded values. A small real change can
- * move one of these by a full grid step, which is a change users see, so it should fail.
+ * move one of these by a full step, which is a change users see, so it should fail.
  *
  * Key points are rounded to 0.1 by the app, so: 0.2 on near/far zero, max drop distance and
  * subsonic distance, 0.1 on apex and max drop elevation, and 5 units on the apex distance,
  * because these apex values were recorded from step 5 rows. The apex no longer depends on the
  * step (#85), and the max apex block below holds it to 1 unit.
  *
- * Known problems in the code are deliberately NOT pinned here. See the todos at the end.
+ * Known problems in the code are deliberately NOT pinned here.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Calculator, Unit } from 'js-ballistics';
+import {
+	Ammo,
+	Atmo,
+	Calculator,
+	DragModel,
+	EulerIntegrationEngine,
+	Shot,
+	Table,
+	UNew,
+	Unit,
+	Weapon
+} from 'js-ballistics';
 import {
 	calculateShotPoint,
 	getElevationValue,
@@ -93,6 +104,11 @@ function near(actual, expected, tolerance, label) {
  * - coldMetric: ATMO_COLD_METRIC, 4 m/s from 300 degrees.
  * - scope600yd: [elevation, windage] by display unit, 600 yd, WIND_10MPH.
  * - spinDriftIn: windage at 500 and 1000 yd, spin drift on, no wind.
+ * - mpbr8in, mpbr20cm: re-recorded for #86, the only values here to change on purpose. The search
+ *   used to walk zeros up to 200 on 5 unit rows, so optimalZero was a near crossing and mpbrMin,
+ *   mpbrMax and the apex distance sat on the 5 unit grid. Now optimalZero is the far crossing and
+ *   equals farZero, mpbrMax gains 2 to 8 units from the better arc, and the distances are read
+ *   between step 1 rows. See the MPBR search block for the check against a brute force search.
  */
 const REFERENCE = {
 	P223_G1: {
@@ -125,8 +141,8 @@ const REFERENCE = {
 		],
 		scope600yd: { MOA: [-14.1, 8.9], MRAD: [-4.1, 2.6], IN: [-88.9, 55.9], FT: [-7.41, 4.66], CM: [-225.8, 142.1], M: [-2.26, 1.42] },
 		spinDriftIn: [2.105, 15.93],
-		mpbr8in: { optimalZero: 39, nearZero: 39, farZero: 286, mpbrMin: 0, mpbrMax: 330, maxOrdinate: { elevation: 3.9, distance: 170 }, halfTarget: 4, useMetric: false },
-		mpbr20cm: { optimalZero: 36, nearZero: 36, farZero: 260, mpbrMin: 0, mpbrMax: 300, maxOrdinate: { elevation: 9.8, distance: 155 }, halfTarget: 10, useMetric: true }
+		mpbr8in: { optimalZero: 287, nearZero: 39, farZero: 287, mpbrMin: 0, mpbrMax: 332.3, maxOrdinate: { elevation: 4, distance: 170 }, halfTarget: 4, useMetric: false },
+		mpbr20cm: { optimalZero: 261, nearZero: 36, farZero: 261, mpbrMin: 0, mpbrMax: 302.2, maxOrdinate: { elevation: 9.9, distance: 155 }, halfTarget: 10, useMetric: true }
 	},
 	P308_G1: {
 		profile: P308_G1,
@@ -158,8 +174,8 @@ const REFERENCE = {
 		],
 		scope600yd: { MOA: [-16.3, 5.4], MRAD: [-4.7, 1.6], IN: [-102.2, 33.9], FT: [-8.51, 2.83], CM: [-259.5, 86.2], M: [-2.6, 0.86] },
 		spinDriftIn: [2.346, 12.892],
-		mpbr8in: { optimalZero: 21, nearZero: 21, farZero: 249, mpbrMin: 0, mpbrMax: 290, maxOrdinate: { elevation: 4, distance: 140 }, halfTarget: 4, useMetric: false },
-		mpbr20cm: { optimalZero: 20, nearZero: 20, farZero: 220, mpbrMin: 0, mpbrMax: 260, maxOrdinate: { elevation: 9.2, distance: 125 }, halfTarget: 10, useMetric: true }
+		mpbr8in: { optimalZero: 249, nearZero: 21, farZero: 249, mpbrMin: 0, mpbrMax: 293.4, maxOrdinate: { elevation: 4, distance: 139 }, halfTarget: 4, useMetric: false },
+		mpbr20cm: { optimalZero: 226, nearZero: 20, farZero: 226, mpbrMin: 0, mpbrMax: 266.4, maxOrdinate: { elevation: 9.9, distance: 126 }, halfTarget: 10, useMetric: true }
 	},
 	P65_G7: {
 		profile: P65_G7,
@@ -191,8 +207,8 @@ const REFERENCE = {
 		],
 		scope600yd: { MOA: [-13.5, 4.1], MRAD: [-3.9, 1.2], IN: [-84.9, 26], FT: [-7.08, 2.16], CM: [-215.8, 65.9], M: [-2.16, 0.66] },
 		spinDriftIn: [1.657, 8.119],
-		mpbr8in: { optimalZero: 27, nearZero: 27, farZero: 264, mpbrMin: 0, mpbrMax: 310, maxOrdinate: { elevation: 3.9, distance: 150 }, halfTarget: 4, useMetric: false },
-		mpbr20cm: { optimalZero: 25, nearZero: 25, farZero: 239, mpbrMin: 0, mpbrMax: 280, maxOrdinate: { elevation: 9.7, distance: 135 }, halfTarget: 10, useMetric: true }
+		mpbr8in: { optimalZero: 265, nearZero: 27, farZero: 265, mpbrMin: 0, mpbrMax: 312, maxOrdinate: { elevation: 4, distance: 149 }, halfTarget: 4, useMetric: false },
+		mpbr20cm: { optimalZero: 241, nearZero: 25, farZero: 241, mpbrMin: 0, mpbrMax: 283.6, maxOrdinate: { elevation: 9.9, distance: 135 }, halfTarget: 10, useMetric: true }
 	},
 	P338_G7_METRIC: {
 		profile: P338_G7_METRIC,
@@ -224,8 +240,8 @@ const REFERENCE = {
 		],
 		scope600yd: { MOA: [-10.6, 3.4], MRAD: [-3.1, 1], IN: [-66.4, 21.4], FT: [-5.54, 1.79], CM: [-168.8, 54.5], M: [-1.69, 0.54] },
 		spinDriftIn: [1.564, 7.386],
-		mpbr8in: { optimalZero: 31, nearZero: 31, farZero: 287, mpbrMin: 0, mpbrMax: 335, maxOrdinate: { elevation: 3.8, distance: 160 }, halfTarget: 4, useMetric: false },
-		mpbr20cm: { optimalZero: 28, nearZero: 28, farZero: 265, mpbrMin: 0, mpbrMax: 310, maxOrdinate: { elevation: 10, distance: 150 }, halfTarget: 10, useMetric: true }
+		mpbr8in: { optimalZero: 292, nearZero: 31, farZero: 292, mpbrMin: 0, mpbrMax: 343.4, maxOrdinate: { elevation: 4, distance: 164 }, halfTarget: 4, useMetric: false },
+		mpbr20cm: { optimalZero: 265, nearZero: 28, farZero: 265, mpbrMin: 0, mpbrMax: 311.7, maxOrdinate: { elevation: 9.9, distance: 149 }, halfTarget: 10, useMetric: true }
 	}
 };
 
@@ -1078,9 +1094,278 @@ describe('max apex (#85)', () => {
 });
 
 /**
- * Found while writing these tests and left out of the baseline on purpose, so that recording
- * today's number does not make a bug look correct. Each one needs a decision, then a test.
+ * The search solves for the arc whose apex touches the top of the zone (#86). The tests here
+ * check it from the outside, against a walk over zero distances that shares no code with it.
+ *
+ * Tolerance, as in calculateMPBR: mpbrMax is at most 1 distance unit under the best any zero can
+ * give, the cost of a whole unit zero, and at most 0.1 over it, the rounding of the output.
+ * Measured gap on 19 cases of 3 loads: 0.69 yd at most.
+ *
+ * Every case has a velocity and BC the solver can work with, or stubs the solver, so none can
+ * stall the run.
  */
-describe('known problems, not pinned', () => {
-	it.todo('MPBR under-reports large targets: the zero search stops at 200');
+describe('MPBR search (#86)', () => {
+	/**
+	 * The longest range of any zero on a walk over zero distances, near and far crossings alike,
+	 * in yd. Rows are step 1, the exit is read between two rows, and a zero is skipped when any
+	 * row rises over the top of the zone.
+	 */
+	function bruteForceMpbr(profile, targetInches, zeros, range) {
+		const half = targetInches / 2;
+		const weapon = new Weapon({ sightHeight: UNew.Inch(parseFloat(profile.opticHeight)) });
+		const dm = new DragModel({
+			bc: parseFloat(profile.bc),
+			dragTable: Table.G1,
+			weight: UNew.Grain(parseFloat(profile.bulletWeight)),
+			diameter: UNew.Inch(parseFloat(profile.bulletDiameter)),
+			length: UNew.Inch(2)
+		});
+		const ammo = new Ammo({ dm, mv: UNew.FPS(parseFloat(profile.velocity)) });
+		let best = 0;
+		for (const zero of zeros) {
+			const shot = new Shot({ weapon, ammo, atmo: new Atmo(), winds: [] });
+			const calc = new Calculator();
+			weapon.zeroElevation = UNew.Radian(0);
+			calc.setWeaponZero(shot, UNew.Yard(zero));
+			const rows = calc
+				.fire({ shot, trajectoryRange: UNew.Yard(range), trajectoryStep: UNew.Yard(1) })
+				.trajectory.map((p) => [p.distance.In(Unit.Yard), p.targetDrop.In(Unit.Inch)]);
+			if (rows.some(([, height]) => height > half)) continue;
+			const exit = rows.findLastIndex(([, height]) => height >= -half);
+			if (exit === rows.length - 1) continue;
+			const [[x0, y0], [x1, y1]] = [rows[exit], rows[exit + 1]];
+			best = Math.max(best, x0 + ((y0 + half) / (y0 - y1)) * (x1 - x0));
+		}
+		return best;
+	}
+
+	const wholeUnits = (first, last) => Array.from({ length: last - first + 1 }, (_, i) => first + i);
+
+	function expectWithinTolerance(actual, reference) {
+		expect(actual, `${actual} against ${reference}`).toBeGreaterThanOrEqual(reference - 1);
+		expect(actual, `${actual} against ${reference}`).toBeLessThanOrEqual(reference + 0.1);
+	}
+
+	/** Longest range on a walk in 0.05 yd steps, measured once: too slow for every run. */
+	it.each([
+		['8', 294.0],
+		['20', 424.39],
+		['30', 499.13],
+		['300', 1144.89]
+	])('matches the 0.05 yd search on a %s in target', (target, fine) => {
+		expectWithinTolerance(calculateMPBR(P308_G1, target, 'in').mpbrMax, fine);
+	});
+
+	it.each([
+		['8', 300, 340],
+		['30', 440, 520]
+	])('matches a walk over every whole zero on a %s in target', (target, lastZero, range) => {
+		const reference = bruteForceMpbr(P308_G1, parseFloat(target), wholeUnits(1, lastZero), range);
+		expectWithinTolerance(calculateMPBR(P308_G1, target, 'in').mpbrMax, reference);
+	});
+
+	it('fixes the values of the issue', () => {
+		// Before: 475 yd, 415 yd and 290 yd, with zeros of 12, 14 and 21.
+		const max = (target) => calculateMPBR(P308_G1, target, 'in').mpbrMax;
+		expect(max('30')).toBe(498.9);
+		expect(max('20')).toBe(424.3);
+		expect(max('8')).toBe(293.4);
+	});
+
+	it('is not limited by the old 200 unit zero or 900 unit range', () => {
+		// Before: zero 4, near crossing, and 900 yd exactly.
+		const result = calculateMPBR(P308_G1, '300', 'in');
+		expect(result.optimalZero).toBe(995);
+		expect(result.mpbrMax).toBe(1144.2);
+		const reference = bruteForceMpbr(P308_G1, 300, wholeUnits(990, 1000), 1200);
+		expectWithinTolerance(result.mpbrMax, reference);
+	});
+
+	it('reports the far crossing for every target size', () => {
+		// Before: 193 for 4 in, the far crossing, and 24 for 6 in, the near one.
+		const sizes = ['0.5', '1', '2', '3', '4', '5', '6', '8', '12', '20', '30', '100', '1000'];
+		const results = sizes.map((size) => calculateMPBR(P308_G1, size, 'in'));
+		for (const result of results) {
+			expect(result.optimalZero).toBe(result.farZero);
+			expect(Number.isInteger(result.optimalZero)).toBe(true);
+			expect(result.nearZero).toBeLessThan(result.farZero);
+		}
+		const zeros = results.map((result) => result.optimalZero);
+		expect(zeros).toEqual([...zeros].sort((a, b) => a - b));
+		expect(zeros[4]).toBe(193);
+		expect(zeros[6]).toBe(223);
+	});
+
+	it('keeps the apex inside the zone, also when the far crossing is just over a whole unit', () => {
+		// The solver zeroes about 0.1 yd past the distance asked for. On 2 and 3 in that puts the
+		// unit under the far crossing over the top of the zone, so the zero is one lower.
+		for (const [size, zero] of [['2', 153], ['3', 174]]) {
+			const result = calculateMPBR(P308_G1, size, 'in');
+			expect(result.optimalZero).toBe(zero);
+			expect(result.maxOrdinate.elevation).toBeLessThanOrEqual(result.halfTarget);
+		}
+	});
+
+	it.each([
+		['8', 'yd', P308_G1],
+		['30', 'yd', P308_G1],
+		['8', 'yd', P65_G7]
+	])('describes the shot a saved zero gives on a %s in target', (target, unit, profile) => {
+		const result = calculateMPBR(profile, target, 'in');
+		const saved = { ...profile, zeroDist: result.optimalZero, zeroUnit: unit };
+		const range = { distance: Math.ceil(result.mpbrMax), unit, step: 1 };
+		const full = calculateFullTrajectory(saved, range, null, null);
+		near(full.nearZero, result.nearZero, 0.5, 'near zero');
+		near(full.farZero, result.farZero, 0.5, 'far zero');
+		near(full.maxApex.elevation, result.maxOrdinate.elevation, 0.05, 'apex elevation');
+		near(full.maxApex.distance, result.maxOrdinate.distance, 1, 'apex distance');
+		const exit = calculateShotPoint(saved, { distance: result.mpbrMax, unit }, null, null);
+		near(exit.targetDrop.In(Unit.Inch), -result.halfTarget, 0.05, 'height at MPBR');
+	});
+
+	describe('imperial and metric', () => {
+		it.each([
+			['8', '20.32'],
+			['20', '50.8'],
+			['30', '76.2'],
+			['100', '254']
+		])('gives the same range for %s in and %s cm', (inches, centimeters) => {
+			const yd = calculateMPBR(P308_G1, inches, 'in');
+			const m = calculateMPBR(P308_G1, centimeters, 'cm');
+			// Each side has its own whole unit zero, which is the 1 unit of the tolerance.
+			near(m.mpbrMax / 0.9144, yd.mpbrMax, 1, 'mpbrMax');
+			near(m.optimalZero / 0.9144, yd.optimalZero, 2, 'optimal zero');
+			near(m.maxOrdinate.elevation / 2.54, yd.maxOrdinate.elevation, 0.1, 'apex');
+		});
+	});
+
+	describe('where the bullet enters the zone', () => {
+		const heightAt = (result, distance) => {
+			const saved = { ...P308_G1, zeroDist: result.optimalZero, zeroUnit: 'yd' };
+			return calculateShotPoint(saved, { distance, unit: 'yd' }, null, null).targetDrop.In(Unit.Inch);
+		};
+
+		it('is 0 when the muzzle is already inside', () => {
+			// The sight is 1.5 in over the bore, so a 3 in zone starts right at the muzzle.
+			expect(calculateMPBR(P308_G1, '3', 'in').mpbrMin).toBe(0);
+			expect(calculateMPBR(P308_G1, '3.1', 'in').mpbrMin).toBe(0);
+		});
+
+		it.each([['1'], ['2'], ['2.9']])('reads the crossing on a %s in target', (target) => {
+			const result = calculateMPBR(P308_G1, target, 'in');
+			expect(result.mpbrMin).toBeGreaterThan(0);
+			near(heightAt(result, result.mpbrMin), -parseFloat(target) / 2, 0.05, 'height at mpbrMin');
+		});
+
+		it('is not on the 5 unit grid', () => {
+			// Before: 25 and 10, the last row below the zone.
+			expect(calculateMPBR(P308_G1, '1', 'in').mpbrMin).toBe(25.7);
+			expect(calculateMPBR(P308_G1, '2', 'in').mpbrMin).toBe(10.4);
+		});
+
+		it('handles a sight height of 0', () => {
+			const result = calculateMPBR({ ...P308_G1, opticHeight: '0' }, '8', 'in');
+			expect(result.mpbrMin).toBe(0);
+			expect(result.nearZero).toBeNull();
+			expect(result.optimalZero).toBe(result.farZero);
+		});
+	});
+
+	describe('returned trajectory', () => {
+		it('covers the whole range for the chart, with its zero crossings', () => {
+			const { trajectory, mpbrMax } = calculateMPBR(P308_G1, '30', 'in');
+			const distances = trajectory.map((p) => p.distance.In(Unit.Yard));
+			expect(distances).toEqual([...distances].sort((a, b) => a - b));
+			expect(distances.at(-1)).toBeGreaterThanOrEqual(mpbrMax * 1.2);
+			expect(distances.at(-1)).toBeLessThanOrEqual(mpbrMax * 1.2 + 55);
+			expect(trajectory[0].distance.In(Unit.Yard)).toBe(0);
+		});
+
+		it('returns the rows the flight has when the bullet stops before the end of the chart', () => {
+			// Below 50 fps the engine stops, here a few yards short of 1.2 times the range.
+			const result = calculateMPBR({ ...P308_G1, velocity: '60' }, '8', 'in');
+			expect(result.mpbrMax).toBeGreaterThan(result.optimalZero);
+			expect(result.trajectory.length).toBeGreaterThan(1);
+		});
+	});
+
+	describe('targets and loads at the limits', () => {
+		silenceShotErrors();
+
+		it('takes a thin zone', () => {
+			const result = calculateMPBR(P308_G1, '0.001', 'in');
+			expect(result.optimalZero).toBe(result.farZero);
+			expect(result.mpbrMax - result.mpbrMin).toBeLessThan(5);
+		});
+
+		it.each([['0.0001'], ['1e-12']])('returns null when no whole zero fits a %s in zone', (target) => {
+			expect(calculateMPBR(P308_G1, target, 'in')).toBeNull();
+		});
+
+		it('follows a target far past any useful size', () => {
+			// 2750 ft across, just inside the depth the engine follows a bullet to.
+			const result = calculateMPBR(P308_G1, '33000', 'in');
+			expect(result.mpbrMax).toBeGreaterThan(4000);
+			expect(result.optimalZero).toBe(result.farZero);
+		});
+
+		it.each([['34000'], ['100000'], ['1e308'], ['Infinity']])(
+			'returns null for a %s in target, which the whole flight stays inside',
+			(target) => {
+				expect(calculateMPBR(P308_G1, target, 'in')).toBeNull();
+			}
+		);
+
+		it('returns null when the arc cannot reach the top of the zone', () => {
+			// 300 fps cannot lift the apex 1000 ft within the elevation limit.
+			expect(calculateMPBR({ ...P308_G1, velocity: '300' }, '24000', 'in')).toBeNull();
+		});
+
+		it('gives a result for a slow load, which used to return null', () => {
+			const result = calculateMPBR({ ...P308_G1, velocity: '300' }, '8', 'in');
+			expect(result.optimalZero).toBe(30);
+			expect(result.mpbrMax).toBe(36.2);
+		});
+
+		it.each([
+			['8'],
+			['1000'],
+			['100000']
+		])('stops within the bound on integrations on a %s in target', (target) => {
+			const integrating = vi.spyOn(EulerIntegrationEngine.prototype, '_integrate');
+			const zeroing = vi.spyOn(Calculator.prototype, 'setWeaponZero');
+			calculateMPBR(P308_G1, target, 'in');
+			// 54 fires and two zero solves of up to 60 integrations each.
+			expect(integrating.mock.calls.length).toBeLessThanOrEqual(54 + 2 * 60);
+			expect(zeroing.mock.calls.length).toBeLessThanOrEqual(2);
+		});
+
+		/**
+		 * The engine can stay in its loop forever on these, and a test timeout cannot stop
+		 * synchronous code. So the solver is stubbed: without the guards these tests fail on the
+		 * spy instead of stalling the run.
+		 */
+		it.each([
+			['no velocity', { velocity: '0' }],
+			['an empty velocity', { velocity: '' }],
+			['a velocity that is not a number', { velocity: 'abc' }],
+			['a negative velocity', { velocity: '-2650' }],
+			['a velocity under the 50 fps minimum', { velocity: '49' }],
+			['a velocity past the limit', { velocity: '1e15' }],
+			['an empty sight height', { opticHeight: '' }],
+			['an infinite sight height', { opticHeight: 'Infinity' }],
+			['a BC under the limit', { bc: '0.00001' }],
+			['an empty BC', { bc: '' }]
+		])('returns null for %s without reaching the solver', (_, change) => {
+			const firing = vi.spyOn(Calculator.prototype, 'fire').mockImplementation(() => {
+				throw new Error('reached the solver');
+			});
+			const zeroing = vi.spyOn(Calculator.prototype, 'setWeaponZero').mockImplementation(() => {
+				throw new Error('reached the solver');
+			});
+			expect(calculateMPBR({ ...P308_G1, ...change }, '8', 'in')).toBeNull();
+			expect(firing).not.toHaveBeenCalled();
+			expect(zeroing).not.toHaveBeenCalled();
+		});
+	});
 });

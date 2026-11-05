@@ -1,5 +1,6 @@
 # Delivery documentation
 
+- [2026-11-05: MPBR search without the 200 unit limit](2026-11-05-86-mpbr-search.md): large targets are no longer under-reported; the zero is always the far crossing, and dope cards print computed near and far zeros
 - [2026-11-05: Max apex independent of the table step](2026-11-05-85-max-apex.md): max apex is now the same at any step and stays within the range; pinned values unchanged
 - [2026-11-05: Humidity of 1 % or less](2026-11-05-84-humidity-fraction.md): 1 % no longer gives the result of 100 %; saved values of 1 or less shift, values above 1 are unchanged
 - [2026-11-05: Trajectory validation above the line of sight, and failure reporting](2026-11-05-82-83-validation-solver.md): Below / Above choice on the page; unreachable goals now give "No solution" instead of a value
