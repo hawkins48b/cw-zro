@@ -13,3 +13,40 @@
 	--safe-area-left: env(safe-area-inset-left, 0px);
 	--safe-area-right: env(safe-area-inset-right, 0px);
 }
+
+/* Skeleton 5 dropped the pointer cursor on interactive elements */
+@layer base {
+	button:not(:disabled),
+	[role='button']:not(:disabled),
+	.checkbox,
+	.radio,
+	[data-scope='switch'][data-part='root'] {
+		cursor: pointer;
+	}
+}
+
+/*
+ * Skeleton 5 changed these defaults. This block comes after Skeleton's utilities, so it wins.
+ * Fields stay see-through: an opaque field hides the unselected unit chips inside it.
+ * Chips and small text buttons stay at their small size: larger text clips long labels on phones.
+ * The negative margin stops chips and suffixes stretching a field, so it matches a plain input.
+ */
+@layer utilities {
+	.input,
+	.select {
+		background-color: transparent;
+	}
+
+	.chip {
+		--chip-size: var(--text-xs);
+	}
+
+	.btn-sm:not(.btn-icon) {
+		--btn-size: var(--text-xs);
+	}
+
+	.input .chip,
+	.input > span {
+		margin-block: calc(var(--spacing) * -1.5);
+	}
+}

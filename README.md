@@ -8,7 +8,7 @@ ZRO is a precision shooting sports and long-range marksmanship calculator. It co
 |-------|-----------|
 | Framework | Svelte 5 (runes) + SvelteKit 3 |
 | Language | JavaScript (no TypeScript) |
-| UI | Skeleton UI v4 + Tailwind CSS v4 |
+| UI | Skeleton UI v5 + Tailwind CSS v4 |
 | Icons | Lucide Svelte |
 | Ballistics | js-ballistics |
 | Charts | ApexCharts (lazy-loaded) |

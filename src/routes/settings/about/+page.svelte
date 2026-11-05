@@ -1,6 +1,7 @@
 <script>
 	import { m } from '#lib/paraglide/messages.js';
-	import { GithubIcon, ExternalLinkIcon } from '@lucide/svelte';
+	import { ExternalLinkIcon } from '@lucide/svelte';
+	import GithubIcon from '#lib/components/GithubIcon.svelte';
 	import favicon from '#lib/assets/favicon.svg';
 </script>
 

@@ -1,5 +1,6 @@
 # Delivery documentation
 
+- [2026-11-05: Skeleton 5 and Lucide 1](2026-11-05-74-skeleton-lucide.md): UI library and icons on their new majors; defaults that Skeleton 5 changed without notice are restored, and the small visible changes that remain are listed
 - [2026-11-05: Paraglide 3](2026-11-05-73-paraglide.md): Paraglide on 3.1.0 with no application code changes; builds no longer load remote code, and a new test fails on an empty message catalog
 - [2026-11-05: SvelteKit 3 and Vite 8 toolchain](2026-11-05-72-toolchain.md): build toolchain on its latest majors, audit findings down from 13 to 11; `$lib` is now `#lib`, `svelte.config.js` is gone and Node 22.22.2 is the minimum
 - [2026-11-05: In-range dependency updates](2026-11-05-71-in-range-updates.md): every dependency at the latest in its major, audit findings down from 48 to 13; lists what remains and which issue resolves it
