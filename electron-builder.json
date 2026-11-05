@@ -2,12 +2,20 @@
 	"appId": "ch.chocolatewarfare.app.zro",
 	"productName": "ZRO",
 	"directories": {
-		"output": "dist-electron"
+		"output": "dist-electron",
+		"buildResources": "resources"
 	},
-	"files": ["build/**/*", "electron/**/*", "package.json"],
+	"files": [
+		"build/**/*",
+		"electron/**/*",
+		"package.json",
+		"!**/node_modules/**",
+		"node_modules/electron-serve/**/*"
+	],
+	"publish": null,
 	"win": {
 		"target": "nsis",
-		"icon": "build/favicon.png"
+		"icon": "icon.ico"
 	},
 	"nsis": {
 		"oneClick": false,
@@ -15,10 +23,11 @@
 	},
 	"mac": {
 		"target": "dmg",
-		"icon": "build/favicon.png"
+		"icon": "icon.icns"
 	},
 	"linux": {
 		"target": "AppImage",
-		"icon": "build/favicon.png"
+		"icon": "icon.icns",
+		"syncDesktopName": true
 	}
 }

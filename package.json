@@ -5,6 +5,7 @@
 	"version": "2.0.0",
 	"type": "module",
 	"main": "electron/main.js",
+	"desktopName": "cw-zro.desktop",
 	"imports": {
 		"#lib": "./src/lib/index.js",
 		"#lib/*": "./src/lib/*"
@@ -30,9 +31,8 @@
 		"@sveltejs/kit": "^3.1.1",
 		"@sveltejs/vite-plugin-svelte": "^7.3.1",
 		"@tailwindcss/vite": "^4.3.4",
-		"electron": "^40.10.6",
+		"electron": "^45.2.3",
 		"electron-builder": "^26.18.1",
-		"electron-serve": "^3.0.1",
 		"jsdom": "^31.0.0",
 		"svelte": "^5.57.3",
 		"tailwindcss": "^4.3.4",
@@ -51,6 +51,7 @@
 		"@lucide/svelte": "^1.69.0",
 		"@sveltejs/adapter-static": "^4.0.1",
 		"apexcharts": "^5.16.0",
+		"electron-serve": "^3.0.1",
 		"js-ballistics": "^2.2.0-beta.2",
 		"pdf-lib": "^1.17.1",
 		"svelte-gestures": "^5.2.2"
