@@ -169,7 +169,7 @@ Limits:
 - Near the failure edge, one step can span several inches.
 - On a flat curve, the search returns the first value that rounds to the goal.
 - A BC solve can return a physically implausible value, such as 0.021, and the page does not flag it.
-- Running out of time is reported as no solution, even for a solvable goal. A solve near the limit can differ between devices.
+- Running out of time gives its own message, not no solution, because the goal may still be reachable ([#95](https://github.com/hawkins48b/cw-zro/issues/95)). A solve near the limit can differ between devices.
 
 ## Input guards
 
@@ -195,7 +195,7 @@ The library runs synchronously. **Far outside normal values it can stay in its l
 | `calculateMPBR` | Barrel elevation up to 0.5 rad, flight up to 20000 units, at most 54 fires and 2 zero solves | No result. A shot reaching the limit is never reported as a capped distance |
 | `calculateTrajectoryValidation` | Range at least 100 and beyond the zero, value not 0, velocity and BC above 0 | No result, or an error message for the range |
 | `calculateTrajectoryValidation` | Velocity between 0 and 10000 fps, BC between 0.01 and 2 | Shot skipped |
-| `calculateTrajectoryValidation` | At most 200 shots and 5 seconds, checked before each shot | No solution |
+| `calculateTrajectoryValidation` | At most 200 shots and 5 seconds, checked before each shot | No solution, or a timeout message when time ended a search that could still move |
 | Dope card zero search | Zero elevation at most 0.6 rad | Near and far stay blank |
 
 **Remaining gaps.** Security reviews recorded these, and they are not fixed:
@@ -206,7 +206,6 @@ The library runs synchronously. **Far outside normal values it can stay in its l
 - In a review of #113 these ran until they were killed, after 12 to 60 seconds: an optic height of `-2e6` or `1e300`, a custom temperature of `-600` and a custom pressure of `1e308`.
 - BC has no lower limit in `calculateShotPoint` and `calculateFullTrajectory`. Measured on 2026-11-06 on the `.308` test profile at 1000 yd, a BC of `0.00001` at 2700 fps ran until killed at 45 seconds, with no wind and with 10 mph. A BC of `1e-9` at 200 fps with a 10 mph wind from 0° did the same on two of the four test loads tried, at every range tried from 10 to 3000 yd.
 - A custom atmosphere has no physical limits. Measured on 2026-11-06 on the `.308` test profile at 1000 yd, these ran until killed at 45 seconds: a temperature of `-273` °C with a 90° wind of 50 mph up to the wind limit, and at 2700 fps with no wind, a temperature of `100000` in °C or °F, or a pressure of `1e8` hPa. At `-273` °C, 20 mph and less, or a wind from 0° or 180°, gave no result at once.
-- A stored wind speed or direction of `{"toString":1}` throws in `WindInput.svelte` with `Cannot convert object to primitive value`, for the speed at line 63. This is confirmed by mounting the component. From reading the code, the same speed also throws at `routes/calculators/ballistic/+page.svelte:492`, even with the wind panel collapsed. A stored `wind` of `null` throws on the page when it reads the speed, also from reading the code, not from a rendered page. The calculators are safe from all of these.
 - A decimal comma is cut off: `1,5` reads as 1 for wind speed and direction, confirmed on `shotWinds`. This existed before #116. The boxes take text, so a French or German user can reach it by typing.
 - Saved values are not checked when read, so a tampered or absurd value in storage reaches the engine.
 - The time budget of the validation search is checked between shots. It cannot stop one slow shot.

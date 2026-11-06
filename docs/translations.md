@@ -64,7 +64,6 @@ English has no prefix. The strategy in `vite.config.js` is `url`, then `cookie`,
 ## Known problems
 
 - **The language does not persist.** A path with no prefix resolves to English and overwrites the cookie. The desktop app resets to English on every launch, and the mobile app is expected to do the same ([#73](2026-11-05-73-paraglide.md), [#76](2026-11-05-76-electron.md)).
-- **`<html lang>` stays `en`** on `/fr` and `/de` on a static host and on mobile, because the fallback `index.html` hardcodes it.
 - **Long German labels** can clip on phones, for example `Temperaturempfindlichkeit aktivieren`.
 
 ## Build notes

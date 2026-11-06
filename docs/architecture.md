@@ -75,7 +75,7 @@ Configuration is in [`vite.config.js`](../vite.config.js). There is no `svelte.c
 
 `ssr` is off in [`+layout.js`](../src/routes/+layout.js) and no page is prerendered, so `build/` holds a single `index.html` fallback plus assets. The browser renders every route. A web host therefore has to send `index.html` for inner URLs, and today nothing in `build/` asks it to. See [Deployment](deployment.md#deep-links-on-the-web-host).
 
-`hooks.server.js` does not run on a static host. The `index.html` in `build/` has `lang="en"`, so `<html lang>` stays `en` on `/fr` and `/de` there.
+`hooks.server.js` does not run on a static host. The `index.html` in `build/` has `lang="en"`, so the root layout sets `<html lang>` from the locale on the client ([#97](https://github.com/hawkins48b/cw-zro/issues/97)).
 
 ## Layers
 
@@ -85,7 +85,7 @@ Configuration is in [`vite.config.js`](../vite.config.js). There is no `svelte.c
 | `stores/` | Reactive state, saved to `localStorage` | Thin wrappers |
 | `utils/` | Calculations and validation | Plain functions, tested without Svelte |
 
-Stores use runes in `.svelte.js` files. [`localStore.svelte.js`](../src/lib/stores/localStore.svelte.js) is the shared helper that reads and writes `localStorage`. [`profileOps.js`](../src/lib/utils/profileOps.js) mirrors the list operations in the profiles store so that they can be tested, so a change to one needs the same change in the other.
+Stores use runes in `.svelte.js` files. [`localStore.svelte.js`](../src/lib/stores/localStore.svelte.js) is the shared helper that reads and writes `localStorage`. The Ballistic and Scope View stores have two wind getters: `wind` is safe to show, and `storedWind` is the raw value that goes to the calculators, so that [`shotWinds`](../src/lib/utils/shotWind.js) decides what a damaged value gives. See [`storedWind.js`](../src/lib/utils/storedWind.js). [`profileOps.js`](../src/lib/utils/profileOps.js) mirrors the list operations in the profiles store so that they can be tested, so a change to one needs the same change in the other.
 
 ### Where shots are built
 
