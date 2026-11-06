@@ -129,7 +129,9 @@ describe('migrateClockWind', () => {
 	it.each([
 		['an object that cannot become text', throwsAsText],
 		['an array holding one', [throwsAsText]],
-		['a boolean', true]
+		['true', true],
+		['false', false],
+		['null', null]
 	])('does not throw on %s, and the shot gives no result', (_, direction) => {
 		const migrated = migrateClockWind(old(direction));
 		expect(migrated.direction).toBe(direction);

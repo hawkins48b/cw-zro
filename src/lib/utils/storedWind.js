@@ -45,14 +45,16 @@ export function patchWind(stored, patch, fallback) {
 /**
  * Convert a stored wind of the old shape, with a directionUnit, to degrees. This runs when the store
  * is imported, so a damaged direction has to pass through: parseInt would throw on an object that
- * cannot become text. The mapping is as it was, whatever #106 finds about it.
+ * cannot become text. Only a missing direction still reads as 12 o'clock, as it always has. The
+ * mapping is as it was, whatever #106 finds about it.
  *
  * @param {any} wind
  * @returns {object}
  */
 export function migrateClockWind(wind) {
 	const { direction } = wind;
-	const isClock = wind.directionUnit === 'clock' && (isNumberOrText(direction) || !direction);
+	const isClock =
+		wind.directionUnit === 'clock' && (isNumberOrText(direction) || direction === undefined);
 	return {
 		speed: wind.speed,
 		speedUnit: wind.speedUnit,
