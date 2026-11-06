@@ -402,7 +402,7 @@
 	{/if}
 
 	<!-- Legend row below the reticle -->
-	<div class="flex items-center gap-3 text-xs text-surface-500-400 flex-wrap">
+	<div class="flex items-center gap-3 text-xs text-surface-600-400 flex-wrap">
 		{#if aimPoint}
 			<span class="flex items-center gap-1.5">
 				<span class="inline-block size-2.5 rounded-full shrink-0" style="background:#00ff55"></span>
@@ -428,7 +428,7 @@
 	<!-- Rotation (cant) dial -->
 	<div class="space-y-2">
 		<div class="flex items-center gap-3">
-			<span class="text-xs text-surface-500-400 shrink-0">{m.scope_view_rotation()}</span>
+			<span class="text-xs text-surface-600-400 shrink-0">{m.scope_view_rotation()}</span>
 			<input
 				type="range"
 				min="-90"

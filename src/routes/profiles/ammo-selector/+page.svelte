@@ -69,12 +69,12 @@
 
 	<!-- Results -->
 	{#if filtered.profiles.length === 0 && filtered.library.length === 0}
-		<p class="text-surface-500-400 text-sm py-4 text-center">{m.ammo_selector_no_results()}</p>
+		<p class="text-surface-600-400 text-sm py-4 text-center">{m.ammo_selector_no_results()}</p>
 	{:else}
 		<div class="space-y-4">
 			{#if filtered.profiles.length > 0}
 				<div class="card preset-filled-surface-100-900 p-4 space-y-1">
-					<p class="text-xs font-semibold text-surface-500-400 uppercase tracking-wide pb-1 border-b border-surface-200-800">
+					<p class="text-xs font-semibold text-surface-600-400 uppercase tracking-wide pb-1 border-b border-surface-200-800">
 						{m.ammo_selector_from_profiles()}
 					</p>
 					{#each filtered.profiles as item}
@@ -84,7 +84,7 @@
 							onclick={() => select(item)}
 						>
 							<span class="font-medium">{item.brand}</span>
-							<span class="text-surface-500-400 text-sm ml-1">— {item.weight} {item.weightUnit.toLowerCase()}</span>
+							<span class="text-surface-600-400 text-sm ml-1">— {item.weight} {item.weightUnit.toLowerCase()}</span>
 						</button>
 					{/each}
 				</div>
@@ -92,7 +92,7 @@
 
 			{#if filtered.library.length > 0}
 				<div class="card preset-filled-surface-100-900 p-4 space-y-1">
-					<p class="text-xs font-semibold text-surface-500-400 uppercase tracking-wide pb-1 border-b border-surface-200-800">
+					<p class="text-xs font-semibold text-surface-600-400 uppercase tracking-wide pb-1 border-b border-surface-200-800">
 						{m.ammo_selector_library()}
 					</p>
 					{#each filtered.library as item}
@@ -102,7 +102,7 @@
 							onclick={() => select(item)}
 						>
 							<span class="font-medium">{item.brand}</span>
-							<span class="text-surface-500-400 text-sm ml-1">— {item.weight} {item.weightUnit.toLowerCase()}</span>
+							<span class="text-surface-600-400 text-sm ml-1">— {item.weight} {item.weightUnit.toLowerCase()}</span>
 						</button>
 					{/each}
 				</div>
@@ -111,5 +111,5 @@
 	{/if}
 
 	<!-- Disclaimer -->
-	<p class="text-xs text-surface-500-400 text-center pb-4">{m.ammo_selector_disclaimer()}</p>
+	<p class="text-xs text-surface-600-400 text-center pb-4">{m.ammo_selector_disclaimer()}</p>
 </div>

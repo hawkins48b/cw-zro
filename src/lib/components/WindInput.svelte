@@ -175,14 +175,14 @@
 				</g>
 			</svg>
 		</div>
-			<span class="text-xs text-surface-500-400">{m.scope_view_wind_relative_to_shooter()}</span>
+			<span class="text-xs text-surface-600-400">{m.scope_view_wind_relative_to_shooter()}</span>
 		</div>
 
 		<!-- ── Speed & direction inputs ───────────────── -->
 		<div class="flex-1 space-y-3 min-w-0">
 			<!-- Wind speed -->
 			<div class="space-y-1">
-				<span class="text-xs text-surface-500-400">{m.scope_view_wind_speed()}</span>
+				<span class="text-xs text-surface-600-400">{m.scope_view_wind_speed()}</span>
 				<div class="input !flex !items-center gap-2">
 					<input
 						class="w-10 shrink-0 bg-transparent border-none outline-none shadow-none p-0 text-sm"
@@ -208,7 +208,7 @@
 
 			<!-- Wind direction (degrees only) -->
 			<div class="space-y-1">
-				<span class="text-xs text-surface-500-400">{m.scope_view_wind_dir()}</span>
+				<span class="text-xs text-surface-600-400">{m.scope_view_wind_dir()}</span>
 				<div class="input !flex !items-center gap-2">
 					<input
 						class="w-10 shrink-0 bg-transparent border-none outline-none shadow-none p-0 text-sm"
@@ -218,7 +218,7 @@
 						value={direction}
 						oninput={(e) => onchange({ direction: e.target.value })}
 					/>
-					<span class="text-xs text-surface-500-400 ml-auto shrink-0">{m.unit_deg()}</span>
+					<span class="text-xs text-surface-600-400 ml-auto shrink-0">{m.unit_deg()}</span>
 				</div>
 			</div>
 		</div>
@@ -240,7 +240,7 @@
 			{/each}
 		</div>
 		{#if activePreset}
-			<p class="text-xs text-surface-500-400 italic">{activePreset.hint()}</p>
+			<p class="text-xs text-surface-600-400 italic">{activePreset.hint()}</p>
 		{/if}
 	</div>
 </div>

@@ -117,9 +117,9 @@
 					onclick={() => (showElevation = !showElevation)}
 				>
 					{#if showElevation}
-						<ChevronDown class="size-4 text-surface-500-400 shrink-0" />
+						<ChevronDown class="size-4 text-surface-600-400 shrink-0" />
 					{:else}
-						<ChevronRight class="size-4 text-surface-500-400 shrink-0" />
+						<ChevronRight class="size-4 text-surface-600-400 shrink-0" />
 					{/if}
 					<span class="text-sm font-medium">{m.scope_view_angle()}</span>
 				</button>
@@ -147,7 +147,7 @@
 							{/each}
 						</div>
 					</div>
-					<p class="text-xs text-surface-500-400">{m.scope_view_angle_hint()}</p>
+					<p class="text-xs text-surface-600-400">{m.scope_view_angle_hint()}</p>
 				{/if}
 			</div>
 
@@ -180,7 +180,7 @@
 			{#if !activeProfile.profile}
 				<!-- No active profile -->
 				<div class="py-6 text-center space-y-2">
-					<p class="text-surface-500-400 text-sm">{m.scope_view_no_profile()}</p>
+					<p class="text-surface-600-400 text-sm">{m.scope_view_no_profile()}</p>
 					<a href="/profiles" class="btn btn-sm preset-tonal-primary">
 						{m.nav_profiles()}
 					</a>
@@ -209,10 +209,10 @@
 					</div>
 					<p class="font-bold text-2xl leading-tight">
 						{elevClicks}
-						<span class="text-base font-normal text-surface-500-400">
+						<span class="text-base font-normal text-surface-600-400">
 							{elevClicks === 1 ? m.scope_view_click() : m.scope_view_clicks()}
 						</span>
-						<span class="text-sm font-normal text-surface-500-400">
+						<span class="text-sm font-normal text-surface-600-400">
 							({Math.abs(elevValue ?? 0)} {elevUnit})
 						</span>
 					</p>
@@ -234,10 +234,10 @@
 					</div>
 					<p class="font-bold text-2xl leading-tight">
 						{windClicks}
-						<span class="text-base font-normal text-surface-500-400">
+						<span class="text-base font-normal text-surface-600-400">
 							{windClicks === 1 ? m.scope_view_click() : m.scope_view_clicks()}
 						</span>
-						<span class="text-sm font-normal text-surface-500-400">
+						<span class="text-sm font-normal text-surface-600-400">
 							({Math.abs(windValue ?? 0)} {windUnit})
 						</span>
 					</p>
@@ -259,24 +259,24 @@
 					<div class="grid grid-cols-3 gap-3 text-center">
 						<div>
 							<div class="flex justify-center mb-1">
-								<Timer class="size-4 text-surface-500-400" />
+								<Timer class="size-4 text-surface-600-400" />
 							</div>
-							<p class="text-xs text-surface-500-400">{m.scope_view_flight_time()}</p>
-							<p class="font-semibold">{flightTime}<span class="text-xs font-normal text-surface-500-400 ml-0.5">{m.unit_s()}</span></p>
+							<p class="text-xs text-surface-600-400">{m.scope_view_flight_time()}</p>
+							<p class="font-semibold">{flightTime}<span class="text-xs font-normal text-surface-600-400 ml-0.5">{m.unit_s()}</span></p>
 						</div>
 						<div>
 							<div class="flex justify-center mb-1">
-								<Zap class="size-4 text-surface-500-400" />
+								<Zap class="size-4 text-surface-600-400" />
 							</div>
-							<p class="text-xs text-surface-500-400">{m.scope_view_energy()}</p>
-							<p class="font-semibold">{energy?.value}<span class="text-xs font-normal text-surface-500-400 ml-0.5">{energy?.unit}</span></p>
+							<p class="text-xs text-surface-600-400">{m.scope_view_energy()}</p>
+							<p class="font-semibold">{energy?.value}<span class="text-xs font-normal text-surface-600-400 ml-0.5">{energy?.unit}</span></p>
 						</div>
 						<div>
 							<div class="flex justify-center mb-1">
-								<ArrowRight class="size-4 text-surface-500-400" />
+								<ArrowRight class="size-4 text-surface-600-400" />
 							</div>
-							<p class="text-xs text-surface-500-400">{m.scope_view_terminal_velocity()}</p>
-							<p class="font-semibold">{terminalVel?.value}<span class="text-xs font-normal text-surface-500-400 ml-0.5">{terminalVel?.unit}</span></p>
+							<p class="text-xs text-surface-600-400">{m.scope_view_terminal_velocity()}</p>
+							<p class="font-semibold">{terminalVel?.value}<span class="text-xs font-normal text-surface-600-400 ml-0.5">{terminalVel?.unit}</span></p>
 						</div>
 					</div>
 				</div>

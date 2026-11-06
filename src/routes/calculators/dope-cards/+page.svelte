@@ -48,7 +48,7 @@
 
 {#if !activeProfile.profile}
 	<div class="py-12 text-center space-y-3">
-		<p class="text-surface-500-400">{m.dope_no_profile()}</p>
+		<p class="text-surface-600-400">{m.dope_no_profile()}</p>
 		<a href="/profiles" class="btn preset-tonal-primary">{m.nav_profiles()}</a>
 	</div>
 {:else}
@@ -63,9 +63,9 @@
 				onclick={() => (expanded = !expanded)}
 			>
 				{#if expanded}
-					<ChevronDown class="size-4 text-surface-500-400 shrink-0" />
+					<ChevronDown class="size-4 text-surface-600-400 shrink-0" />
 				{:else}
-					<ChevronRight class="size-4 text-surface-500-400 shrink-0" />
+					<ChevronRight class="size-4 text-surface-600-400 shrink-0" />
 				{/if}
 				<span class="font-medium">{m.dope_midrange_title()}</span>
 			</button>

@@ -98,12 +98,12 @@
 						value={atmosphere.humidity}
 						oninput={(e) => onchange({ humidity: e.target.value })}
 					/>
-					<span class="text-sm text-surface-500-400 shrink-0">%</span>
+					<span class="text-sm text-surface-600-400 shrink-0">%</span>
 				</div>
 			</div>
 		{:else}
 			<!-- ICAO standard values -->
-			<div class="text-sm text-surface-500-400 space-y-0.5">
+			<div class="text-sm text-surface-600-400 space-y-0.5">
 				<p>0 {m.unit_ft()}, 29.92 {m.unit_inhg()}, 59 {m.unit_f()}, 0% {m.ballistic_humidity()}</p>
 				<p>0 {m.unit_m()}, 1013.25 {m.unit_hpa()}, 15 {m.unit_c()}, 0% {m.ballistic_humidity()}</p>
 			</div>

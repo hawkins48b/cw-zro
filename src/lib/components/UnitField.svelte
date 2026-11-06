@@ -77,6 +77,6 @@
 	{#if invalid}
 		<p class="text-xs text-error-500">{invalid}</p>
 	{:else if hint}
-		<p class="text-xs text-surface-500-400">{hint}</p>
+		<p class="text-xs text-surface-600-400">{hint}</p>
 	{/if}
 </div>

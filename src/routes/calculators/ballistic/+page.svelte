@@ -415,7 +415,7 @@
 {#if !activeProfile.profile}
 	<!-- No profile -->
 	<div class="py-12 text-center space-y-3">
-		<p class="text-surface-500-400">{m.ballistic_no_profile()}</p>
+		<p class="text-surface-600-400">{m.ballistic_no_profile()}</p>
 		<a href="/profiles" class="btn preset-tonal-primary">{m.nav_profiles()}</a>
 	</div>
 {:else}
@@ -464,9 +464,9 @@
 							value={ballistic.range.step}
 							oninput={(e) => ballistic.setRange({ step: e.target.value })}
 						/>
-						<span class="text-sm text-surface-500-400 shrink-0">{distLabel}</span>
+						<span class="text-sm text-surface-600-400 shrink-0">{distLabel}</span>
 					</div>
-					<p class="text-xs text-surface-500-400">{m.ballistic_step_hint()}</p>
+					<p class="text-xs text-surface-600-400">{m.ballistic_step_hint()}</p>
 				</div>
 			</div>
 
@@ -484,9 +484,9 @@
 					onclick={() => ballistic.setOptions({ showWind: !ballistic.options.showWind })}
 				>
 					{#if ballistic.options.showWind}
-						<ChevronDown class="size-4 text-surface-500-400 shrink-0" />
+						<ChevronDown class="size-4 text-surface-600-400 shrink-0" />
 					{:else}
-						<ChevronRight class="size-4 text-surface-500-400 shrink-0" />
+						<ChevronRight class="size-4 text-surface-600-400 shrink-0" />
 					{/if}
 					<span class="text-sm font-medium">{m.ballistic_wind()}</span>
 					{#if parseFloat(ballistic.wind.speed) > 0}
@@ -526,7 +526,7 @@
 
 			<!-- Chart legend -->
 			{#if ballistic.options.showAnnotations}
-				<div class="flex flex-wrap gap-x-5 gap-y-1 px-2 text-xs text-surface-500-400">
+				<div class="flex flex-wrap gap-x-5 gap-y-1 px-2 text-xs text-surface-600-400">
 					<span class="flex items-center gap-1.5">
 						<span class="inline-block w-5 border-t-2 border-dashed border-surface-400-600"></span>
 						{m.ballistic_legend_los()}
@@ -543,13 +543,13 @@
 							<MapPin class="size-3.5" />
 						</div>
 						<div class="min-w-0">
-							<p class="text-xs text-surface-500-400 uppercase tracking-wide leading-none mb-0.5">{m.ballistic_near_zero()}</p>
+							<p class="text-xs text-surface-600-400 uppercase tracking-wide leading-none mb-0.5">{m.ballistic_near_zero()}</p>
 							{#if nearZero !== null}
 								<p class="text-sm font-semibold tabular-nums leading-none">
-									{nearZero} <span class="text-xs font-normal text-surface-500-400">{distLabel}</span>
+									{nearZero} <span class="text-xs font-normal text-surface-600-400">{distLabel}</span>
 								</p>
 							{:else}
-								<p class="text-xs text-surface-500-400">{m.ballistic_unknown()}</p>
+								<p class="text-xs text-surface-600-400">{m.ballistic_unknown()}</p>
 							{/if}
 						</div>
 					</div>
@@ -560,13 +560,13 @@
 							<MapPin class="size-3.5" />
 						</div>
 						<div class="min-w-0">
-							<p class="text-xs text-surface-500-400 uppercase tracking-wide leading-none mb-0.5">{m.ballistic_far_zero()}</p>
+							<p class="text-xs text-surface-600-400 uppercase tracking-wide leading-none mb-0.5">{m.ballistic_far_zero()}</p>
 							{#if farZero !== null}
 								<p class="text-sm font-semibold tabular-nums leading-none">
-									{farZero} <span class="text-xs font-normal text-surface-500-400">{distLabel}</span>
+									{farZero} <span class="text-xs font-normal text-surface-600-400">{distLabel}</span>
 								</p>
 							{:else}
-								<p class="text-xs text-surface-500-400">{m.ballistic_unknown()}</p>
+								<p class="text-xs text-surface-600-400">{m.ballistic_unknown()}</p>
 							{/if}
 						</div>
 					</div>
@@ -577,14 +577,14 @@
 							<MapPin class="size-3.5" />
 						</div>
 						<div class="min-w-0">
-							<p class="text-xs text-surface-500-400 uppercase tracking-wide leading-none mb-0.5">{m.ballistic_max_ord()}</p>
+							<p class="text-xs text-surface-600-400 uppercase tracking-wide leading-none mb-0.5">{m.ballistic_max_ord()}</p>
 							{#if maxApex !== null}
 								<p class="text-sm font-semibold tabular-nums leading-none">
-									{maxApex.elevation} <span class="text-xs font-normal text-surface-500-400">{elevLabel}</span>
+									{maxApex.elevation} <span class="text-xs font-normal text-surface-600-400">{elevLabel}</span>
 								</p>
-								<p class="text-xs text-surface-500-400 leading-none mt-0.5">{m.ballistic_at()} {maxApex.distance} {distLabel}</p>
+								<p class="text-xs text-surface-600-400 leading-none mt-0.5">{m.ballistic_at()} {maxApex.distance} {distLabel}</p>
 							{:else}
-								<p class="text-xs text-surface-500-400">{m.ballistic_unknown()}</p>
+								<p class="text-xs text-surface-600-400">{m.ballistic_unknown()}</p>
 							{/if}
 						</div>
 					</div>
@@ -595,14 +595,14 @@
 							<MapPin class="size-3.5" />
 						</div>
 						<div class="min-w-0">
-							<p class="text-xs text-surface-500-400 uppercase tracking-wide leading-none mb-0.5">{m.ballistic_max_drop()}</p>
+							<p class="text-xs text-surface-600-400 uppercase tracking-wide leading-none mb-0.5">{m.ballistic_max_drop()}</p>
 							{#if maxDrop !== null}
 								<p class="text-sm font-semibold tabular-nums leading-none">
-									{maxDrop.drop} <span class="text-xs font-normal text-surface-500-400">{elevLabel}</span>
+									{maxDrop.drop} <span class="text-xs font-normal text-surface-600-400">{elevLabel}</span>
 								</p>
-								<p class="text-xs text-surface-500-400 leading-none mt-0.5">{m.ballistic_at()} {maxDrop.distance} {distLabel}</p>
+								<p class="text-xs text-surface-600-400 leading-none mt-0.5">{m.ballistic_at()} {maxDrop.distance} {distLabel}</p>
 							{:else}
-								<p class="text-xs text-surface-500-400">{m.ballistic_unknown()}</p>
+								<p class="text-xs text-surface-600-400">{m.ballistic_unknown()}</p>
 							{/if}
 						</div>
 					</div>
@@ -620,9 +620,9 @@
 					onclick={() => ballistic.setOptions({ showVelocityChart: !ballistic.options.showVelocityChart })}
 				>
 					{#if ballistic.options.showVelocityChart}
-						<ChevronDown class="size-4 text-surface-500-400 shrink-0" />
+						<ChevronDown class="size-4 text-surface-600-400 shrink-0" />
 					{:else}
-						<ChevronRight class="size-4 text-surface-500-400 shrink-0" />
+						<ChevronRight class="size-4 text-surface-600-400 shrink-0" />
 					{/if}
 					<span class="text-sm font-medium">{m.ballistic_vel_chart()}</span>
 				</button>
@@ -644,7 +644,7 @@
 			{#if ballistic.options.showVelocityChart}
 				<div class="px-4 pb-4 border-t border-surface-200-800 pt-3 space-y-2">
 					<div bind:this={velChartEl}></div>
-					<div class="flex flex-wrap justify-center gap-x-6 gap-y-1 text-xs text-surface-500-400">
+					<div class="flex flex-wrap justify-center gap-x-6 gap-y-1 text-xs text-surface-600-400">
 						{#if soundSpeedFPS !== null}
 							<span>
 								{m.ballistic_speed_of_sound()}:
@@ -694,7 +694,7 @@
 				<div class="space-y-2">
 					{#each COLUMN_GROUPS as group}
 						<div class="space-y-1">
-							<p class="text-xs font-medium text-surface-500-400 uppercase tracking-wide">{group.label()}</p>
+							<p class="text-xs font-medium text-surface-600-400 uppercase tracking-wide">{group.label()}</p>
 							<div class="flex flex-wrap gap-1.5">
 								{#each group.columns as col}
 									<button
@@ -711,7 +711,7 @@
 
 			<!-- Table -->
 			{#if tablePoints.length === 0}
-				<p class="text-sm text-surface-500-400 py-4 text-center">{m.ballistic_no_result()}</p>
+				<p class="text-sm text-surface-600-400 py-4 text-center">{m.ballistic_no_result()}</p>
 			{:else}
 				<div class="overflow-x-auto">
 					<table class="table text-sm">

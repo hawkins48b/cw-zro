@@ -276,7 +276,7 @@
 
 {#if !activeProfile.profile}
 	<div class="py-12 text-center space-y-3">
-		<p class="text-surface-500-400">{m.traj_val_no_profile()}</p>
+		<p class="text-surface-600-400">{m.traj_val_no_profile()}</p>
 		<a href="/profiles" class="btn preset-tonal-primary">{m.nav_profiles()}</a>
 	</div>
 {:else}
@@ -329,7 +329,7 @@
 					{#if parseFloat(trajectoryValidation.range.distance) > 0 && parseFloat(trajectoryValidation.range.distance) < 100}
 						<p class="text-xs text-error-500">{m.traj_val_range_min_error()}</p>
 					{:else}
-						<p class="text-xs text-surface-500-400">{m.traj_val_range_hint()}</p>
+						<p class="text-xs text-surface-600-400">{m.traj_val_range_hint()}</p>
 					{/if}
 				</div>
 			</div>
@@ -413,9 +413,9 @@
 									: { distanceValue: e.target.value }
 							)}
 						/>
-						<span class="text-sm text-surface-500-400 shrink-0">{measureLabel}</span>
+						<span class="text-sm text-surface-600-400 shrink-0">{measureLabel}</span>
 					</div>
-					<p class="text-xs text-surface-500-400">{measureHint}</p>
+					<p class="text-xs text-surface-600-400">{measureHint}</p>
 				</div>
 			</div>
 		</div>
@@ -436,28 +436,28 @@
 				{#if solveFor === 'velocity'}
 					<!-- Profile velocity -->
 					<div class="px-3 py-3 rounded-lg bg-surface-50-950">
-						<p class="text-xs text-surface-500-400 uppercase tracking-wide leading-none mb-1">
+						<p class="text-xs text-surface-600-400 uppercase tracking-wide leading-none mb-1">
 							{m.traj_val_profile_velocity()}
 						</p>
 						<p class="text-sm font-semibold tabular-nums leading-none">
 							{validationResult.initialVelocity}
-							<span class="text-xs font-normal text-surface-500-400">{velLabel}</span>
+							<span class="text-xs font-normal text-surface-600-400">{velLabel}</span>
 						</p>
 					</div>
 					<!-- Validated velocity -->
 					<div class="px-3 py-3 rounded-lg bg-surface-50-950">
-						<p class="text-xs text-surface-500-400 uppercase tracking-wide leading-none mb-1">
+						<p class="text-xs text-surface-600-400 uppercase tracking-wide leading-none mb-1">
 							{m.traj_val_validated_velocity()}
 						</p>
 						<p class="text-sm font-semibold tabular-nums leading-none text-success-500">
 							{validationResult.validatedVelocity}
-							<span class="text-xs font-normal text-surface-500-400">{velLabel}</span>
+							<span class="text-xs font-normal text-surface-600-400">{velLabel}</span>
 						</p>
 					</div>
 				{:else}
 					<!-- Profile BC -->
 					<div class="px-3 py-3 rounded-lg bg-surface-50-950">
-						<p class="text-xs text-surface-500-400 uppercase tracking-wide leading-none mb-1">
+						<p class="text-xs text-surface-600-400 uppercase tracking-wide leading-none mb-1">
 							{m.traj_val_profile_bc()}
 						</p>
 						<p class="text-sm font-semibold tabular-nums leading-none">
@@ -466,7 +466,7 @@
 					</div>
 					<!-- Validated BC -->
 					<div class="px-3 py-3 rounded-lg bg-surface-50-950">
-						<p class="text-xs text-surface-500-400 uppercase tracking-wide leading-none mb-1">
+						<p class="text-xs text-surface-600-400 uppercase tracking-wide leading-none mb-1">
 							{m.traj_val_validated_bc()}
 						</p>
 						<p class="text-sm font-semibold tabular-nums leading-none text-success-500">
@@ -490,7 +490,7 @@
 				</div>
 			</div>
 		{:else}
-			<p class="text-sm text-surface-500-400 text-center py-2">{m.traj_val_hint()}</p>
+			<p class="text-sm text-surface-600-400 text-center py-2">{m.traj_val_hint()}</p>
 		{/if}
 		{#if validationResult?.suggestAbove}
 			<p class="text-xs text-warning-800-200 text-center">{m.traj_val_above_los_notice()}</p>

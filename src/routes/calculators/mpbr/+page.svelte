@@ -239,7 +239,7 @@
 
 {#if !activeProfile.profile}
 	<div class="py-12 text-center space-y-3">
-		<p class="text-surface-500-400">{m.mpbr_no_profile()}</p>
+		<p class="text-surface-600-400">{m.mpbr_no_profile()}</p>
 		<a href="/profiles" class="btn preset-tonal-primary">{m.nav_profiles()}</a>
 	</div>
 {:else}
@@ -279,9 +279,9 @@
 							hasCalculated = false;
 						}}
 					/>
-					<span class="text-sm text-surface-500-400 shrink-0">{elevLabel}</span>
+					<span class="text-sm text-surface-600-400 shrink-0">{elevLabel}</span>
 				</div>
-				<p class="text-xs text-surface-500-400">{m.mpbr_target_size_hint()}</p>
+				<p class="text-xs text-surface-600-400">{m.mpbr_target_size_hint()}</p>
 			</div>
 
 			<!-- Calculate button -->
@@ -306,7 +306,7 @@
 		<div>
 			<button
 				type="button"
-				class="flex items-center gap-2 w-full text-sm text-surface-500-400 hover:text-surface-700-300"
+				class="flex items-center gap-2 w-full text-sm text-surface-600-400 hover:text-surface-700-300"
 				onclick={() => (showInfo = !showInfo)}
 			>
 				<Info class="size-4 shrink-0" />
@@ -318,7 +318,7 @@
 					<p>{m.mpbr_about_definition()}</p>
 					<p>{m.mpbr_about_zero()}</p>
 					<p>{m.mpbr_about_beyond()}</p>
-					<p class="text-xs text-surface-500-400">{m.mpbr_about_ideal()}</p>
+					<p class="text-xs text-surface-600-400">{m.mpbr_about_ideal()}</p>
 				</div>
 			{/if}
 		</div>
@@ -336,9 +336,9 @@
 						<Crosshair class="size-3.5" />
 					</div>
 					<div class="min-w-0">
-						<p class="text-xs text-surface-500-400 uppercase tracking-wide leading-none mb-0.5">{m.mpbr_optimal_zero()}</p>
+						<p class="text-xs text-surface-600-400 uppercase tracking-wide leading-none mb-0.5">{m.mpbr_optimal_zero()}</p>
 						<p class="text-sm font-semibold tabular-nums leading-none">
-							{mpbrResult.optimalZero} <span class="text-xs font-normal text-surface-500-400">{distLabel}</span>
+							{mpbrResult.optimalZero} <span class="text-xs font-normal text-surface-600-400">{distLabel}</span>
 						</p>
 					</div>
 				</div>
@@ -349,13 +349,13 @@
 						<MapPin class="size-3.5" />
 					</div>
 					<div class="min-w-0">
-						<p class="text-xs text-surface-500-400 uppercase tracking-wide leading-none mb-0.5">{m.mpbr_near_zero()}</p>
+						<p class="text-xs text-surface-600-400 uppercase tracking-wide leading-none mb-0.5">{m.mpbr_near_zero()}</p>
 						{#if mpbrResult.nearZero !== null}
 							<p class="text-sm font-semibold tabular-nums leading-none">
-								{mpbrResult.nearZero} <span class="text-xs font-normal text-surface-500-400">{distLabel}</span>
+								{mpbrResult.nearZero} <span class="text-xs font-normal text-surface-600-400">{distLabel}</span>
 							</p>
 						{:else}
-							<p class="text-xs text-surface-500-400">{m.mpbr_unknown()}</p>
+							<p class="text-xs text-surface-600-400">{m.mpbr_unknown()}</p>
 						{/if}
 					</div>
 				</div>
@@ -366,13 +366,13 @@
 						<MapPin class="size-3.5" />
 					</div>
 					<div class="min-w-0">
-						<p class="text-xs text-surface-500-400 uppercase tracking-wide leading-none mb-0.5">{m.mpbr_far_zero()}</p>
+						<p class="text-xs text-surface-600-400 uppercase tracking-wide leading-none mb-0.5">{m.mpbr_far_zero()}</p>
 						{#if mpbrResult.farZero !== null}
 							<p class="text-sm font-semibold tabular-nums leading-none">
-								{mpbrResult.farZero} <span class="text-xs font-normal text-surface-500-400">{distLabel}</span>
+								{mpbrResult.farZero} <span class="text-xs font-normal text-surface-600-400">{distLabel}</span>
 							</p>
 						{:else}
-							<p class="text-xs text-surface-500-400">{m.mpbr_unknown()}</p>
+							<p class="text-xs text-surface-600-400">{m.mpbr_unknown()}</p>
 						{/if}
 					</div>
 				</div>
@@ -383,9 +383,9 @@
 						<Ruler class="size-3.5" />
 					</div>
 					<div class="min-w-0">
-						<p class="text-xs text-surface-500-400 uppercase tracking-wide leading-none mb-0.5">{m.mpbr_min_pbr()}</p>
+						<p class="text-xs text-surface-600-400 uppercase tracking-wide leading-none mb-0.5">{m.mpbr_min_pbr()}</p>
 						<p class="text-sm font-semibold tabular-nums leading-none">
-							{mpbrResult.mpbrMin} <span class="text-xs font-normal text-surface-500-400">{distLabel}</span>
+							{mpbrResult.mpbrMin} <span class="text-xs font-normal text-surface-600-400">{distLabel}</span>
 						</p>
 					</div>
 				</div>
@@ -396,9 +396,9 @@
 						<Ruler class="size-3.5" />
 					</div>
 					<div class="min-w-0">
-						<p class="text-xs text-surface-500-400 uppercase tracking-wide leading-none mb-0.5">{m.mpbr_max_pbr()}</p>
+						<p class="text-xs text-surface-600-400 uppercase tracking-wide leading-none mb-0.5">{m.mpbr_max_pbr()}</p>
 						<p class="text-sm font-semibold tabular-nums leading-none">
-							{mpbrResult.mpbrMax} <span class="text-xs font-normal text-surface-500-400">{distLabel}</span>
+							{mpbrResult.mpbrMax} <span class="text-xs font-normal text-surface-600-400">{distLabel}</span>
 						</p>
 					</div>
 				</div>
@@ -409,14 +409,14 @@
 						<TrendingUp class="size-3.5" />
 					</div>
 					<div class="min-w-0">
-						<p class="text-xs text-surface-500-400 uppercase tracking-wide leading-none mb-0.5">{m.mpbr_max_ord()}</p>
+						<p class="text-xs text-surface-600-400 uppercase tracking-wide leading-none mb-0.5">{m.mpbr_max_ord()}</p>
 						{#if mpbrResult.maxOrdinate}
 							<p class="text-sm font-semibold tabular-nums leading-none">
-								{mpbrResult.maxOrdinate.elevation} <span class="text-xs font-normal text-surface-500-400">{elevLabel}</span>
+								{mpbrResult.maxOrdinate.elevation} <span class="text-xs font-normal text-surface-600-400">{elevLabel}</span>
 							</p>
-							<p class="text-xs text-surface-500-400 leading-none mt-0.5">{m.mpbr_at()} {mpbrResult.maxOrdinate.distance} {distLabel}</p>
+							<p class="text-xs text-surface-600-400 leading-none mt-0.5">{m.mpbr_at()} {mpbrResult.maxOrdinate.distance} {distLabel}</p>
 						{:else}
-							<p class="text-xs text-surface-500-400">{m.mpbr_unknown()}</p>
+							<p class="text-xs text-surface-600-400">{m.mpbr_unknown()}</p>
 						{/if}
 					</div>
 				</div>
@@ -457,11 +457,11 @@
 
 		{:else if !calculating && hasCalculated}
 			<!-- Calculation returned no result -->
-			<p class="text-sm text-surface-500-400 text-center py-8">{m.mpbr_no_result()}</p>
+			<p class="text-sm text-surface-600-400 text-center py-8">{m.mpbr_no_result()}</p>
 
 		{:else if !calculating}
 			<!-- Not yet calculated -->
-			<p class="text-sm text-surface-500-400 text-center py-8">{m.mpbr_hint()}</p>
+			<p class="text-sm text-surface-600-400 text-center py-8">{m.mpbr_hint()}</p>
 		{/if}
 
 	</div>

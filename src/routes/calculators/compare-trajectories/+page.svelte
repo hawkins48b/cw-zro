@@ -198,7 +198,7 @@
 
 	{#if profiles.list.length === 0}
 		<div class="py-12 text-center space-y-3">
-			<p class="text-surface-500-400">{m.compare_no_profiles()}</p>
+			<p class="text-surface-600-400">{m.compare_no_profiles()}</p>
 			<a href="/profiles" class="btn preset-tonal-primary">{m.nav_profiles()}</a>
 		</div>
 	{:else}
@@ -274,7 +274,7 @@
 					{/each}
 				</div>
 			{:else}
-				<p class="text-sm text-surface-500-400 text-center py-4">{m.compare_no_entries()}</p>
+				<p class="text-sm text-surface-600-400 text-center py-4">{m.compare_no_entries()}</p>
 			{/if}
 		</div>
 

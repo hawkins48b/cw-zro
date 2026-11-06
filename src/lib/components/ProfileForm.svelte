@@ -193,7 +193,7 @@
 			{#if fieldError('name')}
 				<p class="text-xs text-error-500">{fieldError('name')}</p>
 			{:else}
-				<p class="text-xs text-surface-500-400">{m.profile_rifle_designation_hint()}</p>
+				<p class="text-xs text-surface-600-400">{m.profile_rifle_designation_hint()}</p>
 			{/if}
 		</div>
 
@@ -228,7 +228,7 @@
 			{#if fieldError('opticName')}
 				<p class="text-xs text-error-500">{fieldError('opticName')}</p>
 			{:else}
-				<p class="text-xs text-surface-500-400">{m.profile_optic_name_hint()}</p>
+				<p class="text-xs text-surface-600-400">{m.profile_optic_name_hint()}</p>
 			{/if}
 		</div>
 
@@ -273,7 +273,7 @@
 					</button>
 				{/each}
 			</div>
-			<p class="text-xs text-surface-500-400">{m.profile_optic_reticle_type_hint()}</p>
+			<p class="text-xs text-surface-600-400">{m.profile_optic_reticle_type_hint()}</p>
 		</div>
 
 		<!-- Elevation click value -->
@@ -303,7 +303,7 @@
 					<Link2Off class="size-4" />
 				{/if}
 			</button>
-			<span class="text-xs text-surface-500-400">{m.profile_optic_click_link()}</span>
+			<span class="text-xs text-surface-600-400">{m.profile_optic_click_link()}</span>
 		</div>
 
 		<!-- Windage click value (only when unlinked) -->
@@ -349,7 +349,7 @@
 			{#if fieldError('bulletBrand')}
 				<p class="text-xs text-error-500">{fieldError('bulletBrand')}</p>
 			{:else}
-				<p class="text-xs text-surface-500-400">{m.profile_ammo_brand_hint()}</p>
+				<p class="text-xs text-surface-600-400">{m.profile_ammo_brand_hint()}</p>
 			{/if}
 		</div>
 

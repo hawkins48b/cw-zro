@@ -109,6 +109,6 @@
 	</div>
 
 	{#if hint}
-		<p class="text-xs text-surface-500-400">{hint}</p>
+		<p class="text-xs text-surface-600-400">{hint}</p>
 	{/if}
 </div>

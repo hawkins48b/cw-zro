@@ -85,7 +85,7 @@
 
 	{#if profiles.list.length === 0}
 		<div class="py-12 text-center space-y-3">
-			<p class="text-surface-500-400">{m.compare_no_profiles()}</p>
+			<p class="text-surface-600-400">{m.compare_no_profiles()}</p>
 			<a href={localizeHref('/profiles/new')} class="btn preset-tonal-primary">{m.profiles_new()}</a>
 		</div>
 	{:else}
