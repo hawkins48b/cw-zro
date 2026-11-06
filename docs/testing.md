@@ -11,7 +11,7 @@ npx vitest run -t "MPBR search"                        # By name
 
 Vitest is configured in [`vite.config.js`](../vite.config.js): `src/**/*.test.js`, jsdom, globals on. The tests need no build.
 
-On 2026-11-05: **554 passed, 1 todo**, in 12 files.
+On 2026-11-06: **1014 passed, 1 todo**, in 15 files.
 
 | File | Tests | Covers |
 |------|-------|--------|
@@ -27,6 +27,9 @@ On 2026-11-05: **554 passed, 1 todo**, in 12 files.
 | [`messages.test.js`](../src/test/messages.test.js) | 6 | Message catalogs |
 | [`format.test.js`](../src/test/format.test.js) | 6 | Escaping of text for chart labels |
 | [`yAxisUnit.test.js`](../src/test/yAxisUnit.test.js) | 7 | Stored unit of the compare chart |
+| [`zeroDistance.test.js`](../src/test/zeroDistance.test.js) | 102 | Zero distance guard, with the engine stubbed |
+| [`nanElevation.test.js`](../src/test/nanElevation.test.js) | 47 | Optic height and barrel elevation guards, with the engine stubbed |
+| [`windGuard.test.js`](../src/test/windGuard.test.js) | 311 | Wind speed and direction guard, with the engine stubbed for rejected winds |
 
 The todo is the check of the G7 path against a table published for a G7 BC. The Federal table cannot do this.
 

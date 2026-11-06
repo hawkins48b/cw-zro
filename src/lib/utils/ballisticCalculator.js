@@ -4,7 +4,6 @@ import {
 	DragModel,
 	Ammo,
 	Atmo,
-	Wind,
 	Shot,
 	UNew,
 	Table,
@@ -13,6 +12,7 @@ import {
 	TrajectoryRangeError,
 	defaultEngineConfig
 } from 'js-ballistics';
+import { shotWinds } from './shotWind.js';
 import { hasFiniteElevation, isUsableZeroDistance } from './zeroDistance.js';
 
 /**
@@ -172,15 +172,8 @@ export function calculateShotPoint(profile, range, atmosphere, wind, options = {
 		}
 
 		// --- Wind ---
-		const winds = [];
-		if (wind && parseFloat(wind.speed) > 0) {
-			const velocity =
-				wind.speedUnit === 'mps'
-					? UNew.MPS(parseFloat(wind.speed))
-					: UNew.MPH(parseFloat(wind.speed));
-			const directionFrom = UNew.Degree(parseFloat(wind.direction));
-			winds.push(new Wind({ velocity, directionFrom }));
-		}
+		const winds = shotWinds(wind);
+		if (!winds) return null;
 
 		// --- Zero distance ---
 		const zeroDistance =
@@ -368,15 +361,8 @@ export function calculateFullTrajectory(profile, range, atmosphere, wind) {
 		}
 
 		// --- Wind ---
-		const winds = [];
-		if (wind && parseFloat(wind.speed) > 0) {
-			const velocity =
-				wind.speedUnit === 'mps'
-					? UNew.MPS(parseFloat(wind.speed))
-					: UNew.MPH(parseFloat(wind.speed));
-			const directionFrom = UNew.Degree(parseFloat(wind.direction));
-			winds.push(new Wind({ velocity, directionFrom }));
-		}
+		const winds = shotWinds(wind);
+		if (!winds) return null;
 
 		// --- Zero distance ---
 		const zeroDistance =

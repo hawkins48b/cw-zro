@@ -97,6 +97,8 @@ One wind applies for the whole flight, with no vertical part. Direction is in de
 
 On the wind dial, 0° is at the top, towards the target, and the arrowhead sits at the entered angle. So the arrowhead shows where the wind is going, not where it comes from. Entering the clock position the wind comes from gives the opposite of the table above.
 
+An empty direction box counts as 0°, a tailwind, as its placeholder and the dial show ([#116](https://github.com/hawkins48b/cw-zro/issues/116)). So clearing the box with a wind speed above 0 gives a result for a wind the user did not enter.
+
 ## Spin drift
 
 With the option on and a twist entered, the library adds the empirical drift `1.25 × (Sg + 1.2) × t^1.83` inches, where `t` is the time of flight and `Sg` is the Miller stability factor, corrected for velocity, temperature and pressure. The profile form requires bullet length and twist.
@@ -186,6 +188,9 @@ The library runs synchronously. **Far outside normal values it can stay in its l
 | Both, `calculateMPBR` and dope cards | Finite barrel elevation after the zero solve, before any shot (`hasFiniteElevation`). It only rejects NaN and Infinity, so it changes no result. It does not stop every hang: a NaN that appears during the flight solves to a finite elevation, usually 0 | No result. A dope card stays blank |
 | Compare trajectories | Same zero rule on each entry's field | Message under the field, and the entry leaves the chart |
 | Both, custom atmosphere | All values finite, pressure above 0, humidity 0 to 100 | No result |
+| Both, wind speed above 0 (`shotWinds`) | Speed at most 100 m/s, about 224 mph, in either unit. Direction a number or text that reads as a number, at most 1e6 degrees either way, so a negative angle is valid. An empty or whitespace text counts as 0°. Null, a missing value, an object or a boolean is not empty | No result |
+| Both, stored wind speed that is an array, object or boolean (`shotWinds`) | Rejected, because the page can still show it as a speed | No result |
+| Both, wind speed empty, text, 0, negative, null or missing (`shotWinds`) | No wind is used, so the direction is not checked | Normal result without wind |
 | `calculateMPBR` | BC at least 0.01, velocity 50 to under 10000 fps, finite optic height | No result |
 | `calculateMPBR` | Barrel elevation up to 0.5 rad, flight up to 20000 units, at most 54 fires and 2 zero solves | No result. A shot reaching the limit is never reported as a capped distance |
 | `calculateTrajectoryValidation` | Range at least 100 and beyond the zero, value not 0, velocity and BC above 0 | No result, or an error message for the range |
@@ -198,8 +203,11 @@ The library runs synchronously. **Far outside normal values it can stay in its l
 - `calculateShotPoint` has no upper limit on distance, and no screen limits zero distance, velocity, optic height, wind or atmosphere values, apart from the rules above.
 - Dope cards have no velocity guard.
 - A zero from 0.001 to about 0.1 passes the guards and usually gives no result, with no message, after about a second of blocked page per trajectory. The profile form accepts these values too.
-- An empty or non-numeric wind direction with a wind speed above 0 hangs `calculateShotPoint` and `calculateFullTrajectory`. Clearing the direction box sends that value, so it needs no changed storage. The hang is confirmed on the functions, not yet in a browser.
-- In a review of #113 these ran until they were killed, after 12 to 60 seconds: an optic height of `-2e6` or `1e300`, a custom temperature of `-600`, a custom pressure of `1e308`, and a wind speed or direction of `1e999`.
+- In a review of #113 these ran until they were killed, after 12 to 60 seconds: an optic height of `-2e6` or `1e300`, a custom temperature of `-600` and a custom pressure of `1e308`.
+- BC has no lower limit in `calculateShotPoint` and `calculateFullTrajectory`. Measured on 2026-11-06 on the `.308` test profile at 1000 yd, a BC of `0.00001` at 2700 fps ran until killed at 45 seconds, with no wind and with 10 mph. A BC of `1e-9` at 200 fps with a 10 mph wind from 0° did the same on two of the four test loads tried, at every range tried from 10 to 3000 yd.
+- A custom atmosphere has no physical limits. Measured on 2026-11-06 on the `.308` test profile at 1000 yd, these ran until killed at 45 seconds: a temperature of `-273` °C with a 90° wind of 50 mph up to the wind limit, and at 2700 fps with no wind, a temperature of `100000` in °C or °F, or a pressure of `1e8` hPa. At `-273` °C, 20 mph and less, or a wind from 0° or 180°, gave no result at once.
+- A stored wind speed or direction of `{"toString":1}` throws in `WindInput.svelte` with `Cannot convert object to primitive value`, for the speed at line 63. This is confirmed by mounting the component. From reading the code, the same speed also throws at `routes/calculators/ballistic/+page.svelte:492`, even with the wind panel collapsed. A stored `wind` of `null` throws on the page when it reads the speed, also from reading the code, not from a rendered page. The calculators are safe from all of these.
+- A decimal comma is cut off: `1,5` reads as 1 for wind speed and direction, confirmed on `shotWinds`. This existed before #116. The boxes take text, so a French or German user can reach it by typing.
 - Saved values are not checked when read, so a tampered or absurd value in storage reaches the engine.
 - The time budget of the validation search is checked between shots. It cannot stop one slow shot.
 - An MPBR calculation has no time limit, because it runs only from a button. It can take seconds on absurd input.

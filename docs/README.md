@@ -14,6 +14,7 @@ Living documents. They describe the current state of `develop`.
 
 ## Delivery documentation
 
+- [2026-11-06: Stopping hangs from an empty wind direction](2026-11-06-116-wind-guard.md): clearing the direction box no longer freezes the app and counts as 0°; a bad direction, or a speed above 100 m/s, gives no result; a decimal comma is still cut off
 - [2026-11-06: Stopping hangs from an empty optic height](2026-11-06-113-nan-elevation.md): an empty or non-numeric optic height no longer freezes the app, and a non-finite elevation is never fired; no result changes, and an empty wind direction still hangs
 - [2026-11-05: Blocking unusable zero distances](2026-11-05-88-zero-distance-guard.md): a zero of 0 no longer freezes the app; an empty or tiny zero now gives no result, and the compare page shows a message
 - [2026-11-05: Escaping profile names in the compare chart](2026-11-05-103-chart-name-escaping.md): names with markup and a bad stored chart unit no longer run as HTML; screen readers get entities in some labels for names with `&`, `<` or `>`
