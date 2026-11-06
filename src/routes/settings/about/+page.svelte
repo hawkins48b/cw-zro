@@ -22,7 +22,7 @@
 	<!-- Description & version -->
 	<div class="card p-6 space-y-2">
 		<p class="text-surface-600-400">{m.about_description()}</p>
-		<p class="text-sm text-surface-400-600">{m.about_version({ version: '2.0.0' })}</p>
+		<p class="text-sm text-surface-400-600">{m.about_version({ version: __APP_VERSION__ })}</p>
 	</div>
 
 	<!-- Open Source -->
