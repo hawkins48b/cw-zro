@@ -6,7 +6,7 @@
 	import { settings } from '#lib/stores/settings.svelte.js';
 	import { compareTrajectories } from '#lib/stores/compareTrajectories.svelte.js';
 	import { calculateFullTrajectory } from '#lib/utils/ballisticCalculator.js';
-	import { escapeHtmlText } from '#lib/utils/format.js';
+	import { compareSeriesName } from '#lib/utils/compareEntries.js';
 	import { isUsableZeroDistance } from '#lib/utils/zeroDistance.js';
 	import { Unit } from 'js-ballistics';
 	import { Plus, X } from '@lucide/svelte';
@@ -49,11 +49,11 @@
 		compareTrajectories.entries.map((entry) => {
 			const profile = profiles.get(entry.profileId);
 			if (!profile) return null;
-			const zeroLabel = `${entry.zeroDist}\u202f${entry.zeroUnit === 'm' ? m.unit_m() : m.unit_yd()}`;
+			const zeroUnitLabel = entry.zeroUnit === 'm' ? m.unit_m() : m.unit_yd();
 			return {
 				...entry,
 				profile,
-				label: `${profile.name} @ ${zeroLabel}`
+				seriesName: compareSeriesName(profile.name, entry.zeroDist, zeroUnitLabel)
 			};
 		}).filter(Boolean)
 	);
@@ -86,7 +86,7 @@
 			}));
 			// An entry without a result has no series, so the color comes from the entry's position:
 			// a line must keep the color of the dot on its card.
-			series.push({ name: escapeHtmlText(entry.label), data, color: entryColor(i) });
+			series.push({ name: entry.seriesName, data, color: entryColor(i) });
 		}
 
 		return series.length > 0 ? series : null;
