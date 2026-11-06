@@ -13,7 +13,7 @@ const MAX_SHOTS = 200;
  * very long zero one failed shot can take seconds, while the page runs this on every keystroke.
  * On a desktop a normal solve takes under 0.2 s and a 5000 yd zero about 0.9 s. Phones are
  * slower, so a tighter budget would turn valid long-range answers into errors. Beyond that a
- * solvable goal can run out of time (a 20000 yd zero took 16 s) and is reported as no solution.
+ * solvable goal can run out of time (a 20000 yd zero took 16 s), which is reported as a timeout.
  *
  * It is checked before each shot. One shot cannot be interrupted, so the budget does not stop
  * a single slow or hung shot, and a search can overrun it by the length of its last shot. The
@@ -34,7 +34,7 @@ const SEARCH_BUDGET_MS = 5000;
  * @param {object|null} atmosphere - { altitude, altitudeUnit, pressure, pressureUnit, temperature, temperatureUnit, humidity } or null for ISA
  * @param {'below'|'above'} direction - where the bullet was seen relative to the line of sight
  * @returns {{ solveFor, initialVelocity, validatedVelocity, initialBc, validatedBc, initialPoint, validatedPoint, suggestAbove }
- *   | { error: 'range' } | { error: 'no_solution', suggestAbove?: true } | null}
+ *   | { error: 'range' } | { error: 'no_solution', suggestAbove?: true } | { error: 'timeout', suggestAbove?: true } | null}
  *   validatedPoint is the shot at exactly validatedVelocity and validatedBc. suggestAbove is
  *   true when the goal is below the line of sight but the profile's own shot is above it at
  *   this range, so the observation was probably meant as above.
@@ -174,7 +174,14 @@ export function calculateTrajectoryValidation(
 		// without ever equalling it, and that is still an answer. Stopping for any other reason
 		// (only one side seen, bounds or failed shots, out of shots or time) means the goal was not reached.
 		const converged = currentMeasure === goal || paramOverGoal - paramUnderGoal < 2 * minStep;
-		if (!converged) return noSolution;
+		if (!converged) {
+			// Time is the only reason left for a search that could still have moved. It says nothing
+			// about the goal, so it must not read as no solution.
+			const stillSearching = currentMeasure !== goal && step >= minStep;
+			return stillSearching && performance.now() >= deadline
+				? { ...noSolution, error: 'timeout' }
+				: noSolution;
+		}
 
 		// The answer is rounded for display and for saving to the profile, so the point has to come
 		// from the rounded value. Rounding moves it by at most half a minStep, which keeps it within

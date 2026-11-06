@@ -305,6 +305,7 @@
 	"traj_val_no_profile": "Kein aktives Profil. Gehen Sie zu Profile, um eines zu aktivieren.",
 	"traj_val_hint": "Geben Sie eine Beobachtung ein, um die Trajektorie zu validieren",
 	"traj_val_no_result": "Keine Lösung: Diese Beobachtung ist mit dem aktuellen Profil nicht erreichbar. Prüfen Sie den beobachteten Wert, die Wahl oberhalb/unterhalb sowie Einschiessentfernung und Optikhöhe im Profil.",
+	"traj_val_timeout": "Suche abgebrochen: Die Zeit lief ab, bevor eine Antwort gefunden wurde. Diese Beobachtung ist also möglicherweise erreichbar. Die übliche Ursache ist eine sehr lange Einschiessentfernung.",
 	"traj_val_solve_for": "Berechnen",
 	"traj_val_solve_velocity": "Geschwindigkeit",
 	"traj_val_solve_bc": "Ballistik-Koeff.",

@@ -431,6 +431,8 @@
 			<p class="text-sm text-warning-800-200 text-center py-2">{m.traj_val_range_error()}</p>
 		{:else if validationResult?.error === 'no_solution'}
 			<p class="text-sm text-warning-800-200 text-center py-2">{m.traj_val_no_result()}</p>
+		{:else if validationResult?.error === 'timeout'}
+			<p class="text-sm text-warning-800-200 text-center py-2">{m.traj_val_timeout()}</p>
 		{:else if validationResult && !validationResult.error}
 			<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
 				{#if solveFor === 'velocity'}

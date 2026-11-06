@@ -115,9 +115,9 @@ describe('trajectory validation time budget', () => {
 		vi.restoreAllMocks();
 	});
 
-	it('reports no solution when the budget runs out before the search converges', () => {
+	it('reports a timeout when the budget runs out before the search converges', () => {
 		shotsTake(() => 2000, (v) => (v - 2000) / 10);
-		expect(solve('50', 'above')).toEqual({ error: 'no_solution' });
+		expect(solve('50', 'above')).toEqual({ error: 'timeout' });
 		// Fired at 0, 2000 and 4000 ms; at 6000 ms the budget is gone.
 		expect(calculateShotPoint.mock.calls.length).toBe(3);
 	});
@@ -125,18 +125,38 @@ describe('trajectory validation time budget', () => {
 	it('stops on the failed-shot path too', () => {
 		// Only the first shot is good, so every later one takes the back-off branch.
 		shotsTake(() => 2000, (v) => (v === 3000 ? -100 : null));
-		expect(solve('50', 'above')).toEqual({ error: 'no_solution' });
+		expect(solve('50', 'above')).toEqual({ error: 'timeout' });
 		expect(calculateShotPoint.mock.calls.length).toBe(3);
 	});
 
 	it('still suggests above when the budget runs out', () => {
 		shotsTake(() => 2000, (v) => (v - 2000) / 10);
-		expect(solve('50', 'below')).toEqual({ error: 'no_solution', suggestAbove: true });
+		expect(solve('50', 'below')).toEqual({ error: 'timeout', suggestAbove: true });
+	});
+
+	it('still reports no solution for an unreachable goal inside the budget', () => {
+		shotsTake(() => 1, () => 8);
+		expect(solve('9', 'above')).toEqual({ error: 'no_solution' });
+	});
+
+	it('reports no solution when the search had finished as the budget ran out', () => {
+		// Every shot after the first fails, so the step halves down to its minimum. The last of those
+		// shots uses up the budget, but the search had nothing left to try: the goal is out of reach.
+		const clean = () => (v) => (v === 3000 ? -100 : null);
+		shotsTake(() => 1, clean());
+		expect(solve('50', 'above')).toEqual({ error: 'no_solution' });
+		const shots = calculateShotPoint.mock.calls.length;
+
+		calculateShotPoint.mockReset();
+		now = 1000;
+		shotsTake((shot) => (shot === shots ? 9000 : 1), clean());
+		expect(solve('50', 'above')).toEqual({ error: 'no_solution' });
+		expect(calculateShotPoint.mock.calls.length).toBe(shots);
 	});
 
 	it('does not fire another shot once the budget is gone', () => {
 		shotsTake((shot) => (shot === 1 ? 5000 : 1), (v) => (v - 2000) / 10);
-		expect(solve('50', 'above').error).toBe('no_solution');
+		expect(solve('50', 'above').error).toBe('timeout');
 		expect(calculateShotPoint.mock.calls.length).toBe(1);
 	});
 

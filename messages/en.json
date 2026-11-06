@@ -305,6 +305,7 @@
 	"traj_val_no_profile": "No active profile. Go to Profiles to activate one.",
 	"traj_val_hint": "Enter an observation to validate the trajectory",
 	"traj_val_no_result": "No solution: this observation cannot be reached with the current profile. Check the observed value, the above/below choice, and the profile's zero distance and optic height.",
+	"traj_val_timeout": "Search stopped: it ran out of time before finding an answer, so this observation may still be reachable. A very long zero distance is the usual cause.",
 	"traj_val_solve_for": "Solve For",
 	"traj_val_solve_velocity": "Velocity",
 	"traj_val_solve_bc": "Ballistic Coeff.",
