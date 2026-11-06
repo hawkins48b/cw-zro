@@ -182,6 +182,8 @@ The library runs synchronously. **Far outside normal values it can stay in its l
 | `calculateFullTrajectory` | Distance above 0 and at most 3000, BC above 0. Step at least 1, 25 when empty | No result |
 | Both | Velocity at the current temperature finite and at least 50 fps (`hasFlyableVelocity`) | No result |
 | Both, and dope cards | Zero distance a finite number of at least 0.001 after taking its absolute value (`isUsableZeroDistance`) | No result. A dope card stays blank |
+| Both, and dope cards | Finite optic height | No result. A dope card stays blank |
+| Both, `calculateMPBR` and dope cards | Finite barrel elevation after the zero solve, before any shot (`hasFiniteElevation`). It only rejects NaN and Infinity, so it changes no result. It does not stop every hang: a NaN that appears during the flight solves to a finite elevation, usually 0 | No result. A dope card stays blank |
 | Compare trajectories | Same zero rule on each entry's field | Message under the field, and the entry leaves the chart |
 | Both, custom atmosphere | All values finite, pressure above 0, humidity 0 to 100 | No result |
 | `calculateMPBR` | BC at least 0.01, velocity 50 to under 10000 fps, finite optic height | No result |
@@ -196,7 +198,8 @@ The library runs synchronously. **Far outside normal values it can stay in its l
 - `calculateShotPoint` has no upper limit on distance, and no screen limits zero distance, velocity, optic height, wind or atmosphere values, apart from the rules above.
 - Dope cards have no velocity guard.
 - A zero from 0.001 to about 0.1 passes the guards and usually gives no result, with no message, after about a second of blocked page per trajectory. The profile form accepts these values too.
-- An empty or non-numeric optic height hangs `calculateShotPoint` and `calculateFullTrajectory`: the zero solve gives a NaN elevation and the shot never ends. The profile form blocks it, so it takes a changed saved profile.
+- An empty or non-numeric wind direction with a wind speed above 0 hangs `calculateShotPoint` and `calculateFullTrajectory`. Clearing the direction box sends that value, so it needs no changed storage. The hang is confirmed on the functions, not yet in a browser.
+- In a review of #113 these ran until they were killed, after 12 to 60 seconds: an optic height of `-2e6` or `1e300`, a custom temperature of `-600`, a custom pressure of `1e308`, and a wind speed or direction of `1e999`.
 - Saved values are not checked when read, so a tampered or absurd value in storage reaches the engine.
 - The time budget of the validation search is checked between shots. It cannot stop one slow shot.
 - An MPBR calculation has no time limit, because it runs only from a button. It can take seconds on absurd input.

@@ -1,3 +1,5 @@
+import { Unit } from 'js-ballistics';
+
 /**
  * Smallest zero distance the engine is given, in the unit it was entered in (yd or m).
  *
@@ -23,4 +25,23 @@ export function isUsableZeroDistance(value) {
 	if (typeof value !== 'number' && typeof value !== 'string') return false;
 	const zero = Math.abs(parseFloat(value));
 	return Number.isFinite(zero) && zero >= MIN_ZERO_DISTANCE;
+}
+
+/**
+ * Whether a solved shot can be fired. Call this between setWeaponZero and fire.
+ *
+ * The solver can return NaN without an error, as it does on an infinite cant angle, and fire then
+ * never ends: every exit check in the engine is false with NaN. This reads the elevation the engine
+ * flies, which adds the cant to weapon.zeroElevation. It only rejects values that are not finite,
+ * so it changes no result.
+ *
+ * A finite elevation does not make a shot safe. When a NaN only appears during the flight, the
+ * solver stops on the elevation it started from, usually 0, and fire still hangs. A NaN sight height
+ * does that, so it has its own check before the solve. Other inputs need their own checks too.
+ *
+ * @param {Shot} shot
+ * @returns {boolean}
+ */
+export function hasFiniteElevation(shot) {
+	return Number.isFinite(shot.barrelElevation.In(Unit.Radian));
 }

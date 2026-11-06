@@ -1,7 +1,7 @@
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { Calculator, Weapon, DragModel, Ammo, Atmo, Wind, Shot, UNew, Unit, Table, TrajectoryRangeError } from 'js-ballistics';
 import { findZeroCrossings, ZERO_SEARCH_RANGE, isFlyableZeroElevation } from './dopeCardZeros.js';
-import { isUsableZeroDistance } from './zeroDistance.js';
+import { hasFiniteElevation, isUsableZeroDistance } from './zeroDistance.js';
 
 const PDF_UNIT = 1 / 72;
 const PDF_PRIMARY_COLOR = rgb(0.03529411764705882, 0.47843137254901963, 0.20392156862745098);
@@ -181,6 +181,8 @@ function computeTrajectory(profile, range, windSpeedMph, forZeros = false) {
 		const sightHeight = profile.opticHeightUnit === 'cm'
 			? UNew.Centimeter(parseFloat(profile.opticHeight))
 			: UNew.Inch(parseFloat(profile.opticHeight));
+		// An empty height is NaN, which the engine never leaves its loop on.
+		if (!Number.isFinite(sightHeight.In(Unit.Inch))) return null;
 		const weapon = new Weapon({ sightHeight });
 
 		const weight = profile.bulletWeightUnit === 'g'
@@ -216,6 +218,7 @@ function computeTrajectory(profile, range, windSpeedMph, forZeros = false) {
 		const shot = new Shot({ weapon, ammo, atmo, winds });
 		const calc = new Calculator();
 		calc.setWeaponZero(shot, zeroDist);
+		if (!hasFiniteElevation(shot)) return null;
 		if (forZeros && !isFlyableZeroElevation(weapon.zeroElevation)) return null;
 		const result = calc.fire({ shot, trajectoryRange: trajRange, trajectoryStep: trajStep, extraData: forZeros });
 		if (!result || result.length === 0) return null;

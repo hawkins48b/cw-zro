@@ -13,7 +13,7 @@ import {
 	TrajectoryRangeError,
 	defaultEngineConfig
 } from 'js-ballistics';
-import { isUsableZeroDistance } from './zeroDistance.js';
+import { hasFiniteElevation, isUsableZeroDistance } from './zeroDistance.js';
 
 /**
  * Relative humidity for Atmo, as a fraction: 0 is 0 %, 1 is 100 %.
@@ -95,6 +95,8 @@ export function calculateShotPoint(profile, range, atmosphere, wind, options = {
 			profile.opticHeightUnit === 'cm'
 				? UNew.Centimeter(parseFloat(profile.opticHeight))
 				: UNew.Inch(parseFloat(profile.opticHeight));
+		// An empty height is NaN, which the engine never leaves its loop on.
+		if (!Number.isFinite(sightHeight.In(Unit.Inch))) return null;
 
 		// --- Barrel twist (spin drift only) ---
 		let twist = UNew.Inch(0);
@@ -196,6 +198,7 @@ export function calculateShotPoint(profile, range, atmosphere, wind, options = {
 		const shot = new Shot({ weapon, ammo, atmo, winds, cantAngle: cantDeg !== 0 ? UNew.Degree(cantDeg) : undefined });
 		const calc = new Calculator();
 		calc.setWeaponZero(shot, zeroDistance);
+		if (!hasFiniteElevation(shot)) return null;
 		const result = calc.fire({ shot, trajectoryRange, trajectoryStep: trajectoryRange });
 
 		if (!result || result.length === 0) return null;
@@ -297,6 +300,8 @@ export function calculateFullTrajectory(profile, range, atmosphere, wind) {
 			profile.opticHeightUnit === 'cm'
 				? UNew.Centimeter(parseFloat(profile.opticHeight))
 				: UNew.Inch(parseFloat(profile.opticHeight));
+		// An empty height is NaN, which the engine never leaves its loop on.
+		if (!Number.isFinite(sightHeight.In(Unit.Inch))) return null;
 
 		// --- Barrel twist ---
 		let twist = UNew.Inch(0);
@@ -389,6 +394,7 @@ export function calculateFullTrajectory(profile, range, atmosphere, wind) {
 		const shot = new Shot({ weapon, ammo, atmo, winds });
 		const calc = new Calculator();
 		calc.setWeaponZero(shot, zeroDistance);
+		if (!hasFiniteElevation(shot)) return null;
 		const hitResult = calc.fire({ shot, trajectoryRange, trajectoryStep, extraData: true });
 
 		if (!hitResult || hitResult.length === 0) return null;
@@ -672,17 +678,20 @@ export function calculateMPBR(profile, targetSizeStr, targetUnit) {
 		const zeroedRows = (zero) => {
 			weapon.zeroElevation = UNew.Radian(0);
 			calc.setWeaponZero(shot, toDistance(zero));
+			if (!hasFiniteElevation(shot)) return null;
 			return heightRows(flightRows(calc, shot, longestFlight, oneUnit));
 		};
 		// A zero of 0 would hang the solver.
 		if (optimalZero < 1) return null;
 		let rows = zeroedRows(optimalZero);
+		if (!rows) return null;
 		// The solver zeroes on its first step past the distance, about 0.1 yd further out, so a far
 		// crossing just over a whole unit can put the apex over the top: take the unit below.
 		if (rows[apexIndex(rows)].y > halfTargetMM) {
 			optimalZero -= 1;
 			if (optimalZero < 1) return null;
 			rows = zeroedRows(optimalZero);
+			if (!rows) return null;
 		}
 		const top = apexIndex(rows);
 		const maxOrdMM = rows[top].y;
