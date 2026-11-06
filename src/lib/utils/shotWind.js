@@ -1,4 +1,5 @@
 import { UNew, Unit, Wind } from 'js-ballistics';
+import { isNumberOrText } from './storedWind.js';
 
 /**
  * Fastest wind the engine is given, in m/s: about 224 mph (owner decision on #116).
@@ -17,9 +18,6 @@ const MAX_WIND_SPEED_MPS = 100;
  * result still looks normal. No one enters this many turns, so it gives no result instead.
  */
 const MAX_WIND_DIRECTION_DEGREES = 1e6;
-
-/** Whether a stored value can be read as a number. Storage can hold any JSON value. */
-const isNumberOrText = (value) => typeof value === 'number' || typeof value === 'string';
 
 /**
  * The winds array of a Shot, from the wind of a screen or of storage. Call this before the engine.

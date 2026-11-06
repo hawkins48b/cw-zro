@@ -1,3 +1,4 @@
+import { pageWind, patchWind } from '#lib/utils/storedWind.js';
 import { localStore } from './localStore.svelte.js';
 
 const ISA_DEFAULTS = {
@@ -12,10 +13,12 @@ const ISA_DEFAULTS = {
 
 const DEFAULT_COLUMNS = ['rangeYd', 'elevIn', 'elevMOA', 'velFps', 'energyFtlb', 'time'];
 
+const DEFAULT_WIND = { speed: '0', speedUnit: 'mph', direction: '90' };
+
 const store = localStore('zro-ballistic', () => ({
 	range: { distance: '500', unit: 'yd', step: '25' },
 	atmosphere: { useISA: true, ...ISA_DEFAULTS },
-	wind: { speed: '0', speedUnit: 'mph', direction: '90' },
+	wind: DEFAULT_WIND,
 	options: {
 		showAtmosphere: false,
 		showWind: false,
@@ -33,7 +36,12 @@ export const ballistic = {
 	get atmosphere() {
 		return store.value.atmosphere;
 	},
+	/** The wind to show. Never hand this to a calculator: use storedWind. */
 	get wind() {
+		return pageWind(store.value.wind, DEFAULT_WIND);
+	},
+	/** The wind as stored, for the calculators: shotWinds decides what a damaged value gives. */
+	get storedWind() {
 		return store.value.wind;
 	},
 	get options() {
@@ -51,7 +59,7 @@ export const ballistic = {
 		}
 	},
 	setWind(patch) {
-		store.value = { ...store.value, wind: { ...store.value.wind, ...patch } };
+		store.value = { ...store.value, wind: patchWind(store.value.wind, patch, DEFAULT_WIND) };
 	},
 	setOptions(patch) {
 		store.value = { ...store.value, options: { ...store.value.options, ...patch } };

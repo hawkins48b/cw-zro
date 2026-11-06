@@ -32,7 +32,7 @@
 		const profile = activeProfile.profile;
 		if (!profile) return null;
 		const atmo = ballistic.atmosphere.useISA ? null : ballistic.atmosphere;
-		return calculateFullTrajectory(profile, ballistic.range, atmo, ballistic.wind);
+		return calculateFullTrajectory(profile, ballistic.range, atmo, ballistic.storedWind);
 	});
 
 	let tablePoints = $derived(trajectoryResult?.trajectory ?? []);

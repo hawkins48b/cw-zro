@@ -1,3 +1,4 @@
+import { migrateClockWind, pageWind, patchWind } from '#lib/utils/storedWind.js';
 import { localStore } from './localStore.svelte.js';
 
 const ISA_DEFAULTS = {
@@ -10,22 +11,19 @@ const ISA_DEFAULTS = {
 	humidity: '0'
 };
 
+const DEFAULT_WIND = { speed: '0', speedUnit: 'mph', direction: '90' };
+
 const store = localStore('zro-scope-view', () => ({
 	range: { distance: '500', unit: 'yd' },
 	elevation: { angle: '0', unit: 'deg' },
 	atmosphere: { useISA: true, ...ISA_DEFAULTS },
-	wind: { speed: '0', speedUnit: 'mph', direction: '90' },
+	wind: DEFAULT_WIND,
 	rotation: 0
 }));
 
 // One-time migration: convert stored clock direction to degrees
 if (store.value.wind?.directionUnit !== undefined) {
-	const w = store.value.wind;
-	const deg =
-		w.directionUnit === 'clock'
-			? String((parseInt(w.direction || '12') % 12) * 30)
-			: w.direction;
-	store.value = { ...store.value, wind: { speed: w.speed, speedUnit: w.speedUnit, direction: deg } };
+	store.value = { ...store.value, wind: migrateClockWind(store.value.wind) };
 }
 
 export const scopeView = {
@@ -38,7 +36,12 @@ export const scopeView = {
 	get atmosphere() {
 		return store.value.atmosphere;
 	},
+	/** The wind to show. Never hand this to a calculator: use storedWind. */
 	get wind() {
+		return pageWind(store.value.wind, DEFAULT_WIND);
+	},
+	/** The wind as stored, for the calculators: shotWinds decides what a damaged value gives. */
+	get storedWind() {
 		return store.value.wind;
 	},
 	get rotation() {
@@ -59,7 +62,7 @@ export const scopeView = {
 		}
 	},
 	setWind(patch) {
-		store.value = { ...store.value, wind: { ...store.value.wind, ...patch } };
+		store.value = { ...store.value, wind: patchWind(store.value.wind, patch, DEFAULT_WIND) };
 	},
 	setRotation(angle) {
 		store.value = { ...store.value, rotation: angle };

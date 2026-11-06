@@ -45,14 +45,14 @@
 	let point = $derived.by(() => {
 		const profile = activeProfile.profile;
 		if (!profile || !effectiveRange) return null;
-		return calculateShotPoint(profile, effectiveRange, atmoParams, scopeView.wind);
+		return calculateShotPoint(profile, effectiveRange, atmoParams, scopeView.storedWind);
 	});
 
 	let cantedPoint = $derived.by(() => {
 		if (!scopeView.rotation) return point;
 		const profile = activeProfile.profile;
 		if (!profile || !effectiveRange) return null;
-		return calculateShotPoint(profile, effectiveRange, atmoParams, scopeView.wind, { cantAngle: scopeView.rotation });
+		return calculateShotPoint(profile, effectiveRange, atmoParams, scopeView.storedWind, { cantAngle: scopeView.rotation });
 	});
 
 	let elevUnit = $derived(activeProfile.profile?.elevationClickUnit ?? 'MOA');
