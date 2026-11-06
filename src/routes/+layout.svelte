@@ -3,7 +3,7 @@
 	import favicon from '#lib/assets/favicon.svg';
 	import { page } from '$app/state';
 	import { m } from '#lib/paraglide/messages.js';
-	import { localizeHref, deLocalizeHref } from '#lib/paraglide/runtime.js';
+	import { localizeHref, deLocalizeHref, getLocale } from '#lib/paraglide/runtime.js';
 	import { Navigation } from '@skeletonlabs/skeleton-svelte';
 	import {
 		ArrowLeftIcon,
@@ -70,6 +70,12 @@
 
 	$effect(() => {
 		applyDarkMode(settings.darkMode);
+	});
+
+	// The static build serves one index.html for every locale, so its lang is always the base one.
+	// The language buttons reload the page, so this runs again after each switch.
+	$effect(() => {
+		document.documentElement.lang = getLocale();
 	});
 </script>
 
