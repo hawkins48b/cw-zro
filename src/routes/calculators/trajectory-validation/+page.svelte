@@ -6,6 +6,7 @@
 	import { settings } from '#lib/stores/settings.svelte.js';
 	import { trajectoryValidation } from '#lib/stores/trajectoryValidation.svelte.js';
 	import { calculateTrajectoryValidation } from '#lib/utils/trajectoryValidation.js';
+	import { altitudeTooLowMessage } from '#lib/components/altitudeMessage.js';
 	import { calculateFullTrajectory } from '#lib/utils/ballisticCalculator.js';
 	import { readDecimal } from '#lib/utils/decimal.js';
 	import { formatLimit } from '#lib/utils/format.js';
@@ -428,12 +429,15 @@
 		<!-- ═══ Atmosphere ═══════════════════════════════════════════════ -->
 		<AtmosphereCard
 			atmosphere={trajectoryValidation.atmosphere}
+			altitudeTooLow={validationResult?.error === 'minimum_altitude'}
 			onchange={(patch) => trajectoryValidation.setAtmosphere(patch)}
 		/>
 
 		<!-- ═══ Results ══════════════════════════════════════════════════ -->
 		{#if validationResult?.error === 'range'}
 			<p class="text-sm text-warning-800-200 text-center py-2">{m.traj_val_range_error()}</p>
+		{:else if validationResult?.error === 'minimum_altitude'}
+			<p class="text-sm text-warning-800-200 text-center py-2">{altitudeTooLowMessage(trajectoryValidation.atmosphere.altitudeUnit)}</p>
 		{:else if validationResult?.error === 'no_solution'}
 			<p class="text-sm text-warning-800-200 text-center py-2">{m.traj_val_no_result()}</p>
 		{:else if validationResult?.error === 'timeout'}

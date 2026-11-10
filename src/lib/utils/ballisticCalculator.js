@@ -20,8 +20,10 @@ import {
 	MIN_ZERO_DISTANCE
 } from './zeroDistance.js';
 import { readDecimal } from './decimal.js';
+import { createFlightCalculator, endedAtMinimumAltitude } from './flightStop.js';
 import {
 	hasFlyableVelocity,
+	hasUsableBullet,
 	isUsableAtmosphere,
 	isUsableBc,
 	isUsableRange,
@@ -107,9 +109,13 @@ function shotAtmosphere(atmosphere) {
  * @param {object} wind    - { speed, speedUnit: 'mph'|'mps', direction, directionUnit: 'clock'|'deg' }
  * @param {object} [options] - optional settings
  * @param {number} [options.cantAngle=0] - rifle cant angle in degrees
+ * @param {{ minimumAltitude?: boolean }} [options.report] - when given, minimumAltitude is set to
+ *   whether a null result came from the engine's minimum altitude (flightStop.js, #125)
  * @returns {TrajectoryData|null} last trajectory point or null on error
  */
 export function calculateShotPoint(profile, range, atmosphere, wind, options = {}) {
+	const { calc, stops } = createFlightCalculator();
+	if (options.report) options.report.minimumAltitude = false;
 	try {
 		const dist = Math.abs(readDecimal(range.distance));
 		if (!isUsableRange(dist)) return null;
@@ -118,6 +124,7 @@ export function calculateShotPoint(profile, range, atmosphere, wind, options = {
 		// --- Optic height ---
 		const opticHeight = readDecimal(profile.opticHeight);
 		if (!isUsableSightHeight(opticHeight, profile.opticHeightUnit)) return null;
+		if (!hasUsableBullet(profile)) return null;
 		const sightHeight =
 			profile.opticHeightUnit === 'cm' ? UNew.Centimeter(opticHeight) : UNew.Inch(opticHeight);
 
@@ -187,17 +194,25 @@ export function calculateShotPoint(profile, range, atmosphere, wind, options = {
 		if (!hasFlyableVelocity(ammo, atmo)) return null;
 		const cantDeg = options.cantAngle ?? 0;
 		const shot = new Shot({ weapon, ammo, atmo, winds, cantAngle: cantDeg !== 0 ? UNew.Degree(cantDeg) : undefined });
-		const calc = new Calculator();
 		calc.setWeaponZero(shot, zeroDistance);
-		if (!hasFiniteElevation(shot)) return null;
+		if (!hasFiniteElevation(shot)) {
+			reportStop(options.report, null, stops);
+			return null;
+		}
 		const result = calc.fire({ shot, trajectoryRange, trajectoryStep: trajectoryRange });
 
 		if (!result || result.length === 0) return null;
 		return result.at(result.length - 1);
 	} catch (e) {
+		reportStop(options.report, e, stops);
 		console.error('Ballistic calculation error:', e);
 		return null;
 	}
+}
+
+/** Records in a caller's report whether a null result came from the minimum altitude. */
+function reportStop(report, error, stops) {
+	if (report) report.minimumAltitude = endedAtMinimumAltitude(error, stops);
 }
 
 /**
@@ -277,9 +292,14 @@ const round2 = (v) => Math.round(v * 100) / 100;
  * @param {object} range      - { distance, unit: 'yd'|'m', step }
  * @param {object|null} atmosphere - custom atmo or null for ISA
  * @param {object} wind       - { speed, speedUnit: 'mph'|'mps', direction }
+ * @param {object} [options]
+ * @param {{ minimumAltitude?: boolean }} [options.report] - when given, minimumAltitude is set to
+ *   whether a null result came from the engine's minimum altitude (flightStop.js, #125)
  * @returns {{ trajectory, chartPoints, nearZero, farZero, maxApex, soundSpeedFPS } | null}
  */
-export function calculateFullTrajectory(profile, range, atmosphere, wind) {
+export function calculateFullTrajectory(profile, range, atmosphere, wind, options = {}) {
+	const { calc, stops } = createFlightCalculator();
+	if (options.report) options.report.minimumAltitude = false;
 	try {
 		const maxDist = Math.abs(readDecimal(range.distance));
 		const stepVal = Math.max(1, Math.abs(readDecimal(range.step)) || 25);
@@ -289,6 +309,7 @@ export function calculateFullTrajectory(profile, range, atmosphere, wind) {
 		// --- Optic height ---
 		const opticHeight = readDecimal(profile.opticHeight);
 		if (!isUsableSightHeight(opticHeight, profile.opticHeightUnit)) return null;
+		if (!hasUsableBullet(profile)) return null;
 		const sightHeight =
 			profile.opticHeightUnit === 'cm' ? UNew.Centimeter(opticHeight) : UNew.Inch(opticHeight);
 
@@ -351,9 +372,11 @@ export function calculateFullTrajectory(profile, range, atmosphere, wind) {
 		// --- Compute ---
 		if (!hasFlyableVelocity(ammo, atmo)) return null;
 		const shot = new Shot({ weapon, ammo, atmo, winds });
-		const calc = new Calculator();
 		calc.setWeaponZero(shot, zeroDistance);
-		if (!hasFiniteElevation(shot)) return null;
+		if (!hasFiniteElevation(shot)) {
+			reportStop(options.report, null, stops);
+			return null;
+		}
 		const hitResult = calc.fire({ shot, trajectoryRange, trajectoryStep, extraData: true });
 
 		if (!hitResult || hitResult.length === 0) return null;
@@ -434,6 +457,7 @@ export function calculateFullTrajectory(profile, range, atmosphere, wind) {
 
 		return { trajectory: tablePoints, chartPoints: allPoints, nearZero, farZero, maxApex, maxDrop, soundSpeedFPS, subsonicDist };
 	} catch (e) {
+		reportStop(options.report, e, stops);
 		console.error('Ballistic trajectory error:', e);
 		return null;
 	}
@@ -537,6 +561,7 @@ export function calculateMPBR(profile, targetSizeStr, targetUnit) {
 		// ── Build weapon (shared across all iterations) ──────────────────
 		const opticHeight = readDecimal(profile.opticHeight);
 		if (!isUsableSightHeight(opticHeight, profile.opticHeightUnit)) return null;
+		if (!hasUsableBullet(profile)) return null;
 		const sightHeight =
 			profile.opticHeightUnit === 'cm' ? UNew.Centimeter(opticHeight) : UNew.Inch(opticHeight);
 		let twist = UNew.Inch(0);

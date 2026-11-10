@@ -1,8 +1,9 @@
 import { UNew, Unit, defaultEngineConfig } from 'js-ballistics';
+import { readDecimal } from './decimal.js';
 
 /**
  * Limits of the values the engine is given, shared by the profile form and every calculation path
- * (#89, #90, #92, #93, #119; owner decisions of 2026-11-10).
+ * (#89, #90, #92, #93, #119, #125; owner decisions of 2026-11-10).
  *
  * js-ballistics runs synchronously and can stay in its loop for good far outside normal values,
  * which neither try/catch nor a timeout can stop, so the calculators check these before they call
@@ -36,6 +37,35 @@ export const PRESSURE_LIMITS = { hpa: { min: 300, max: 1200 }, inhg: { min: 8.86
 
 /** Relative humidity, in percent. */
 export const HUMIDITY_LIMITS = { min: 0, max: 100 };
+
+/*
+ * Bullet, barrel and altitude limits (#125; owner decision of 2026-11-10), both ends included, in
+ * the unit entered. They cover every real bullet, barrel and shooting site. None of these fields
+ * hung in the probes of the #89 security review (1e±300, empty and text in each, altitude ±1e300),
+ * so they stop nonsense in a profile from giving a normal looking result, not a hang. Inch and mm
+ * ends are exact conversions. The gram and foot ends are the owner's rounded values, so they are
+ * not exactly the grain and metre ones: 0.065 g is 1.003 gr and 130 g is 2006 gr; -3281 ft is
+ * -1000.05 m and 32808 ft is 9999.9 m.
+ */
+
+/** Bullet weight: 1 to 2000 gr, or 0.065 to 130 g. */
+export const BULLET_WEIGHT_LIMITS = { gr: { min: 1, max: 2000 }, g: { min: 0.065, max: 130 } };
+
+/** Bullet diameter: 0.1 to 1 in, or 2.54 to 25.4 mm. */
+export const BULLET_DIAMETER_LIMITS = { in: { min: 0.1, max: 1 }, mm: { min: 2.54, max: 25.4 } };
+
+/** Bullet length, used with spin drift only: 0.1 to 4 in, or 2.54 to 101.6 mm. */
+export const BULLET_LENGTH_LIMITS = { in: { min: 0.1, max: 4 }, mm: { min: 2.54, max: 101.6 } };
+
+/**
+ * Barrel twist, one turn in this length, used with spin drift only: 1 to 100 in, or 25.4 to
+ * 2540 mm. The calculators take it either way, since a negative twist is a left-hand barrel; the
+ * profile form only takes a positive one.
+ */
+export const BARREL_TWIST_LIMITS = { in: { min: 1, max: 100 }, mm: { min: 25.4, max: 2540 } };
+
+/** Altitude of a custom atmosphere: -1000 to 10000 m, or -3281 to 32808 ft. */
+export const ALTITUDE_LIMITS = { m: { min: -1000, max: 10000 }, ft: { min: -3281, max: 32808 } };
 
 /** Whether a number lies from min to max, both included. False for NaN. */
 const within = (value, { min, max }) => value >= min && value <= max;
@@ -133,16 +163,91 @@ export function pressureLimits(unit) {
 }
 
 /**
- * Whether the values of a custom atmosphere can be given to the engine. Altitude only has to be
- * finite: density comes from pressure, temperature and humidity.
+ * Bullet weight limits in a unit: 'g', or grains for anything else, as the calculators read it.
+ * @param {string} unit
+ */
+export function bulletWeightLimits(unit) {
+	return unit === 'g' ? BULLET_WEIGHT_LIMITS.g : BULLET_WEIGHT_LIMITS.gr;
+}
+
+/**
+ * Bullet diameter limits in a unit: 'mm', or inches for anything else, as the calculators read it.
+ * @param {string} unit
+ */
+export function bulletDiameterLimits(unit) {
+	return unit === 'mm' ? BULLET_DIAMETER_LIMITS.mm : BULLET_DIAMETER_LIMITS.in;
+}
+
+/**
+ * Bullet length limits in a unit: 'mm', or inches for anything else, as the calculators read it.
+ * @param {string} unit
+ */
+export function bulletLengthLimits(unit) {
+	return unit === 'mm' ? BULLET_LENGTH_LIMITS.mm : BULLET_LENGTH_LIMITS.in;
+}
+
+/**
+ * Barrel twist limits in a unit: 'mm', or inches for anything else, as the calculators read it.
+ * @param {string} unit
+ */
+export function barrelTwistLimits(unit) {
+	return unit === 'mm' ? BARREL_TWIST_LIMITS.mm : BARREL_TWIST_LIMITS.in;
+}
+
+/**
+ * Altitude limits in a unit: 'm', or feet for anything else, as the calculators read it.
+ * @param {string} unit
+ */
+export function altitudeLimits(unit) {
+	return unit === 'm' ? ALTITUDE_LIMITS.m : ALTITUDE_LIMITS.ft;
+}
+
+/**
+ * Whether the bullet and barrel of a profile can be given to the engine (#125): weight and
+ * diameter always, since they always go into the drag model, and twist and length when spin drift
+ * is on and they are set, the only case in which the calculators pass them on (otherwise they use
+ * no twist and a 2 in length). A twist is checked either way: a negative one is a left-hand barrel.
+ * Values are read as the calculators read them, with a comma as a decimal point.
+ *
+ * @param {object} profile - flat v2 profile
+ * @param {{ spinDrift?: boolean }} [options] - spinDrift false for a path that never uses spin
+ *   drift (the dope cards), so that twist and length are not checked there
+ * @returns {boolean}
+ */
+export function hasUsableBullet(profile, { spinDrift = true } = {}) {
+	if (!within(readDecimal(profile.bulletWeight), bulletWeightLimits(profile.bulletWeightUnit))) {
+		return false;
+	}
+	if (!within(readDecimal(profile.bulletDiameter), bulletDiameterLimits(profile.bulletDiameterUnit))) {
+		return false;
+	}
+	if (!(spinDrift && profile.spinDrift)) return true;
+	if (
+		profile.barrelTwist &&
+		!within(Math.abs(readDecimal(profile.barrelTwist)), barrelTwistLimits(profile.barrelTwistUnit))
+	) {
+		return false;
+	}
+	if (
+		profile.bulletLength &&
+		!within(readDecimal(profile.bulletLength), bulletLengthLimits(profile.bulletLengthUnit))
+	) {
+		return false;
+	}
+	return true;
+}
+
+/**
+ * Whether the values of a custom atmosphere can be given to the engine. Altitude has its own
+ * limits (#125), although density comes from pressure, temperature and humidity only.
  *
  * @param {{ altitude: number, pressure: number, temperature: number, humidity: number }} values
- * @param {{ pressureUnit?: string, temperatureUnit?: string }} units
+ * @param {{ altitudeUnit?: string, pressureUnit?: string, temperatureUnit?: string }} units
  * @returns {boolean}
  */
 export function isUsableAtmosphere(values, units) {
 	return (
-		Number.isFinite(values.altitude) &&
+		within(values.altitude, altitudeLimits(units.altitudeUnit)) &&
 		within(values.pressure, pressureLimits(units.pressureUnit)) &&
 		within(values.temperature, temperatureLimits(units.temperatureUnit)) &&
 		within(values.humidity, HUMIDITY_LIMITS)

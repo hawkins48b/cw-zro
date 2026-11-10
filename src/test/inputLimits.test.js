@@ -303,7 +303,7 @@ describe.each(ATMOSPHERE_PATHS)('%s, custom atmosphere (#92)', (_, run) => {
 		['35.4 inHg', { pressure: '35.4' }],
 		['humidity 0', { humidity: '0' }],
 		['humidity 100', { humidity: '100' }],
-		['any finite altitude', { altitude: '-1000' }]
+		['-1000 ft', { altitude: '-1000' }]
 	])('reaches the engine with %s', (__, change) => {
 		run({ ...ATMO, ...change });
 		expect(reached()).toBe(true);
@@ -359,26 +359,54 @@ describe('dope cards with no data (#91)', () => {
 		expect(reached()).toBe(false);
 	});
 
-	it('downloadDopeCard saves nothing and reports it when a card has no data', async () => {
+	it('downloadDopeCard saves nothing and reports no-data when a card has no data', async () => {
 		const save = vi.fn();
-		expect(await downloadDopeCard(generateImperialDopeCard, { ...P308_G1, bc: '0.001' }, save)).toBe(false);
-		expect(save).not.toHaveBeenCalled();
-	});
-
-	it('downloadDopeCard reports a failure to generate the same way', async () => {
-		const save = vi.fn();
-		const generate = async () => {
-			throw new Error('template not loaded');
-		};
-		expect(await downloadDopeCard(generate, P308_G1, save)).toBe(false);
+		expect(await downloadDopeCard(generateImperialDopeCard, { ...P308_G1, bc: '0.001' }, save)).toBe('no-data');
 		expect(save).not.toHaveBeenCalled();
 	});
 
 	it('downloadDopeCard saves a card that has data', async () => {
 		const save = vi.fn(async () => {});
 		const doc = {};
-		expect(await downloadDopeCard(async () => doc, P308_G1, save)).toBe(true);
+		expect(await downloadDopeCard(async () => doc, P308_G1, save)).toBe('saved');
 		expect(save).toHaveBeenCalledWith(doc);
+	});
+});
+
+describe('dope card build or save failure (#123)', () => {
+	it('reports failed, not no-data, when the generator throws', async () => {
+		const save = vi.fn();
+		const generate = async () => {
+			throw new Error('template not loaded');
+		};
+		expect(await downloadDopeCard(generate, P308_G1, save)).toBe('failed');
+		expect(save).not.toHaveBeenCalled();
+	});
+
+	it.each([
+		['imperial', generateImperialDopeCard],
+		['metric', generateMetricDopeCard]
+	])('reports failed when the %s template cannot be fetched, on a valid profile', async (_, generate) => {
+		vi.stubGlobal('fetch', async () => {
+			throw new TypeError('Failed to fetch');
+		});
+		const save = vi.fn();
+		expect(await downloadDopeCard(generate, P308_G1, save)).toBe('failed');
+		expect(save).not.toHaveBeenCalled();
+	});
+
+	it('reports failed when saving the file throws', async () => {
+		const save = vi.fn(async () => {
+			throw new Error('disk full');
+		});
+		expect(await downloadDopeCard(async () => ({}), P308_G1, save)).toBe('failed');
+		expect(save).toHaveBeenCalledTimes(1);
+	});
+
+	it('reports no-data on a profile with no data even though nothing failed', async () => {
+		const save = vi.fn();
+		expect(await downloadDopeCard(generateMetricDopeCard, { ...P308_G1, bulletWeight: '0' }, save)).toBe('no-data');
+		expect(save).not.toHaveBeenCalled();
 	});
 });
 

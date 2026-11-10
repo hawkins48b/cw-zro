@@ -4,8 +4,10 @@
 	import { activeProfile } from '#lib/stores/activeProfile.svelte.js';
 	import { ballistic } from '#lib/stores/ballistic.svelte.js';
 	import { settings } from '#lib/stores/settings.svelte.js';
-	import { calculateFullTrajectory } from '#lib/utils/ballisticCalculator.js';
+	import { ballisticPageTrajectory, isUsableBallisticRange } from '#lib/utils/ballisticPage.js';
 	import { readDecimal } from '#lib/utils/decimal.js';
+	import { formatLimit } from '#lib/utils/format.js';
+	import { MAX_DISTANCE } from '#lib/utils/inputLimits.js';
 	import WindInput from '#lib/components/WindInput.svelte';
 	import AtmosphereCard from '#lib/components/AtmosphereCard.svelte';
 	import {
@@ -29,12 +31,13 @@
 	});
 
 	// ── Trajectory computation ───────────────────────────────────────
-	let trajectoryResult = $derived.by(() => {
-		const profile = activeProfile.profile;
-		if (!profile) return null;
+	// The range box shows the range message when the page does not calculate (#122).
+	let rangeUsable = $derived(isUsableBallisticRange(ballistic.range.distance));
+	let trajectory = $derived.by(() => {
 		const atmo = ballistic.atmosphere.useISA ? null : ballistic.atmosphere;
-		return calculateFullTrajectory(profile, ballistic.range, atmo, ballistic.storedWind);
+		return ballisticPageTrajectory(activeProfile.profile, ballistic.range, atmo, ballistic.storedWind);
 	});
+	let trajectoryResult = $derived(trajectory.result);
 
 	let tablePoints = $derived(trajectoryResult?.trajectory ?? []);
 	let chartPoints = $derived(trajectoryResult?.chartPoints ?? []);
@@ -437,6 +440,7 @@
 							inputmode="decimal"
 							placeholder="500"
 							value={ballistic.range.distance}
+							aria-invalid={!rangeUsable}
 							oninput={(e) => ballistic.setRange({ distance: e.target.value })}
 						/>
 						<div class="flex items-center gap-1 shrink-0">
@@ -451,6 +455,9 @@
 							{/each}
 						</div>
 					</div>
+					{#if !rangeUsable}
+						<p class="text-xs text-error-500">{m.validation_range_above_zero({ max: formatLimit(MAX_DISTANCE), unit: distLabel })}</p>
+					{/if}
 				</div>
 
 				<!-- Step -->
@@ -474,6 +481,7 @@
 			<!-- Atmosphere -->
 			<AtmosphereCard
 				atmosphere={ballistic.atmosphere}
+				altitudeTooLow={trajectory.altitudeTooLow}
 				onchange={(patch) => ballistic.setAtmosphere(patch)}
 			/>
 

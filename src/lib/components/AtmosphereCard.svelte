@@ -2,9 +2,20 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { readDecimal } from '#lib/utils/decimal.js';
 	import { formatLimit } from '#lib/utils/format.js';
-	import { HUMIDITY_LIMITS, pressureLimits, temperatureLimits } from '#lib/utils/inputLimits.js';
+	import {
+		HUMIDITY_LIMITS,
+		altitudeLimits,
+		pressureLimits,
+		temperatureLimits
+	} from '#lib/utils/inputLimits.js';
 
-	let { atmosphere, onchange } = $props();
+	import { altitudeTooLowMessage } from '#lib/components/altitudeMessage.js';
+
+	/**
+	 * altitudeTooLow: the page's result is missing because the engine ended the flight at its
+	 * minimum altitude (#125, flightStop.js). Shown under the altitude box when the box itself is valid.
+	 */
+	let { atmosphere, onchange, altitudeTooLow = false } = $props();
 
 	/**
 	 * The range message of a box whose value the calculators reject (isUsableAtmosphere), or ''.
@@ -16,7 +27,13 @@
 		return m.validation_range({ min: formatLimit(limits.min), max: formatLimit(limits.max), unit });
 	}
 
-	let altitudeError = $derived(Number.isFinite(readDecimal(atmosphere.altitude)) ? '' : m.validation_required());
+	let altitudeError = $derived(
+		rangeError(
+			atmosphere.altitude,
+			altitudeLimits(atmosphere.altitudeUnit),
+			atmosphere.altitudeUnit === 'm' ? m.unit_m() : m.unit_ft()
+		)
+	);
 	let pressureError = $derived(
 		rangeError(
 			atmosphere.pressure,
@@ -71,6 +88,8 @@
 				</div>
 				{#if altitudeError}
 					<p class="text-xs text-error-500">{altitudeError}</p>
+				{:else if altitudeTooLow}
+					<p class="text-xs text-warning-800-200" role="alert">{altitudeTooLowMessage(atmosphere.altitudeUnit)}</p>
 				{/if}
 			</div>
 

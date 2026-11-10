@@ -22,7 +22,7 @@
 	import { Unit } from 'js-ballistics';
 	import { readDecimal } from '#lib/utils/decimal.js';
 	import { MAX_DISTANCE } from '#lib/utils/inputLimits.js';
-	import { isUsableScopeRange, scopeEffectiveRange } from '#lib/utils/scopeRange.js';
+	import { isUsableScopeAngle, isUsableScopeRange, scopeEffectiveRange } from '#lib/utils/scopeRange.js';
 	import { formatLimit } from '#lib/utils/format.js';
 
 	// ── Derived computation ─────────────────────────────────────────
@@ -35,17 +35,22 @@
 		scopeEffectiveRange(scopeView.range, showElevation ? scopeView.elevation : null)
 	);
 	let rangeUsable = $derived(isUsableScopeRange(scopeView.range.distance));
+	let angleUsable = $derived(isUsableScopeAngle(showElevation ? scopeView.elevation : null));
 	let distLabel = $derived(scopeView.range.unit === 'm' ? m.unit_m() : m.unit_yd());
 
 	let atmoParams = $derived(
 		scopeView.atmosphere.useISA ? null : scopeView.atmosphere
 	);
 
-	let point = $derived.by(() => {
+	// Whether the custom altitude is too low for this shot (#125), from the engine's stop reason.
+	let shot = $derived.by(() => {
 		const profile = activeProfile.profile;
-		if (!profile || !effectiveRange) return null;
-		return calculateShotPoint(profile, effectiveRange, atmoParams, scopeView.storedWind);
+		if (!profile || !effectiveRange) return { point: null, altitudeTooLow: false };
+		const report = {};
+		const point = calculateShotPoint(profile, effectiveRange, atmoParams, scopeView.storedWind, { report });
+		return { point, altitudeTooLow: !point && !!atmoParams && report.minimumAltitude };
 	});
+	let point = $derived(shot.point);
 
 	let cantedPoint = $derived.by(() => {
 		if (!scopeView.rotation) return point;
@@ -131,6 +136,7 @@
 							inputmode="decimal"
 							placeholder="0"
 							value={scopeView.elevation.angle}
+							aria-invalid={!angleUsable}
 							oninput={(e) => scopeView.setElevation({ angle: e.target.value })}
 						/>
 						<div class="flex items-center gap-1 shrink-0">
@@ -147,7 +153,11 @@
 							{/each}
 						</div>
 					</div>
-					<p class="text-xs text-surface-600-400">{m.scope_view_angle_hint()}</p>
+					{#if angleUsable}
+						<p class="text-xs text-surface-600-400">{m.scope_view_angle_hint()}</p>
+					{:else}
+						<p class="text-xs text-error-500">{m.scope_view_cos_invalid()}</p>
+					{/if}
 				{/if}
 			</div>
 
@@ -163,6 +173,7 @@
 		<!-- Atmosphere -->
 		<AtmosphereCard
 			atmosphere={scopeView.atmosphere}
+			altitudeTooLow={shot.altitudeTooLow}
 			onchange={(patch) => scopeView.setAtmosphere(patch)}
 		/>
 	</div>

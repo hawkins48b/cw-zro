@@ -3,7 +3,7 @@ import { Calculator, Weapon, DragModel, Ammo, Atmo, Wind, Shot, UNew, Unit, Tabl
 import { findZeroCrossings, ZERO_SEARCH_RANGE, isFlyableZeroElevation } from './dopeCardZeros.js';
 import { hasFiniteElevation, isUsableZeroDistance, zeroDistanceValue } from './zeroDistance.js';
 import { readDecimal } from './decimal.js';
-import { hasFlyableVelocity, isUsableBc, isUsableSightHeight } from './inputLimits.js';
+import { hasFlyableVelocity, hasUsableBullet, isUsableBc, isUsableSightHeight } from './inputLimits.js';
 
 const PDF_UNIT = 1 / 72;
 const PDF_PRIMARY_COLOR = rgb(0.03529411764705882, 0.47843137254901963, 0.20392156862745098);
@@ -184,6 +184,8 @@ function computeTrajectory(profile, range, windSpeedMps, forZeros = false) {
 		// The same limits as the other calculators: out of them the engine can loop for good.
 		const opticHeight = readDecimal(profile.opticHeight);
 		if (!isUsableSightHeight(opticHeight, profile.opticHeightUnit)) return null;
+		// The cards never use spin drift, so twist and length do not reach the engine here.
+		if (!hasUsableBullet(profile, { spinDrift: false })) return null;
 		const sightHeight = profile.opticHeightUnit === 'cm'
 			? UNew.Centimeter(opticHeight)
 			: UNew.Inch(opticHeight);

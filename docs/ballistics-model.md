@@ -17,6 +17,8 @@ The app uses `js-ballistics` 2.2.0-beta.2, a pre-release, with its default Euler
 
 In `calculateShotPoint` and `calculateFullTrajectory`, a flight that ends before the requested range gives no result, not a partial table. The `.223` test profile, for example, gives no result at 3000 yd: its flight ends at 2732 yd.
 
+These two functions run the same Euler engine through a subclass that only notes when a flight ended at the minimum altitude, then rethrows the engine's error ([`flightStop.js`](../src/lib/utils/flightStop.js), [#125](https://github.com/hawkins48b/cw-zro/issues/125)). The integration is the engine's own, so results are unchanged. The subclass overrides the library's internal `_integrate`, so it must be rechecked on any `js-ballistics` upgrade.
+
 ## Inputs and units
 
 Everything comes from a profile or from the screen. Values are stored as entered, with their unit, and converted when a calculation runs.
@@ -71,9 +73,9 @@ A single BC scales the standard G1 or G7 drag table from the library. Any `bcTyp
 
 **Standard.** With "use ISA" on, the app calls `new Atmo()`: sea level, 15 °C (59 °F), 1013.25 hPa, 0 % humidity.
 
-**Custom.** The four values are passed as entered. A temperature outside -90 to 70 °C (-130 to 158 °F), a pressure outside 300 to 1200 hPa (8.86 to 35.4 inHg), a humidity outside 0 to 100, or an altitude that is not finite gives no result, and the box shows the allowed range ([#92](https://github.com/hawkins48b/cw-zro/issues/92)). The limits are in the unit entered.
+**Custom.** The four values are passed as entered. A temperature outside -90 to 70 °C (-130 to 158 °F), a pressure outside 300 to 1200 hPa (8.86 to 35.4 inHg), a humidity outside 0 to 100, or an altitude outside -1000 to 10000 m (-3281 to 32808 ft) gives no result, and the box shows the allowed range ([#92](https://github.com/hawkins48b/cw-zro/issues/92), [#125](https://github.com/hawkins48b/cw-zro/issues/125)). The limits are in the unit entered.
 
-**Enter the pressure measured at the shooting site.** Density comes from pressure, temperature and humidity. Altitude does not enter it. Changing only the altitude from 0 to 10000 ft left drop and velocity identical on the hot altitude test atmosphere, while changing the pressure from 24.9 to 29.92 inHg moved drop at 1000 yd by 49 in. A sea-level corrected pressure, as in weather reports, gives the wrong density at altitude. The field does not say this on screen.
+**Enter the pressure measured at the shooting site.** Density comes from pressure, temperature and humidity. Altitude does not enter it. Its only effect found is the end of the flight at an altitude of -1410.748 ft, -430 m (see [Engine](#engine)): the site altitude plus the height of the bullet over the muzzle. A low site inside the altitude limits can therefore give no result. The Ballistic, scope view and trajectory validation pages then say under the altitude box that the altitude is too low for this shot ([#125](https://github.com/hawkins48b/cw-zro/issues/125)). On the `.308` test profile there is no result below about -1402 ft at 600 yd, or -365 ft at 3000 yd. Changing only the altitude from 0 to 10000 ft left drop and velocity identical on the hot altitude test atmosphere, while changing the pressure from 24.9 to 29.92 inHg moved drop at 1000 yd by 49 in. A sea-level corrected pressure, as in weather reports, gives the wrong density at altitude. The field does not say this on screen.
 
 **During the flight**, density and speed of sound follow the height of the bullet once it is more than 30 ft from the starting altitude, using a fixed lapse rate. Speed of sound depends on temperature only, not on humidity.
 
@@ -109,7 +111,7 @@ A comma in the speed or direction box reads as a decimal point: `1,5` is 1.5, in
 
 With the option on and a twist entered, the library adds the empirical drift `1.25 × (Sg + 1.2) × t^1.83` inches, where `t` is the time of flight and `Sg` is the Miller stability factor, corrected for velocity, temperature and pressure. The profile form requires bullet length and twist.
 
-- The form accepts positive twist only, so all drift is to the right. Left-hand twist cannot be entered, although the calculation supports it.
+- The form accepts a twist of 1 to 100 in (25.4 to 2540 mm) and a length of 0.1 to 4 in (2.54 to 101.6 mm), positive only, so all drift entered in the form is to the right. Left-hand twist cannot be entered, although the calculation supports it: the calculators take a stored negative twist from -1 to -100 in ([#125](https://github.com/hawkins48b/cw-zro/issues/125)).
 - It is added to windage, not modelled as a force.
 - Spin drift has no independent check.
 
@@ -125,7 +127,7 @@ The zero is the only saved distance. Near and far zero come from the trajectory.
 
 ## Angles
 
-**Uphill and downhill.** While its angle section is open, the scope view multiplies the distance by the cosine of the entered angle, or by the entered cosine, and then calculates a flat shot at that shorter distance. This is an approximation: the engine's look angle is not used. Time, energy and velocity shown with it are those of the shorter distance. No other screen has an angle.
+**Uphill and downhill.** While its angle section is open, the scope view multiplies the distance by the cosine of the entered angle, or by the entered cosine, and then calculates a flat shot at that shorter distance. An entered cosine must be above 0 and at most 1, or the box shows a message and there is no result. An empty box is a flat shot ([#121](https://github.com/hawkins48b/cw-zro/issues/121)). This is an approximation: the engine's look angle is not used. Time, energy and velocity shown with it are those of the shorter distance. No other screen has an angle.
 
 **Cant.** Rotating the scope view recalculates the shot with a cant angle, for the reticle only. The adjustments shown come from the shot without cant. The zero is solved on the canted shot too. At 600 yd on the `.308` test profile, 5° gives 2.01 in of windage and 0.12 in more drop. Cant has a regression test and no independent check.
 
@@ -181,7 +183,7 @@ Limits:
 
 The library runs synchronously. **Far outside normal values it can stay in its loop for good, and neither `try/catch` nor a timeout can stop that.** So guards have to run before the engine is called. These are the guards in place.
 
-The limits were set by the owner on 2026-11-10 ([#89](https://github.com/hawkins48b/cw-zro/issues/89), [#90](https://github.com/hawkins48b/cw-zro/issues/90), [#91](https://github.com/hawkins48b/cw-zro/issues/91), [#92](https://github.com/hawkins48b/cw-zro/issues/92), [#93](https://github.com/hawkins48b/cw-zro/issues/93), [#114](https://github.com/hawkins48b/cw-zro/issues/114), [#119](https://github.com/hawkins48b/cw-zro/issues/119)). They live in [`inputLimits.js`](../src/lib/utils/inputLimits.js) and [`zeroDistance.js`](../src/lib/utils/zeroDistance.js), and the form and every path read them from there. Measured on f40933f before the change, 3888 worst-case combinations inside them (G1 and G7, BC 0.01 to 2, 60 to 9999 fps, sight height -10 to 10 in, zero 1 to 3000, both ends of temperature and pressure, no wind and 223 mph at 0° and 90°) gave no hang through `calculateShotPoint` and `calculateFullTrajectory`. The slowest took 2.2 s, on a 3000 zero. The dope cards, MPBR and validation were not part of that run.
+The limits were set by the owner on 2026-11-10 ([#89](https://github.com/hawkins48b/cw-zro/issues/89), [#90](https://github.com/hawkins48b/cw-zro/issues/90), [#91](https://github.com/hawkins48b/cw-zro/issues/91), [#92](https://github.com/hawkins48b/cw-zro/issues/92), [#93](https://github.com/hawkins48b/cw-zro/issues/93), [#114](https://github.com/hawkins48b/cw-zro/issues/114), [#119](https://github.com/hawkins48b/cw-zro/issues/119), [#125](https://github.com/hawkins48b/cw-zro/issues/125)). They live in [`inputLimits.js`](../src/lib/utils/inputLimits.js) and [`zeroDistance.js`](../src/lib/utils/zeroDistance.js), and the form and every path read them from there. Measured on f40933f before the change, 3888 worst-case combinations inside them (G1 and G7, BC 0.01 to 2, 60 to 9999 fps, sight height -10 to 10 in, zero 1 to 3000, both ends of temperature and pressure, no wind and 223 mph at 0° and 90°) gave no hang through `calculateShotPoint` and `calculateFullTrajectory`. The slowest took 2.2 s, on a 3000 zero. The dope cards, MPBR and validation were not part of that run.
 
 | Limit | Value, in the unit entered |
 |-------|----------------------------|
@@ -193,26 +195,39 @@ The limits were set by the owner on 2026-11-10 ([#89](https://github.com/hawkins
 | Air temperature, custom | -90 to 70 °C, or -130 to 158 °F |
 | Air pressure, custom | 300 to 1200 hPa, or 8.86 to 35.4 inHg |
 | Humidity, custom | 0 to 100 % |
+| Altitude, custom | -1000 to 10000 m, or -3281 to 32808 ft ([#125](https://github.com/hawkins48b/cw-zro/issues/125)) |
+| Bullet weight | 1 to 2000 gr, or 0.065 to 130 g ([#125](https://github.com/hawkins48b/cw-zro/issues/125)) |
+| Bullet diameter | 0.1 to 1 in, or 2.54 to 25.4 mm ([#125](https://github.com/hawkins48b/cw-zro/issues/125)) |
+| Bullet length, spin drift on | 0.1 to 4 in, or 2.54 to 101.6 mm ([#125](https://github.com/hawkins48b/cw-zro/issues/125)) |
+| Barrel twist, spin drift on | 1 to 100 in, or 25.4 to 2540 mm, either way in the calculators ([#125](https://github.com/hawkins48b/cw-zro/issues/125)) |
+
+All ends are included. The gram and foot ends are the owner's rounded values, not exact conversions: 130 g is 2006 gr, -3281 ft is -1000.05 m.
 
 | Where | Rule | Otherwise |
 |-------|------|-----------|
 | Profile form | Optic height, zero, diameter, weight, BC, velocity and click values must be plain finite decimals above 0. `Infinity`, `1e999`, hex and text after the number are not numbers | Form error |
-| Profile form | Optic height, zero, BC and velocity within the limits above. The form requires a positive optic height, although the calculators take a negative one | Form error stating the range, in the unit chosen |
-| Profile form, spin drift on | Twist and length must be positive | Form error |
+| Profile form | Optic height, zero, diameter, weight, BC and velocity within the limits above. The form requires a positive optic height, although the calculators take a negative one | Form error stating the range, in the unit chosen |
+| Profile form, spin drift on | Twist and length must be positive and within the limits above | Form error stating the range, in the unit chosen |
 | Profile form, sensitivity on | Temperature and modifier must be plain finite decimals | Form error |
 | `calculateShotPoint`, `calculateFullTrajectory` | Range within the limit. Step at least 1, 25 when empty (full trajectory) | No result |
 | All five paths | BC at least 0.01 (`isUsableBc`) | No result. A dope card is not saved |
 | All five paths | Entered velocity finite and under 10000 fps, and velocity at the current temperature finite, at least 50 and under 10000 fps (`hasFlyableVelocity`). MPBR and the dope cards use no powder sensitivity | No result. A dope card is not saved |
 | All five paths | Optic height finite and within 10 in or 25.4 cm either way (`isUsableSightHeight`) | No result. A dope card is not saved |
+| All five paths | Bullet weight and diameter within the limits above (`hasUsableBullet`) ([#125](https://github.com/hawkins48b/cw-zro/issues/125)) | No result. A dope card is not saved |
+| Shot point, full trajectory, MPBR, spin drift on | Twist, taken either way, and length within the limits above when they are set (`hasUsableBullet`). Empty, they are not passed to the engine (no twist, 2 in length), as before. The dope cards never use spin drift and do not check them | No result |
 | Shot point, full trajectory, dope cards | Zero distance 1 to 3000 (`isUsableZeroDistance`) | No result. A dope card is not saved |
 | Shot point, full trajectory, MPBR, dope cards | Finite barrel elevation after the zero solve, before any shot (`hasFiniteElevation`). It only rejects NaN and Infinity, so it changes no result. It does not stop every hang: a NaN that appears during the flight solves to a finite elevation, usually 0 | No result. A dope card is not saved |
-| Shot point, full trajectory, custom atmosphere | Values within the limits above (`isUsableAtmosphere`). Altitude only has to be finite | No result, and a message under the box |
+| Shot point, full trajectory, custom atmosphere | Values within the limits above, altitude included (`isUsableAtmosphere`) | No result, and a message under the box |
+| Ballistic, scope view and trajectory validation pages, custom atmosphere | The engine ended the flight at its minimum altitude of -1410.748 ft, as it reports it: `fire` throws `TrajectoryRangeError` with `MinimumAltitudeReached`, or the zero solve fails after that stop cut one of its flights. The calculators run the default Euler engine through a subclass that only notes that stop ([`flightStop.js`](../src/lib/utils/flightStop.js)), so no result changes ([#125](https://github.com/hawkins48b/cw-zro/issues/125)) | No result, as before, and "altitude too low for this shot" under the altitude box. Validation returns `minimum_altitude` |
+| Ballistic page | Range above 0 and at most 3000 (`isUsableBallisticRange`). A negative range gives no result here, as on the compare page ([#122](https://github.com/hawkins48b/cw-zro/issues/122)) | No result, and a message under the box |
+| Scope view, angle in cos | Cosine finite, above 0 and at most 1 (`isUsableScopeAngle`). Empty is flat ([#121](https://github.com/hawkins48b/cw-zro/issues/121)) | No result, and a message under the box |
 | Shot point, full trajectory, wind speed above 0 (`shotWinds`) | Speed at most 100 m/s, about 224 mph, in either unit. Direction a number or text that reads as a number, at most 1e6 degrees either way, so a negative angle is valid. An empty or whitespace text counts as 0°. Null, a missing value, an object or a boolean is not empty | No result |
 | Shot point, full trajectory, stored wind speed that is an array, object or boolean (`shotWinds`) | Rejected, because the page can still show it as a speed | No result |
 | Shot point, full trajectory, wind speed empty, text, 0, negative, null or missing (`shotWinds`) | No wind is used, so the direction is not checked | Normal result without wind |
 | Compare trajectories | Same zero rule on each entry's field. Range within the limit | Message under the field, and the entry leaves the chart |
 | Compare trajectories | A usable zero whose trajectory gives no result ([#114](https://github.com/hawkins48b/cw-zro/issues/114)) | Message under the field, and the entry leaves the chart |
 | Dope cards | Any of the four card trajectories gives no result, for any reason. `generateImperialDopeCard` and `generateMetricDopeCard` return null | The page shows "Cannot compute" and saves no PDF ([#91](https://github.com/hawkins48b/cw-zro/issues/91)) |
+| Dope cards | Building or saving the PDF throws, for example when the template cannot be fetched (`downloadDopeCard` returns `'failed'`) | The page shows that the PDF could not be created or saved, not "Cannot compute" ([#123](https://github.com/hawkins48b/cw-zro/issues/123)) |
 | `calculateMPBR` | Barrel elevation up to 0.5 rad, flight up to 20000 units, at most 54 fires and 2 zero solves | No result. A shot reaching the limit is never reported as a capped distance |
 | MPBR page | A suggested zero above 3000, from a huge target | Shown, but not offered for saving, with a message |
 | `calculateTrajectoryValidation` | Range at least 100 and at most 3000, beyond the zero, value not 0, velocity and BC above 0 | No result, or an error message for the range |
@@ -220,12 +235,13 @@ The limits were set by the owner on 2026-11-10 ([#89](https://github.com/hawkins
 | `calculateTrajectoryValidation` | At most 200 shots and 5 seconds, checked before each shot | No solution, or a timeout message when time ended a search that could still move |
 | Dope card zero search | Zero elevation at most 0.6 rad | Near and far stay blank |
 
-Saved profiles are read through the same guards on every path, so a stored `Infinity`, hex or out-of-limit value in a field with a limit gives no result instead of freezing a page. Weight and diameter have no limit: a stored `Infinity` or `0x10` there still gives a result (`0x10` reads as 0), checked on `calculateFullTrajectory` with the `.308` test profile, spin drift off.
+Saved profiles are read through the same guards on every path, so a stored `Infinity`, hex or out-of-limit value in a field with a limit gives no result instead of freezing a page. Since [#125](https://github.com/hawkins48b/cw-zro/issues/125) this also covers weight, diameter, twist, length and altitude: a stored `Infinity` or `0x10` there gives no result (`0x10` reads as 0, below every lower limit).
 
 **Remaining gaps.** These are known and not fixed:
 
-- Bullet weight, diameter, length and twist have no upper limit, and the powder sensitivity temperature and modifier only have to be finite in the form. The velocity they give is checked.
-- Altitude only has to be finite. It does not enter the density (see [Atmosphere](#atmosphere)).
+- The powder sensitivity temperature and modifier only have to be finite in the form. The velocity they give is checked.
+- Altitude does not enter the density (see [Atmosphere](#atmosphere)). The low end of its limits gives no result, because the engine ends every flight below -1410.748 ft. The pages with a custom atmosphere say so. With the standard atmosphere (compare, MPBR, dope cards, and the other pages with "use ISA" on) a flight that drops 1410 ft below the muzzle ends the same way, and shows only the general no-result text.
+- In trajectory validation, only the profile's own first shot is checked for that stop. A later shot of the search that ends there counts as a failed shot, and can end in "no solution".
 - The hangs measured near the limits needed a sight height about as large as the zero distance or larger (20 in with a 0.5 zero, 10 in with a 0.2 zero), which the limits rule out. No proof covers every combination inside them, and the dope cards, MPBR and validation were not part of the 3888-combination run.
 - A zero near 1 on a slow or low-BC load can still give no result. The compare page says so, the other pages show their no-result message.
 - The time budget of the validation search is checked between shots. It cannot stop one slow shot.

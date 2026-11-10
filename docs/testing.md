@@ -11,7 +11,7 @@ npx vitest run -t "MPBR search"                        # By name
 
 Vitest is configured in [`vite.config.js`](../vite.config.js): `src/**/*.test.js`, jsdom, globals on. The tests need no build.
 
-On 2026-11-10: **1830 passed, 1 todo**, in 20 files.
+On 2026-11-10, after #121 to #125: **2689 passed, 1 todo**, in 23 files.
 
 | File | Tests | Covers |
 |------|-------|--------|
@@ -20,7 +20,7 @@ On 2026-11-10: **1830 passed, 1 todo**, in 20 files.
 | [`ballistics.published.test.js`](../src/test/ballistics.published.test.js) | 17, 1 todo | Layer 2: published manufacturer tables |
 | [`ballistics.units.test.js`](../src/test/ballistics.units.test.js) | 24 | Unit conversions by definition, number formatting |
 | [`trajectoryValidation.search.test.js`](../src/test/trajectoryValidation.search.test.js) | 19 | The validation search, on fake curves and a fake clock |
-| [`profileValidation.test.js`](../src/test/profileValidation.test.js) | 172 | Profile form rules: plain decimals, decimal comma, limits |
+| [`profileValidation.test.js`](../src/test/profileValidation.test.js) | 232 | Profile form rules: plain decimals, decimal comma, limits, including bullet and barrel limits (#125) |
 | [`profileOps.test.js`](../src/test/profileOps.test.js) | 37 | Profile list operations, ammo selector return path |
 | [`auditCheck.test.js`](../src/test/auditCheck.test.js) | 84 | The audit check |
 | [`electronNavigation.test.js`](../src/test/electronNavigation.test.js) | 34 | Electron URL rules |
@@ -31,8 +31,11 @@ On 2026-11-10: **1830 passed, 1 todo**, in 20 files.
 | [`storedWind.test.js`](../src/test/storedWind.test.js) | 34 | Stored wind as pages show it |
 | [`yAxisUnit.test.js`](../src/test/yAxisUnit.test.js) | 7 | Stored unit of the compare chart |
 | [`zeroDistance.test.js`](../src/test/zeroDistance.test.js) | 176 | Zero distance guard, 1 to 3000, with the engine stubbed |
-| [`scopeRange.test.js`](../src/test/scopeRange.test.js) | 22 | Scope view range: a stored range above the limit gives no result, so the message shows |
-| [`inputLimits.test.js`](../src/test/inputLimits.test.js) | 458 | BC, velocity, sight height, range and atmosphere limits on every path, dope cards with no data, decimal comma on the wind path. The engine is stubbed for values past a limit |
+| [`scopeRange.test.js`](../src/test/scopeRange.test.js) | 58 | Scope view range and typed cosine (#121): a stored range above the limit, or a cosine not above 0 and up to 1, gives no result, so the message shows |
+| [`inputLimits.test.js`](../src/test/inputLimits.test.js) | 462 | BC, velocity, sight height, range and atmosphere limits on every path, dope cards with no data or a failed build or save (#123), decimal comma on the wind path. The engine is stubbed for values past a limit |
+| [`bulletLimits.test.js`](../src/test/bulletLimits.test.js) | 655 | Bullet weight, diameter, twist, length and altitude limits on every path (#125). The engine is stubbed for values past a limit |
+| [`ballisticPage.test.js`](../src/test/ballisticPage.test.js) | 43 | Ballistic page range: the message and the result agree for every range (#122) |
+| [`minimumAltitude.test.js`](../src/test/minimumAltitude.test.js) | 61 | Custom altitude too low for the shot (#125): the engine's minimum altitude stop is reported on both sides of it, on the real engine, and the report changes no result |
 | [`nanElevation.test.js`](../src/test/nanElevation.test.js) | 47 | Optic height and barrel elevation guards, with the engine stubbed |
 | [`windGuard.test.js`](../src/test/windGuard.test.js) | 311 | Wind speed and direction guard, with the engine stubbed for rejected winds |
 
@@ -83,7 +86,7 @@ A known defect is not pinned, so that a test does not make it look correct. The 
 
 So a test for a hang must not run the hang:
 
-- Stub the solver to throw, then check that the guard stops the call before it. Without the guard, the test fails on the stub. See `vi.spyOn(Calculator.prototype, 'setWeaponZero')` in the baseline tests. `calculateMPBR` fires before it solves a zero, so stub `fire` too, as `inputLimits.test.js` does.
+- Stub the solver to throw, then check that the guard stops the call before it. Without the guard, the test fails on the stub. See `vi.spyOn(Calculator.prototype, 'setWeaponZero')` in the baseline tests. `calculateMPBR` fires before it solves a zero, so stub `fire` too, as `inputLimits.test.js` and `bulletLimits.test.js` do.
 - Check the value at each limit too: it must reach the stub. That proves the stub is live and the limit is not stricter than decided.
 - If a run stalls, stop it by hand and run the file with `-t` to find the test.
 

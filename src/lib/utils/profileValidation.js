@@ -8,6 +8,10 @@ import {
 	MAX_VELOCITY_FPS,
 	MIN_BC,
 	MIN_VELOCITY_FPS,
+	barrelTwistLimits,
+	bulletDiameterLimits,
+	bulletLengthLimits,
+	bulletWeightLimits,
 	maxSightHeight,
 	velocityInFps
 } from './inputLimits.js';
@@ -55,12 +59,13 @@ const VELOCITY_SHOWN = {
  * The limits of a numeric profile field with one, for its error message, in the unit chosen in the
  * form. Null for a field without limits beyond being positive.
  *
- * | kind            | Allowed              | Fields       |
- * |-----------------|----------------------|--------------|
- * | 'above_zero_max'| over 0, up to max    | opticHeight  |
- * | 'range'         | min to max           | zeroDist     |
- * | 'min'           | min or more          | bc           |
- * | 'min_below_max' | min to under max     | velocity     |
+ * | kind            | Allowed              | Fields                                         |
+ * |-----------------|----------------------|------------------------------------------------|
+ * | 'above_zero_max'| over 0, up to max    | opticHeight                                    |
+ * | 'range'         | min to max           | zeroDist, bulletWeight, bulletDiameter,        |
+ * |                 |                      | barrelTwist, bulletLength (#125)               |
+ * | 'min'           | min or more          | bc                                             |
+ * | 'min_below_max' | min to under max     | velocity                                       |
  *
  * @param {string} key
  * @param {object} form
@@ -85,6 +90,22 @@ export function profileFieldLimits(key, form) {
 			const unit = form.velocityUnit === 'mps' ? 'mps' : 'fps';
 			return { kind: 'min_below_max', ...VELOCITY_SHOWN[unit], unit };
 		}
+		case 'bulletWeight': {
+			const unit = form.bulletWeightUnit === 'g' ? 'g' : 'gr';
+			return { kind: 'range', ...bulletWeightLimits(unit), unit };
+		}
+		case 'bulletDiameter': {
+			const unit = form.bulletDiameterUnit === 'mm' ? 'mm' : 'in';
+			return { kind: 'range', ...bulletDiameterLimits(unit), unit };
+		}
+		case 'barrelTwist': {
+			const unit = form.barrelTwistUnit === 'mm' ? 'mm' : 'in';
+			return { kind: 'range', ...barrelTwistLimits(unit), unit };
+		}
+		case 'bulletLength': {
+			const unit = form.bulletLengthUnit === 'mm' ? 'mm' : 'in';
+			return { kind: 'range', ...bulletLengthLimits(unit), unit };
+		}
 		default:
 			return null;
 	}
@@ -105,6 +126,13 @@ function isWithinLimits(key, value, form) {
 		case 'velocity': {
 			const fps = velocityInFps(value, form.velocityUnit);
 			return fps >= MIN_VELOCITY_FPS && fps < MAX_VELOCITY_FPS;
+		}
+		case 'bulletWeight':
+		case 'bulletDiameter':
+		case 'barrelTwist':
+		case 'bulletLength': {
+			const { min, max } = profileFieldLimits(key, form);
+			return value >= min && value <= max;
 		}
 		default:
 			return true;

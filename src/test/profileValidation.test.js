@@ -409,8 +409,84 @@ describe('profileFieldLimits', () => {
 		expect(profileFieldLimits(key, { ...validForm, ...units })).toEqual(expected);
 	});
 
+	it.each([
+		['bulletWeight', { bulletWeightUnit: 'gr' }, { kind: 'range', min: 1, max: 2000, unit: 'gr' }],
+		['bulletWeight', { bulletWeightUnit: 'g' }, { kind: 'range', min: 0.065, max: 130, unit: 'g' }],
+		['bulletDiameter', { bulletDiameterUnit: 'in' }, { kind: 'range', min: 0.1, max: 1, unit: 'in' }],
+		['bulletDiameter', { bulletDiameterUnit: 'mm' }, { kind: 'range', min: 2.54, max: 25.4, unit: 'mm' }],
+		['barrelTwist', { barrelTwistUnit: 'in' }, { kind: 'range', min: 1, max: 100, unit: 'in' }],
+		['barrelTwist', { barrelTwistUnit: 'mm' }, { kind: 'range', min: 25.4, max: 2540, unit: 'mm' }],
+		['bulletLength', { bulletLengthUnit: 'in' }, { kind: 'range', min: 0.1, max: 4, unit: 'in' }],
+		['bulletLength', { bulletLengthUnit: 'mm' }, { kind: 'range', min: 2.54, max: 101.6, unit: 'mm' }],
+		// A unit the form does not offer reads as the calculators read it: grains and inches.
+		['bulletWeight', { bulletWeightUnit: undefined }, { kind: 'range', min: 1, max: 2000, unit: 'gr' }],
+		['barrelTwist', { barrelTwistUnit: 'cm' }, { kind: 'range', min: 1, max: 100, unit: 'in' }]
+	])('states the limits of %s with %j (#125)', (key, units, expected) => {
+		expect(profileFieldLimits(key, { ...validForm, ...units })).toEqual(expected);
+	});
+
 	it('has none for a field that only has to be positive', () => {
-		expect(profileFieldLimits('bulletWeight', validForm)).toBeNull();
+		expect(profileFieldLimits('elevationClickValue', validForm)).toBeNull();
+	});
+});
+
+// ── Bullet and barrel limits (#125; owner decision of 2026-11-10) ──────────
+
+describe('validateProfile — bullet and barrel limits (#125)', () => {
+	const spinForm = { ...validForm, barrelTwist: '10', bulletLength: '1.225' };
+	const errorFor = (change, key, spinDrift = false) =>
+		validateProfile({ ...spinForm, ...change }, spinDrift, false)[key];
+
+	describe.each([
+		[
+			'bulletWeight',
+			'bulletWeightUnit',
+			false,
+			[['1', 'gr'], ['2000', 'gr'], ['1,5', 'gr'], ['0.065', 'g'], ['130', 'g'], ['10,9', 'g']],
+			[['0.99', 'gr'], ['2000.01', 'gr'], ['1e6', 'gr'], ['0.064', 'g'], ['130.01', 'g'], ['500', 'g']]
+		],
+		[
+			'bulletDiameter',
+			'bulletDiameterUnit',
+			false,
+			[['0.1', 'in'], ['1', 'in'], ['0,308', 'in'], ['2.54', 'mm'], ['25.4', 'mm'], ['7,82', 'mm']],
+			[['0.099', 'in'], ['1.01', 'in'], ['7.62', 'in'], ['2.53', 'mm'], ['25.41', 'mm'], ['0.308', 'mm']]
+		],
+		[
+			'barrelTwist',
+			'barrelTwistUnit',
+			true,
+			[['1', 'in'], ['100', 'in'], ['10,5', 'in'], ['25.4', 'mm'], ['2540', 'mm'], ['254', 'mm']],
+			[['0.99', 'in'], ['100.01', 'in'], ['254', 'in'], ['25.39', 'mm'], ['2540.01', 'mm'], ['10', 'mm']]
+		],
+		[
+			'bulletLength',
+			'bulletLengthUnit',
+			true,
+			[['0.1', 'in'], ['4', 'in'], ['1,225', 'in'], ['2.54', 'mm'], ['101.6', 'mm'], ['30,9', 'mm']],
+			[['0.099', 'in'], ['4.01', 'in'], ['31', 'in'], ['2.53', 'mm'], ['101.61', 'mm'], ['1.2', 'mm']]
+		]
+	])('%s', (key, unitKey, spinDrift, accepted, rejected) => {
+		it.each(accepted)('accepts %s %s', (value, unit) => {
+			expect(errorFor({ [key]: value, [unitKey]: unit }, key, spinDrift)).toBeUndefined();
+		});
+
+		it.each(rejected)('rejects %s %s as out_of_range', (value, unit) => {
+			expect(errorFor({ [key]: value, [unitKey]: unit }, key, spinDrift)).toBe('out_of_range');
+		});
+	});
+
+	it('keeps required and invalid_number before the limits', () => {
+		expect(errorFor({ bulletWeight: '' }, 'bulletWeight')).toBe('required');
+		expect(errorFor({ bulletWeight: '0' }, 'bulletWeight')).toBe('invalid_number');
+		expect(errorFor({ bulletDiameter: 'Infinity' }, 'bulletDiameter')).toBe('invalid_number');
+		expect(errorFor({ barrelTwist: '-10' }, 'barrelTwist', true)).toBe('invalid_number');
+	});
+
+	it('does not check twist and length with spin drift off', () => {
+		const e = validateProfile({ ...spinForm, barrelTwist: '1000', bulletLength: '50' }, false, false);
+		expect(e.barrelTwist).toBeUndefined();
+		expect(e.bulletLength).toBeUndefined();
 	});
 });
 

@@ -36,7 +36,11 @@ const SEARCH_BUDGET_MS = 5000;
  * @param {object|null} atmosphere - { altitude, altitudeUnit, pressure, pressureUnit, temperature, temperatureUnit, humidity } or null for ISA
  * @param {'below'|'above'} direction - where the bullet was seen relative to the line of sight
  * @returns {{ solveFor, initialVelocity, validatedVelocity, initialBc, validatedBc, initialPoint, validatedPoint, suggestAbove }
- *   | { error: 'range' } | { error: 'no_solution', suggestAbove?: true } | { error: 'timeout', suggestAbove?: true } | null}
+ *   | { error: 'range' } | { error: 'minimum_altitude' } | { error: 'no_solution', suggestAbove?: true }
+ *   | { error: 'timeout', suggestAbove?: true } | null}
+ *   'minimum_altitude': with a custom atmosphere, the profile's own shot gave no result because the
+ *   engine ended it at its minimum altitude (flightStop.js). A later shot of the search that ends
+ *   there only counts as a failed shot.
  *   validatedPoint is the shot at exactly validatedVelocity and validatedBc. suggestAbove is
  *   true when the goal is below the line of sight but the profile's own shot is above it at
  *   this range, so the observation was probably meant as above.
@@ -109,8 +113,10 @@ export function calculateTrajectoryValidation(
 
 		const deadline = performance.now() + SEARCH_BUDGET_MS;
 
-		// Initial shot
-		const initialPoint = calculateShotPoint(profile, rangeObj, atmosphere, null);
+		// Initial shot. A custom altitude too low for this shot has its own message (#125).
+		const report = {};
+		const initialPoint = calculateShotPoint(profile, rangeObj, atmosphere, null, { report });
+		if (!initialPoint && atmosphere && report.minimumAltitude) return { error: 'minimum_altitude' };
 		const initialMeasure = getMeasure(initialPoint);
 		if (initialMeasure === null) return { error: 'no_solution' };
 

@@ -6,24 +6,24 @@
 
 	// ── Download state ────────────────────────────────────────────────
 	let loading = $state({ imperial: false, metric: false });
-	// A card the profile gives no data for is not saved: the page says so instead (#91).
-	let noResult = $state(false);
+	// The outcome of the last download: a card the profile gives no data for is not saved (#91),
+	// and a failed build or save has its own message (#123). See downloadDopeCard.
+	let outcome = $state(null);
 
 	async function download(type) {
 		const profile = activeProfile.profile;
 		if (!profile || loading[type]) return;
 		loading[type] = true;
-		noResult = false;
+		outcome = null;
 		try {
-			// Loaded on demand, inside downloadDopeCard so that a failed load shows the message too.
+			// Loaded on demand, inside downloadDopeCard so that a failed load counts as a failure.
 			const generate = async (p) =>
 				type === 'imperial'
 					? (await import('#lib/utils/dopeCardImperial.js')).generateImperialDopeCard(p)
 					: (await import('#lib/utils/dopeCardMetric.js')).generateMetricDopeCard(p);
-			const saved = await downloadDopeCard(generate, profile, (pdfDoc) =>
+			outcome = await downloadDopeCard(generate, profile, (pdfDoc) =>
 				savePDF(pdfDoc, `mid-range-dope-card-${type}.pdf`)
 			);
-			noResult = !saved;
 		} finally {
 			loading[type] = false;
 		}
@@ -106,8 +106,10 @@
 						</button>
 					</div>
 
-					{#if noResult}
+					{#if outcome === 'no-data'}
 						<p class="text-sm text-warning-800-200" role="alert">{m.dope_no_result()}</p>
+					{:else if outcome === 'failed'}
+						<p class="text-sm text-error-500" role="alert">{m.dope_save_failed()}</p>
 					{/if}
 				</div>
 			{/if}

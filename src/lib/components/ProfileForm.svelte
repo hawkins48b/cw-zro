@@ -140,6 +140,9 @@
 	const UNIT_LABELS = {
 		in: () => m.unit_in(),
 		cm: () => m.unit_cm(),
+		mm: () => m.unit_mm(),
+		gr: () => m.unit_gr(),
+		g: () => m.unit_g(),
 		yd: () => m.unit_yd(),
 		m: () => m.unit_m(),
 		fps: () => m.unit_fps(),
