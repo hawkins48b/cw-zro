@@ -17,7 +17,9 @@ export default defineConfig({
 		paraglideVitePlugin({
 			project: './project.inlang',
 			outdir: './src/lib/paraglide',
-			strategy: ['url', 'cookie', 'baseLocale']
+			// The language picked is kept in localStorage and applied at start by hooks.client.js
+			// (#96): a cookie never won over the unprefixed `/`, and app:// cannot hold one.
+			strategy: ['url', 'baseLocale']
 		}),
 		sveltekit({
 			adapter: adapter({

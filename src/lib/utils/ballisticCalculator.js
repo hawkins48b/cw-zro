@@ -21,9 +21,11 @@ import {
 } from './zeroDistance.js';
 import { readDecimal } from './decimal.js';
 import { createFlightCalculator, endedAtMinimumAltitude } from './flightStop.js';
+import { stationPressure } from './stationPressure.js';
 import {
 	hasFlyableVelocity,
 	hasUsableBullet,
+	hasPositiveDensity,
 	isUsableAtmosphere,
 	isUsableBc,
 	isUsableRange,
@@ -74,14 +76,40 @@ function powderSensitivity(profile, mv) {
 
 /**
  * The Atmo of a calculation: the standard atmosphere without custom values, or null when a custom
- * value is out of its limits (isUsableAtmosphere). An extreme temperature or pressure can hang the
+ * value is out of its limits (isUsableAtmosphere) or the air density is not above 0
+ * (hasPositiveDensity). An extreme temperature or pressure can hang the
  * engine for good, which try/catch cannot stop.
+ *
+ * The pressure is entered as sea-level pressure (QNH) and passed to Atmo as the pressure at the
+ * site altitude (stationPressure, #107). The limits apply to the value entered.
  *
  * @param {object|null} atmosphere - { altitude, altitudeUnit, pressure, pressureUnit, temperature, temperatureUnit, humidity }
  * @returns {Atmo|null}
  */
 function shotAtmosphere(atmosphere) {
 	if (!atmosphere) return new Atmo(); // ICAO standard atmosphere
+	const atmo = customAtmo(atmosphere);
+	return atmo && hasPositiveDensity(atmo) ? atmo : null;
+}
+
+/**
+ * Whether a custom atmosphere within its limits is rejected because its air density is not above 0
+ * (hasPositiveDensity, #107), so that the atmosphere box can say why there is no result.
+ *
+ * @param {object|null} atmosphere - as for calculateShotPoint
+ * @returns {boolean} false for null, for values out of their limits, and for any usable air
+ */
+export function hasNoAirDensity(atmosphere) {
+	const atmo = atmosphere ? customAtmo(atmosphere) : null;
+	return atmo !== null && !hasPositiveDensity(atmo);
+}
+
+/**
+ * The Atmo of custom values, or null when a value is out of its limits. Its density is not checked.
+ * @param {object} atmosphere
+ * @returns {Atmo|null}
+ */
+function customAtmo(atmosphere) {
 	const values = {
 		altitude: readDecimal(atmosphere.altitude),
 		pressure: readDecimal(atmosphere.pressure),
@@ -91,8 +119,11 @@ function shotAtmosphere(atmosphere) {
 	if (!isUsableAtmosphere(values, atmosphere)) return null;
 	const altitude =
 		atmosphere.altitudeUnit === 'm' ? UNew.Meter(values.altitude) : UNew.Foot(values.altitude);
-	const pressure =
-		atmosphere.pressureUnit === 'hpa' ? UNew.hPa(values.pressure) : UNew.InHg(values.pressure);
+	// The entered pressure is sea-level pressure (QNH); Atmo needs the pressure at the site (#107).
+	const pressure = stationPressure(
+		atmosphere.pressureUnit === 'hpa' ? UNew.hPa(values.pressure) : UNew.InHg(values.pressure),
+		altitude
+	);
 	const temperature =
 		atmosphere.temperatureUnit === 'c'
 			? UNew.Celsius(values.temperature)

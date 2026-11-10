@@ -11,7 +11,7 @@ npx vitest run -t "MPBR search"                        # By name
 
 Vitest is configured in [`vite.config.js`](../vite.config.js): `src/**/*.test.js`, jsdom, globals on. The tests need no build.
 
-On 2026-11-10, after #121 to #125: **2689 passed, 1 todo**, in 23 files.
+On 2026-11-10, after #121 to #125: **2689 passed, 1 todo**, in 23 files. After #96, #102 and #107: **2723 passed, 1 todo**, in 25 files. #107 changed the pressure of the two custom test atmospheres in [`fixtures/ballisticProfiles.js`](../src/test/fixtures/ballisticProfiles.js) to the sea-level equivalent of the station pressure they were recorded with (owner decision), so no recorded result changed.
 
 | File | Tests | Covers |
 |------|-------|--------|
@@ -38,6 +38,8 @@ On 2026-11-10, after #121 to #125: **2689 passed, 1 todo**, in 23 files.
 | [`minimumAltitude.test.js`](../src/test/minimumAltitude.test.js) | 61 | Custom altitude too low for the shot (#125): the engine's minimum altitude stop is reported on both sides of it, on the real engine, and the report changes no result |
 | [`nanElevation.test.js`](../src/test/nanElevation.test.js) | 47 | Optic height and barrel elevation guards, with the engine stubbed |
 | [`windGuard.test.js`](../src/test/windGuard.test.js) | 311 | Wind speed and direction guard, with the engine stubbed for rejected winds |
+| [`stationPressure.test.js`](../src/test/stationPressure.test.js) | 19 | Sea-level pressure corrected for altitude (#107): the ISA ratio, ft and m, hPa and inHg, the calculators passing the corrected pressure, and the density guard with the engine stubbed |
+| [`storedLocale.test.js`](../src/test/storedLocale.test.js) | 15 | Language choice at start (#96): the URL prefix wins, a stored `fr` or `de` redirects, other values are ignored, no loop, no redirect to another host, storage and cookie errors caught, old cookie deleted |
 
 The todo is the check of the G7 path against a table published for a G7 BC. The Federal table cannot do this.
 

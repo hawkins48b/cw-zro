@@ -147,22 +147,34 @@ export const P308_G1_METRIC_ROUNDED = {
 	velocity: '808'
 };
 
-/** Hot, thin air, imperial inputs. */
+/**
+ * Hot, thin air, imperial inputs.
+ *
+ * Pressure is sea-level pressure (QNH) since #107. It was recorded as a station pressure of
+ * 24.9 inHg at 5000 ft; this is that value divided by the ISA ratio at 5000 ft, so the recorded
+ * results are unchanged.
+ */
 export const ATMO_HOT_ALTITUDE = {
 	altitude: '5000',
 	altitudeUnit: 'ft',
-	pressure: '24.9',
+	pressure: '29.926153780852953',
 	pressureUnit: 'inhg',
 	temperature: '85',
 	temperatureUnit: 'f',
 	humidity: '35'
 };
 
-/** Cold, thin air, metric inputs. */
+/**
+ * Cold, thin air, metric inputs.
+ *
+ * Pressure is sea-level pressure (QNH) since #107. It was recorded as a station pressure of
+ * 845 hPa at 1500 m; this is that value divided by the ISA ratio at 1500 m, so the recorded
+ * results are unchanged.
+ */
 export const ATMO_COLD_METRIC = {
 	altitude: '1500',
 	altitudeUnit: 'm',
-	pressure: '845',
+	pressure: '1012.5788798414616',
 	pressureUnit: 'hpa',
 	temperature: '-5',
 	temperatureUnit: 'c',

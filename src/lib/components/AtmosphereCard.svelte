@@ -10,6 +10,7 @@
 	} from '#lib/utils/inputLimits.js';
 
 	import { altitudeTooLowMessage } from '#lib/components/altitudeMessage.js';
+	import { hasNoAirDensity } from '#lib/utils/ballisticCalculator.js';
 
 	/**
 	 * altitudeTooLow: the page's result is missing because the engine ended the flight at its
@@ -49,6 +50,8 @@
 		)
 	);
 	let humidityError = $derived(rangeError(atmosphere.humidity, HUMIDITY_LIMITS, '%'));
+	// Values within their limits whose air density is not above 0 give no result (#107).
+	let noAirDensity = $derived(!atmosphere.useISA && hasNoAirDensity(atmosphere));
 </script>
 
 <div class="card preset-filled-surface-100-900">
@@ -116,6 +119,10 @@
 				</div>
 				{#if pressureError}
 					<p class="text-xs text-error-500">{pressureError}</p>
+				{:else if noAirDensity}
+					<p class="text-xs text-error-500" role="alert">{m.ballistic_air_too_thin()}</p>
+				{:else}
+					<p class="text-xs text-surface-600-400">{m.ballistic_pressure_hint()}</p>
 				{/if}
 			</div>
 

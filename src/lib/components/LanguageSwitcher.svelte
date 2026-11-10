@@ -1,6 +1,7 @@
 <script>
 	import { page } from '$app/state';
 	import { localizeHref, locales, getLocale } from '#lib/paraglide/runtime.js';
+	import { storeLocale } from '#lib/utils/storedLocale.js';
 
 	const localeLabels = { en: 'EN', fr: 'FR', de: 'DE' };
 </script>
@@ -13,6 +14,7 @@
 			data-sveltekit-reload
 			rel="alternate"
 			hreflang={locale}
+			onclick={() => storeLocale(locale)}
 		>
 			{localeLabels[locale] ?? locale.toUpperCase()}
 		</a>

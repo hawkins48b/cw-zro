@@ -32,7 +32,7 @@ export const MAX_DISTANCE = 3000;
 /** Custom air temperature, in the unit entered: -90 to 70 °C, or -130 to 158 °F. */
 export const TEMPERATURE_LIMITS = { c: { min: -90, max: 70 }, f: { min: -130, max: 158 } };
 
-/** Custom air pressure, in the unit entered: 300 to 1200 hPa, or 8.86 to 35.4 inHg. */
+/** Custom sea-level air pressure, in the unit entered: 300 to 1200 hPa, or 8.86 to 35.4 inHg. */
 export const PRESSURE_LIMITS = { hpa: { min: 300, max: 1200 }, inhg: { min: 8.86, max: 35.4 } };
 
 /** Relative humidity, in percent. */
@@ -239,7 +239,8 @@ export function hasUsableBullet(profile, { spinDrift = true } = {}) {
 
 /**
  * Whether the values of a custom atmosphere can be given to the engine. Altitude has its own
- * limits (#125), although density comes from pressure, temperature and humidity only.
+ * limits (#125). The pressure checked is the sea-level pressure entered; the calculators then
+ * correct it for altitude (stationPressure, #107), which gives about 78 to 1349 hPa at the ends.
  *
  * @param {{ altitude: number, pressure: number, temperature: number, humidity: number }} values
  * @param {{ altitudeUnit?: string, pressureUnit?: string, temperatureUnit?: string }} units
@@ -252,4 +253,21 @@ export function isUsableAtmosphere(values, units) {
 		within(values.temperature, temperatureLimits(units.temperatureUnit)) &&
 		within(values.humidity, HUMIDITY_LIMITS)
 	);
+}
+
+/**
+ * Whether the air density of an atmosphere is above 0 (#107; approved by the owner on 2026-11-10).
+ *
+ * The library's density formula goes below 0 when the water vapour pressure is far above the air
+ * pressure, which no real air does. Inside the limits this needs the pressure after the altitude
+ * correction: at 10000 m, 70 °C and 100 % humidity, a sea-level pressure of 300 to about 453 hPa
+ * gives 78 to 118 hPa at the site and a density ratio of about -0.03 to 0. The engine then
+ * never slowed the bullet: 300 and 350 hPa ran for more than 60 s (300 hPa for more than 5 min)
+ * on a G7 BC 0.01, 9999 fps, 3000 yd zero. No positive density in the probes hung.
+ *
+ * @param {Atmo} atmo
+ * @returns {boolean}
+ */
+export function hasPositiveDensity(atmo) {
+	return Number.isFinite(atmo.densityRatio) && atmo.densityRatio > 0;
 }

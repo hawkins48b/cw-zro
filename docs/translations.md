@@ -49,9 +49,15 @@ It does not check that a translation is correct, or that a key used in the code 
 | French | `/fr/profiles` |
 | German | `/de/profiles` |
 
-English has no prefix. The strategy in `vite.config.js` is `url`, then `cookie`, then `baseLocale`. The URL always wins, so a path with no prefix is English. [`hooks.js`](../src/hooks.js) removes the locale before routing.
+English has no prefix. The strategy in `vite.config.js` is `url`, then `baseLocale`. The URL always wins, so a path with no prefix is English. [`hooks.js`](../src/hooks.js) removes the locale before routing.
 
-[`LanguageSwitcher.svelte`](../src/lib/components/LanguageSwitcher.svelte) uses `localizeHref` and a full page reload.
+[`LanguageSwitcher.svelte`](../src/lib/components/LanguageSwitcher.svelte) uses `localizeHref` and a full page reload. On a click it stores the language in `localStorage` under `zro-locale` (`en`, `fr` or `de`, plain text; English too, so that it can be chosen back).
+
+**The choice survives a restart** ([#96](https://github.com/hawkins48b/cw-zro/issues/96)). The `init` hook in [`hooks.client.js`](../src/hooks.client.js) runs before the first render. When the URL has no locale prefix and `zro-locale` holds `fr` or `de`, it replaces the location with the same path, query and hash in that language (`location.replace`, so no history entry). A URL with `/fr` or `/de` wins and does not change the stored choice. Any other stored value is ignored, and so is a target on another protocol or host: a path such as `//evil.example` or `/\evil.example` would otherwise localize to `//evil.example/fr/`, an open redirect. The decision is [`startupLocaleRedirect`](../src/lib/utils/storedLocale.js), tested in [`storedLocale.test.js`](../src/test/storedLocale.test.js). The web, Electron (`app://`) and the Capacitor apps all start at `/`, so the same hook covers them. Storage errors are caught: the choice then holds until the app restarts.
+
+The `cookie` strategy was dropped with this change. The cookie never decided the language, because `/` always resolved to English, and `app://` cannot hold it. The same hook deletes the `PARAGLIDE_LOCALE` cookie that earlier versions wrote.
+
+Not verified on a device: the restart was checked through the tests and the web build only, not in a running Electron, Android or iOS app.
 
 ## Adding a language
 
@@ -63,7 +69,6 @@ English has no prefix. The strategy in `vite.config.js` is `url`, then `cookie`,
 
 ## Known problems
 
-- **The language does not persist.** A path with no prefix resolves to English and overwrites the cookie. The desktop app resets to English on every launch, and the mobile app is expected to do the same ([#73](2026-11-05-73-paraglide.md), [#76](2026-11-05-76-electron.md)).
 - **Long German labels** can clip on phones, for example `Temperaturempfindlichkeit aktivieren`.
 
 ## Build notes

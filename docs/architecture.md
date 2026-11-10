@@ -39,6 +39,7 @@ src/
 ├── test/                    # Vitest tests and fixtures
 ├── app.css                  # Tailwind and Skeleton, and restored Skeleton defaults
 ├── app.html                 # HTML shell, sets dark mode before the first paint
+├── hooks.client.js          # At start, goes to the stored language when the URL has none
 ├── hooks.js                 # Removes the locale from the URL before routing
 └── hooks.server.js          # Paraglide middleware, server side only
 electron/                    # Desktop main process, navigation rules, preload
@@ -69,7 +70,7 @@ Configuration is in [`vite.config.js`](../vite.config.js). There is no `svelte.c
 | `/profiles/ammo-selector` | Ammunition library |
 | `/settings`, `/settings/about`, `/settings/privacy` | Settings pages |
 
-`/fr` and `/de` prefix any route. English has no prefix. See [Translations](translations.md#locale-urls).
+`/fr` and `/de` prefix any route. English has no prefix. A start without a prefix goes to the language the user picked last, stored in `localStorage` ([#96](https://github.com/hawkins48b/cw-zro/issues/96)). See [Translations](translations.md#locale-urls).
 
 ## Rendering
 
