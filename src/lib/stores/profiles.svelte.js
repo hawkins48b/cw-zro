@@ -1,3 +1,5 @@
+import { addProfile, removeProfile, updateProfile } from '#lib/utils/profileOps.js';
+import { normalizeProfiles } from '#lib/utils/storedProfiles.js';
 import { localStore } from './localStore.svelte.js';
 
 const DEFAULT_PROFILE = {
@@ -37,10 +39,13 @@ const DEFAULT_PROFILE = {
 
 const store = localStore('zro-profiles', () => [{ ...DEFAULT_PROFILE, id: crypto.randomUUID() }]);
 
+/** The usable stored profiles (#120): storage can hold any JSON value. */
+const readList = () => normalizeProfiles(store.value);
+
 // One-time migration: add optic click adjustment fields to profiles that lack them
-if (Array.isArray(store.value)) {
+{
 	let migrated = false;
-	for (const p of store.value) {
+	for (const p of readList()) {
 		if (p.reticleType === undefined) {
 			p.reticleType = 'red-dot';
 			p.elevationClickValue = '0.5';
@@ -54,31 +59,29 @@ if (Array.isArray(store.value)) {
 	if (migrated) store.persist();
 }
 
+// The list operations are those of profileOps.js, which is tested. A write keeps only the usable
+// profiles, so a damaged list is replaced by a usable one when the user saves.
 export const profiles = {
+	/** The profiles as stored, for the calculators. Pages show them through shownProfile. */
 	get list() {
-		return store.value;
+		return readList();
 	},
 	add(profile) {
-		const id = crypto.randomUUID();
-		store.value.push({ ...profile, id });
-		store.persist();
+		const { list, id } = addProfile(readList(), profile);
+		store.value = list;
 		return id;
 	},
 	update(id, data) {
-		const i = store.value.findIndex((p) => p.id === id);
-		if (i === -1) return false;
-		store.value[i] = { ...store.value[i], ...data, id };
-		store.persist();
-		return true;
+		const { list, success } = updateProfile(readList(), id, data);
+		if (success) store.value = list;
+		return success;
 	},
 	remove(id) {
-		const i = store.value.findIndex((p) => p.id === id);
-		if (i === -1) return false;
-		store.value.splice(i, 1);
-		store.persist();
-		return true;
+		const { list, removed } = removeProfile(readList(), id);
+		if (removed) store.value = list;
+		return removed;
 	},
 	get(id) {
-		return store.value.find((p) => p.id === id);
+		return readList().find((p) => p.id === id);
 	}
 };

@@ -1,6 +1,9 @@
+import { shownProfile } from './storedProfiles.js';
+
 /**
  * Pure helper functions for profile list operations.
- * These mirror the logic in the profiles store and are testable without Svelte.
+ * The profiles store calls them on the usable stored list (storedProfiles.js), and they are
+ * testable without Svelte.
  */
 
 /**
@@ -51,7 +54,8 @@ export function getProfile(list, id) {
 }
 
 /**
- * Duplicates a profile, appending " - Copy" to its name.
+ * Duplicates a profile, appending " - Copy" to its name as the page shows it, so that a stored name
+ * that is not text cannot throw (#120).
  * @param {Array}  list
  * @param {string} id
  * @returns {{ list: Array, id: string | null }}
@@ -60,7 +64,7 @@ export function duplicateProfile(list, id) {
 	const src = getProfile(list, id);
 	if (!src) return { list, id: null };
 	const { id: _srcId, ...rest } = src;
-	return addProfile(list, { ...rest, name: `${rest.name} - Copy` });
+	return addProfile(list, { ...rest, name: `${shownProfile(src).name} - Copy` });
 }
 
 /**

@@ -6,13 +6,15 @@
 	import { profiles } from '#lib/stores/profiles.svelte.js';
 	import { ammoSelection } from '#lib/stores/ammoSelection.svelte.js';
 	import { safeReturnPath } from '#lib/utils/profileOps.js';
+	import { shownProfile } from '#lib/utils/storedProfiles.js';
 	import ammoData from '#lib/data/ammo.json';
 
 	const returnPath = safeReturnPath(page.url.searchParams.get('return'));
 
-	// Extract unique ammo from existing profiles
+	// Extract unique ammo from existing profiles, read as the pages show them (#120)
 	const profileAmmo = [...new Map(
 		profiles.list
+			.map(shownProfile)
 			.filter(p => p.bulletBrand && p.bulletWeight && p.bulletDiameter && p.bc)
 			.map(p => [
 				p.bulletBrand + '|' + p.bulletWeight + '|' + p.bulletWeightUnit + '|' + p.bulletDiameter,

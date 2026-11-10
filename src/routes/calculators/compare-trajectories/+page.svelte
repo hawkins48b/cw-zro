@@ -6,7 +6,13 @@
 	import { settings } from '#lib/stores/settings.svelte.js';
 	import { compareTrajectories } from '#lib/stores/compareTrajectories.svelte.js';
 	import { calculateFullTrajectory } from '#lib/utils/ballisticCalculator.js';
-	import { compareSeriesName } from '#lib/utils/compareEntries.js';
+	import {
+		chartLabelSeries,
+		chartLabelText,
+		compareSeriesName,
+		compareSeriesText
+	} from '#lib/utils/compareEntries.js';
+	import { shownProfile } from '#lib/utils/storedProfiles.js';
 	import { isUsableZeroDistance, MIN_ZERO_DISTANCE, MAX_ZERO_DISTANCE } from '#lib/utils/zeroDistance.js';
 	import { readDecimal } from '#lib/utils/decimal.js';
 	import { formatLimit } from '#lib/utils/format.js';
@@ -53,10 +59,14 @@
 			const profile = profiles.get(entry.profileId);
 			if (!profile) return null;
 			const zeroUnitLabel = entry.zeroUnit === 'm' ? m.unit_m() : m.unit_yd();
+			// The calculators get the profile as stored; the page shows its names as text (#120).
+			const shown = shownProfile(profile);
 			return {
 				...entry,
 				profile,
-				seriesName: compareSeriesName(profile.name, entry.zeroDist, zeroUnitLabel)
+				shown,
+				seriesName: compareSeriesName(shown.name, entry.zeroDist, zeroUnitLabel),
+				seriesText: compareSeriesText(shown.name, entry.zeroDist, zeroUnitLabel)
 			};
 		}).filter(Boolean)
 	);
@@ -95,7 +105,7 @@
 			}));
 			// An entry without a result has no series, so the color comes from the entry's position:
 			// a line must keep the color of the dot on its card.
-			series.push({ name: entry.seriesName, data, color: entryColor(i) });
+			series.push({ name: entry.seriesName, text: entry.seriesText, data, color: entryColor(i) });
 		}
 
 		return series.length > 0 ? series : null;
@@ -111,7 +121,12 @@
 		return CHART_COLORS[index % CHART_COLORS.length];
 	}
 
-	function buildChartOptions(series, dark) {
+	/**
+	 * @param {{ name: string, data: object[], color: string }[]} series - names escaped (#103)
+	 * @param {boolean} dark
+	 * @param {string[]} texts - the series names as the user reads them, for the chart label (#111)
+	 */
+	function buildChartOptions(series, dark, texts) {
 		const dAxisLabel = isMetric ? m.unit_meters() : m.unit_yards();
 		const dLabel = isMetric ? m.unit_m() : m.unit_yd();
 		const yLabel = Y_AXIS_OPTIONS.find((o) => o.value === yAxisKey)?.label();
@@ -130,7 +145,12 @@
 				toolbar: { show: false },
 				animations: { enabled: false },
 				zoom: { enabled: false },
-				parentHeightOffset: 0
+				parentHeightOffset: 0,
+				// ApexCharts builds the svg aria-label from the escaped series names; this label
+				// replaces it and is written as text, not HTML (#111).
+				accessibility: {
+					description: m.compare_chart_description({ names: texts.join(', ') })
+				}
 			},
 			stroke: { width: 2, curve: 'monotoneCubic' },
 			theme: { mode: dark ? 'dark' : 'light' },
@@ -187,10 +207,31 @@
 		const data = chartData;
 		if (!ac || !el || !data) return;
 
-		const opts = buildChartOptions(data, settings.darkMode);
+		const texts = data.map(({ name, text }) => ({ name, text }));
+		const series = data.map(({ text, ...rest }) => rest);
+		const opts = buildChartOptions(series, settings.darkMode, texts.map(({ text }) => text));
+
+		// ApexCharts copies the escaped series names into the aria-labels of the legend items and
+		// of the keyboard-focused data point with setAttribute, so a screen reader would read
+		// `&amp;`. Put each element's own series name back as text whenever it writes one (#111).
+		const fixLabels = () => {
+			for (const node of el.querySelectorAll('[aria-label]')) {
+				const index = chartLabelSeries(node);
+				if (index === null) continue;
+				const label = node.getAttribute('aria-label') ?? '';
+				const fixed = chartLabelText(label, texts[index]);
+				if (fixed !== label) node.setAttribute('aria-label', fixed);
+			}
+		};
+		const observer = new MutationObserver(fixLabels);
+		observer.observe(el, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-label'] });
+
 		const chart = new ac(el, opts);
 		chart.render();
-		return () => chart.destroy();
+		return () => {
+			observer.disconnect();
+			chart.destroy();
+		};
 	});
 
 	// ── Helper ───────────────────────────────────────────────────────
@@ -239,8 +280,8 @@
 									style="background-color: {entryColor(i)}"
 								></span>
 								<div class="flex-1 min-w-0">
-									<p class="text-sm font-semibold truncate">{entry.profile.name}</p>
-									<p class="text-xs opacity-70 truncate">{entry.profile.ammo}</p>
+									<p class="text-sm font-semibold truncate">{entry.shown.name}</p>
+									<p class="text-xs opacity-70 truncate">{entry.shown.ammo}</p>
 								</div>
 								<button
 									type="button"
@@ -258,7 +299,7 @@
 									class="flex-1 min-w-0 bg-transparent border-none outline-none shadow-none p-0 text-right"
 									type="text"
 									inputmode="decimal"
-									placeholder={String(entry.profile.zeroDist)}
+									placeholder={String(entry.shown.zeroDist)}
 									value={entry.zeroDist}
 									aria-invalid={!isUsableZeroDistance(entry.zeroDist)}
 									aria-describedby={isUsableZeroDistance(entry.zeroDist) ? undefined : `zero-error-${i}`}

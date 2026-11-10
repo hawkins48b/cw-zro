@@ -6,6 +6,7 @@
 	import { goto } from '$app/navigation';
 	import { Crosshair, ArrowUp, ArrowDown, Search, Plus } from '@lucide/svelte';
 	import { fly } from 'svelte/transition';
+	import { shownProfile } from '#lib/utils/storedProfiles.js';
 
 	// ── Sort & search ───────────────────────────────────────────────
 	let sortBy = $state('recent');
@@ -24,8 +25,9 @@
 		{ value: 'ammo', labelKey: 'profiles_sort_ammo' }
 	];
 
+	// The profiles as the page shows them (#120): names are text, so they sort and search.
 	let sortedProfiles = $derived.by(() => {
-		const list = profiles.list;
+		const list = profiles.list.map(shownProfile);
 		switch (sortBy) {
 			case 'name':
 				return [...list].sort((a, b) =>
@@ -64,10 +66,12 @@
 	function addProfile(profileId) {
 		const profile = profiles.get(profileId);
 		if (!profile) return;
+		// A zero that cannot be read is added as an empty box, so the entry shows its message.
+		const shown = shownProfile(profile);
 		compareTrajectories.addEntry(
 			profileId,
-			String(profile.zeroDist ?? '100'),
-			profile.zeroUnit ?? 'yd'
+			String(profile.zeroDist == null ? '100' : shown.zeroDist),
+			shown.zeroUnit
 		);
 		goto(localizeHref('/calculators/compare-trajectories'));
 	}

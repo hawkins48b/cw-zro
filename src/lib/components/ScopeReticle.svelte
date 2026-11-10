@@ -3,6 +3,7 @@
 	import { getElevationValue, getWindageValue } from '#lib/utils/ballisticCalculator.js';
 	import { scopeView } from '#lib/stores/scopeView.svelte.js';
 	import { activeProfile } from '#lib/stores/activeProfile.svelte.js';
+	import { shownProfile } from '#lib/utils/storedProfiles.js';
 	import { settings } from '#lib/stores/settings.svelte.js';
 	import { RotateCcw, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from '@lucide/svelte';
 
@@ -50,7 +51,7 @@
 	const MOA_GRAD_LABELS = [4, 8, 12, 16];
 
 	// Reticle type from active profile
-	const reticleType = $derived(activeProfile.profile?.reticleType ?? 'red-dot');
+	const reticleType = $derived(shownProfile(activeProfile.profile)?.reticleType ?? 'red-dot');
 
 	// ── Aim point computation ─────────────────────────────────────────
 	// BDC holdover logic: the green dot shows the reticle mark the shooter

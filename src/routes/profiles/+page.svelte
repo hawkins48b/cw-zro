@@ -7,6 +7,7 @@
 	import { fly, fade } from 'svelte/transition';
 	import { usePress } from 'svelte-gestures';
 	import { swipe } from '#lib/actions/swipe.js';
+	import { shownProfile } from '#lib/utils/storedProfiles.js';
 
 	let sortBy = $state('recent');
 	let sortDesc = $state(true);
@@ -18,8 +19,11 @@
 		if (searchActive && searchInput) searchInput.focus();
 	});
 
+	// The profiles as the page shows them (#120): names are text, so they sort and search.
+	let shownProfiles = $derived(profiles.list.map(shownProfile));
+
 	let sortedProfiles = $derived.by(() => {
-		const list = profiles.list;
+		const list = shownProfiles;
 		switch (sortBy) {
 			case 'name':
 				return [...list].sort((a, b) =>
@@ -80,7 +84,7 @@
 
 	let deleteConfirmId = $state(null);
 	let deleteSource = $state(null); // 'swipe' | 'menu'
-	let deleteConfirmProfile = $derived(profiles.list.find((p) => p.id === deleteConfirmId) ?? null);
+	let deleteConfirmProfile = $derived(shownProfiles.find((p) => p.id === deleteConfirmId) ?? null);
 
 	function requestDelete(id, source = 'menu') {
 		deleteConfirmId = id;
@@ -112,7 +116,7 @@
 	// ── Context menu ───────────────────────────────────────────────────────
 
 	let contextMenuId = $state(null);
-	let contextMenuProfile = $derived(profiles.list.find((p) => p.id === contextMenuId));
+	let contextMenuProfile = $derived(shownProfiles.find((p) => p.id === contextMenuId));
 
 	function openContextMenu(id) {
 		contextMenuId = id;
@@ -126,7 +130,7 @@
 		const src = profiles.get(id);
 		if (!src) return;
 		const { id: _id, ...rest } = src;
-		profiles.add({ ...rest, name: `${rest.name} - Copy` });
+		profiles.add({ ...rest, name: `${shownProfile(src).name} - Copy` });
 		closeContextMenu();
 	}
 
@@ -228,7 +232,7 @@
 {:else}
 	<!-- Active profile pinned above the filter -->
 	{#if activeProfile.profile}
-		{@const profile = activeProfile.profile}
+		{@const profile = shownProfile(activeProfile.profile)}
 		<div class="mb-6 max-w-2xl" bind:this={itemRefs[profile.id]}>
 			<div
 				class="card select-none preset-tonal-primary"

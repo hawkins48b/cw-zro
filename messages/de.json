@@ -355,6 +355,7 @@
 	"compare_max_dist": "Max. Distanz",
 	"compare_y_axis": "Y-Achse",
 	"compare_chart_title": "Trajektorienvergleich",
+	"compare_chart_description": "Trajektorienvergleich: {names}",
 	"compare_selected": "Ausgewählt",
 	"unit_feet": "Fuß",
 

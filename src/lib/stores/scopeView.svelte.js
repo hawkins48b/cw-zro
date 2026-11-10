@@ -1,4 +1,11 @@
 import { migrateClockWind, pageWind, patchWind } from '#lib/utils/storedWind.js';
+import {
+	storedAtmosphere,
+	storedElevation,
+	storedObject,
+	storedRange,
+	storedRotation
+} from '#lib/utils/storedState.js';
 import { localStore } from './localStore.svelte.js';
 
 const ISA_DEFAULTS = {
@@ -21,58 +28,63 @@ const store = localStore('zro-scope-view', () => ({
 	rotation: 0
 }));
 
+// The stored state, or an empty one when it is not an object (#120). Each getter checks its field:
+// see storedState.js.
+const state = () => storedObject(store.value);
+
 // One-time migration: convert stored clock direction to degrees
-if (store.value.wind?.directionUnit !== undefined) {
-	store.value = { ...store.value, wind: migrateClockWind(store.value.wind) };
+if (state().wind?.directionUnit !== undefined) {
+	store.value = { ...state(), wind: migrateClockWind(state().wind) };
 }
 
 export const scopeView = {
 	get range() {
-		return store.value.range;
+		return storedRange(state().range);
 	},
 	get elevation() {
-		return store.value.elevation;
+		return storedElevation(state().elevation);
 	},
 	get atmosphere() {
-		return store.value.atmosphere;
+		return storedAtmosphere(state().atmosphere);
 	},
 	/** The wind to show. Never hand this to a calculator: use storedWind. */
 	get wind() {
-		return pageWind(store.value.wind, DEFAULT_WIND);
+		return pageWind(state().wind, DEFAULT_WIND);
 	},
 	/** The wind as stored, for the calculators: shotWinds decides what a damaged value gives. */
 	get storedWind() {
-		return store.value.wind;
+		return state().wind;
 	},
+	/** The cant in degrees: 0 unless a finite number within the slider's range is stored. */
 	get rotation() {
-		return store.value.rotation ?? 0;
+		return storedRotation(state().rotation);
 	},
 
 	setRange(patch) {
-		store.value = { ...store.value, range: { ...store.value.range, ...patch } };
+		store.value = { ...state(), range: { ...this.range, ...patch } };
 	},
 	setElevation(patch) {
-		store.value = { ...store.value, elevation: { ...store.value.elevation, ...patch } };
+		store.value = { ...state(), elevation: { ...this.elevation, ...patch } };
 	},
 	setAtmosphere(patch) {
 		if (patch.useISA === true) {
-			store.value = { ...store.value, atmosphere: { useISA: true, ...ISA_DEFAULTS } };
+			store.value = { ...state(), atmosphere: { useISA: true, ...ISA_DEFAULTS } };
 		} else {
-			store.value = { ...store.value, atmosphere: { ...store.value.atmosphere, ...patch } };
+			store.value = { ...state(), atmosphere: { ...this.atmosphere, ...patch } };
 		}
 	},
 	setWind(patch) {
-		store.value = { ...store.value, wind: patchWind(store.value.wind, patch, DEFAULT_WIND) };
+		store.value = { ...state(), wind: patchWind(state().wind, patch, DEFAULT_WIND) };
 	},
 	setRotation(angle) {
-		store.value = { ...store.value, rotation: angle };
+		store.value = { ...state(), rotation: angle };
 	},
 	resetRotation() {
-		store.value = { ...store.value, rotation: 0 };
+		store.value = { ...state(), rotation: 0 };
 	},
 	resetAtmosphere() {
 		store.value = {
-			...store.value,
+			...state(),
 			atmosphere: { useISA: true, ...ISA_DEFAULTS }
 		};
 	}

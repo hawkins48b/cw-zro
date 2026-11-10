@@ -355,6 +355,7 @@
 	"compare_max_dist": "Distance max.",
 	"compare_y_axis": "Axe Y",
 	"compare_chart_title": "Comparaison de trajectoires",
+	"compare_chart_description": "Comparaison de trajectoires : {names}",
 	"compare_selected": "Sélectionnés",
 	"unit_feet": "pieds",
 

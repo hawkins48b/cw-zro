@@ -86,7 +86,31 @@ Configuration is in [`vite.config.js`](../vite.config.js). There is no `svelte.c
 | `stores/` | Reactive state, saved to `localStorage` | Thin wrappers |
 | `utils/` | Calculations and validation | Plain functions, tested without Svelte |
 
-Stores use runes in `.svelte.js` files. [`localStore.svelte.js`](../src/lib/stores/localStore.svelte.js) is the shared helper that reads and writes `localStorage`. The Ballistic and Scope View stores have two wind getters: `wind` is safe to show, and `storedWind` is the raw value that goes to the calculators, so that [`shotWinds`](../src/lib/utils/shotWind.js) decides what a damaged value gives. See [`storedWind.js`](../src/lib/utils/storedWind.js). [`profileOps.js`](../src/lib/utils/profileOps.js) mirrors the list operations in the profiles store so that they can be tested, so a change to one needs the same change in the other.
+Stores use runes in `.svelte.js` files. [`localStore.svelte.js`](../src/lib/stores/localStore.svelte.js) is the shared helper that reads and writes `localStorage`.
+
+### Stored values
+
+`localStorage` can hold any JSON value, so the stores check each field when they read it, with plain tested functions in `utils/`, and pages only see a usable shape ([#115](https://github.com/hawkins48b/cw-zro/issues/115), [#118](https://github.com/hawkins48b/cw-zro/issues/118), [#120](https://github.com/hawkins48b/cw-zro/issues/120)). A damaged value must not start giving a result for a value the user did not enter, and what the page shows and the result must agree.
+
+| Store | Read by | A damaged value gives |
+|-------|---------|-----------------------|
+| Range of Scope View, Ballistic and compare | [`storedRange`](../src/lib/utils/storedState.js) | An empty box: the range message and no result. The unit is `m`, else `yd`. An empty Ballistic step is 25, as its placeholder says; the step only picks the table rows |
+| Atmosphere of Scope View and Ballistic | [`storedAtmosphere`](../src/lib/utils/storedState.js) | An empty box, which is out of its limits: the box's message and no result. A damaged section is a custom atmosphere with empty boxes, not the standard one. `useISA` is on for any truthy value, as before |
+| Scope View angle | [`storedElevation`](../src/lib/utils/storedState.js) | An empty box, a flat shot in either unit, as before. The unit is `deg`, else a cosine, as `scopeEffectiveRange` reads it, so a missing unit changes no result |
+| Scope View rotation (cant) | [`storedRotation`](../src/lib/utils/storedState.js) | No cant. Only a finite number from -90 to 90 is used, so the slider, the reticle and the result agree |
+| Ballistic display options | [`storedBallisticOptions`](../src/lib/utils/storedState.js) | The default: they change no result |
+| Compare entries and chart unit | [`normalizeCompareEntries`](../src/lib/utils/compareEntries.js), [`normalizeYAxisUnit`](../src/lib/utils/yAxisUnit.js) | The entry is left out; the unit is `in` |
+| Wind of Scope View and Ballistic | Two getters, see below | No result for a damaged field ([#116](https://github.com/hawkins48b/cw-zro/issues/116)) |
+| Profile list | [`normalizeProfiles`](../src/lib/utils/storedProfiles.js) | No profiles for a list that is not a list; an entry that is not an object with a number or text `id` is left out |
+
+A whole store that is not an object reads as empty sections, as above.
+
+Two values are read twice, because the safe value to show would give a result where the stored one gives none:
+
+- **Wind.** The Ballistic and Scope View stores have two wind getters: `wind` is safe to show, and `storedWind` is the raw value that goes to the calculators, so that [`shotWinds`](../src/lib/utils/shotWind.js) decides what a damaged value gives. See [`storedWind.js`](../src/lib/utils/storedWind.js).
+- **Profiles.** `profiles.list`, `profiles.get` and `activeProfile.profile` give the profile as stored, and the calculators check every value they read ([#89](https://github.com/hawkins48b/cw-zro/issues/89)). Pages show a profile through [`shownProfile`](../src/lib/utils/storedProfiles.js): names as text, a damaged number as an empty box, a damaged click value as 0.5, units as the calculators read them. Never hand a shown profile to a calculator: an empty barrel twist, for one, would give a result where the damaged stored twist gives none.
+
+The profiles store calls [`profileOps.js`](../src/lib/utils/profileOps.js) for its list operations, on the usable list, so a write replaces a damaged list with a usable one. The MPBR and trajectory validation stores are not checked yet.
 
 ### Where shots are built
 

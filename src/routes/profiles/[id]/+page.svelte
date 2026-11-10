@@ -5,6 +5,7 @@
 	import { profiles } from '#lib/stores/profiles.svelte.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import ProfileForm from '#lib/components/ProfileForm.svelte';
+	import { shownProfile } from '#lib/utils/storedProfiles.js';
 
 	let profile = $derived(profiles.get(page.params.id));
 </script>
@@ -15,7 +16,7 @@
 
 {#if profile}
 	<ProfileForm
-		initialData={profile}
+		initialData={shownProfile(profile)}
 		onSave={(data) => {
 			profiles.update(page.params.id, data);
 			goto(localizeHref('/profiles'));

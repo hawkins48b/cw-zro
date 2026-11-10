@@ -11,7 +11,7 @@ npx vitest run -t "MPBR search"                        # By name
 
 Vitest is configured in [`vite.config.js`](../vite.config.js): `src/**/*.test.js`, jsdom, globals on. The tests need no build.
 
-On 2026-11-10, after #121 to #125: **2689 passed, 1 todo**, in 23 files. After #96, #102 and #107: **2723 passed, 1 todo**, in 25 files. #107 changed the pressure of the two custom test atmospheres in [`fixtures/ballisticProfiles.js`](../src/test/fixtures/ballisticProfiles.js) to the sea-level equivalent of the station pressure they were recorded with (owner decision), so no recorded result changed.
+On 2026-11-10, after #121 to #125: **2689 passed, 1 todo**, in 23 files. After #96, #102 and #107: **2723 passed, 1 todo**, in 25 files. After #120 and #111: **3065 passed, 1 todo**, in 28 files. #107 changed the pressure of the two custom test atmospheres in [`fixtures/ballisticProfiles.js`](../src/test/fixtures/ballisticProfiles.js) to the sea-level equivalent of the station pressure they were recorded with (owner decision), so no recorded result changed.
 
 | File | Tests | Covers |
 |------|-------|--------|
@@ -22,12 +22,15 @@ On 2026-11-10, after #121 to #125: **2689 passed, 1 todo**, in 23 files. After #
 | [`trajectoryValidation.search.test.js`](../src/test/trajectoryValidation.search.test.js) | 19 | The validation search, on fake curves and a fake clock |
 | [`profileValidation.test.js`](../src/test/profileValidation.test.js) | 232 | Profile form rules: plain decimals, decimal comma, limits, including bullet and barrel limits (#125) |
 | [`profileOps.test.js`](../src/test/profileOps.test.js) | 37 | Profile list operations, ammo selector return path |
+| [`storedProfiles.test.js`](../src/test/storedProfiles.test.js) | 120 | Stored profile list (#120): a list or entry that is not usable, names, numbers, units and click values that cannot be shown, and that the calculators keep the stored profile |
+| [`storedState.test.js`](../src/test/storedState.test.js) | 164 | Stored range, atmosphere, angle, rotation and Ballistic options (#120): each damaged value reads as a usable shape and gives no result where it gave none, with the engine stubbed; an angle without a unit keeps its result; a stored rotation that is not a number gives no cant, on the real engine |
+| [`storedStores.test.js`](../src/test/storedStores.test.js) | 39 | The Scope View, Ballistic, compare and profiles stores on each damaged case of #120, with `localStore` replaced by plain values: they import, read a usable shape and recover on the next change |
 | [`auditCheck.test.js`](../src/test/auditCheck.test.js) | 84 | The audit check |
 | [`electronNavigation.test.js`](../src/test/electronNavigation.test.js) | 34 | Electron URL rules |
 | [`messages.test.js`](../src/test/messages.test.js) | 6 | Message catalogs |
 | [`format.test.js`](../src/test/format.test.js) | 7 | Escaping of text for chart labels, limits in messages |
 | [`decimal.test.js`](../src/test/decimal.test.js) | 85 | Reading typed numbers: plain decimals, decimal comma |
-| [`compareEntries.test.js`](../src/test/compareEntries.test.js) | 27 | Stored compare entries, chart series names |
+| [`compareEntries.test.js`](../src/test/compareEntries.test.js) | 46 | Stored compare entries, chart series names, each series name put back as text in its own chart aria-labels (#111) |
 | [`storedWind.test.js`](../src/test/storedWind.test.js) | 34 | Stored wind as pages show it |
 | [`yAxisUnit.test.js`](../src/test/yAxisUnit.test.js) | 7 | Stored unit of the compare chart |
 | [`zeroDistance.test.js`](../src/test/zeroDistance.test.js) | 176 | Zero distance guard, 1 to 3000, with the engine stubbed |
@@ -97,7 +100,7 @@ So a test for a hang must not run the hang:
 - **The user interface.** Nothing in the repository runs a browser. Screens, forms and charts are not tested. Browser checks in the delivery documents were run from scripts that are not kept.
 - **Electron and Capacitor at runtime.** Only the URL rules are tested.
 - **Rendered PDFs.** Field values and coordinates are checked. No one has reviewed a rendered card.
-- **The stores.** `profileOps.js` is tested in their place.
+- **The stores**, mostly. `profileOps.js` is tested in place of the profile list operations. `compareEntries.test.js` and `storedStores.test.js` run the compare, Ballistic, Scope View and profiles stores with `localStore` replaced by plain values, so the runes in `localStore.svelte.js` are not run.
 
 ## CI
 

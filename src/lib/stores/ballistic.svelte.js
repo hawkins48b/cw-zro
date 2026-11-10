@@ -1,4 +1,10 @@
 import { pageWind, patchWind } from '#lib/utils/storedWind.js';
+import {
+	storedAtmosphere,
+	storedBallisticOptions,
+	storedObject,
+	storedRange
+} from '#lib/utils/storedState.js';
 import { localStore } from './localStore.svelte.js';
 
 const ISA_DEFAULTS = {
@@ -15,61 +21,67 @@ const DEFAULT_COLUMNS = ['rangeYd', 'elevIn', 'elevMOA', 'velFps', 'energyFtlb',
 
 const DEFAULT_WIND = { speed: '0', speedUnit: 'mph', direction: '90' };
 
+const DEFAULT_OPTIONS = {
+	showAtmosphere: false,
+	showWind: false,
+	showVelocityChart: false,
+	showAnnotations: true,
+	visibleColumns: DEFAULT_COLUMNS,
+	velChartUnit: 'fps'
+};
+
 const store = localStore('zro-ballistic', () => ({
 	range: { distance: '500', unit: 'yd', step: '25' },
 	atmosphere: { useISA: true, ...ISA_DEFAULTS },
 	wind: DEFAULT_WIND,
-	options: {
-		showAtmosphere: false,
-		showWind: false,
-		showVelocityChart: false,
-		showAnnotations: true,
-		visibleColumns: DEFAULT_COLUMNS,
-		velChartUnit: 'fps'
-	}
+	options: DEFAULT_OPTIONS
 }));
+
+// The stored state, or an empty one when it is not an object (#120). Each getter checks its field:
+// see storedState.js.
+const state = () => storedObject(store.value);
 
 export const ballistic = {
 	get range() {
-		return store.value.range;
+		return storedRange(state().range, { step: true });
 	},
 	get atmosphere() {
-		return store.value.atmosphere;
+		return storedAtmosphere(state().atmosphere);
 	},
 	/** The wind to show. Never hand this to a calculator: use storedWind. */
 	get wind() {
-		return pageWind(store.value.wind, DEFAULT_WIND);
+		return pageWind(state().wind, DEFAULT_WIND);
 	},
 	/** The wind as stored, for the calculators: shotWinds decides what a damaged value gives. */
 	get storedWind() {
-		return store.value.wind;
+		return state().wind;
 	},
 	get options() {
-		return store.value.options;
+		return storedBallisticOptions(state().options, DEFAULT_OPTIONS);
 	},
 
 	setRange(patch) {
-		store.value = { ...store.value, range: { ...store.value.range, ...patch } };
+		store.value = { ...state(), range: { ...this.range, ...patch } };
 	},
 	setAtmosphere(patch) {
 		if (patch.useISA === true) {
-			store.value = { ...store.value, atmosphere: { useISA: true, ...ISA_DEFAULTS } };
+			store.value = { ...state(), atmosphere: { useISA: true, ...ISA_DEFAULTS } };
 		} else {
-			store.value = { ...store.value, atmosphere: { ...store.value.atmosphere, ...patch } };
+			store.value = { ...state(), atmosphere: { ...this.atmosphere, ...patch } };
 		}
 	},
 	setWind(patch) {
-		store.value = { ...store.value, wind: patchWind(store.value.wind, patch, DEFAULT_WIND) };
+		store.value = { ...state(), wind: patchWind(state().wind, patch, DEFAULT_WIND) };
 	},
 	setOptions(patch) {
-		store.value = { ...store.value, options: { ...store.value.options, ...patch } };
+		store.value = { ...state(), options: { ...this.options, ...patch } };
 	},
 	toggleColumn(col) {
-		const cols = store.value.options.visibleColumns ?? DEFAULT_COLUMNS;
+		const cols = this.options.visibleColumns;
 		const next = cols.includes(col) ? cols.filter((c) => c !== col) : [...cols, col];
 		this.setOptions({ visibleColumns: next });
 	},
 	resetAtmosphere() {
-		store.value = { ...store.value, atmosphere: { useISA: true, ...ISA_DEFAULTS } };
+		store.value = { ...state(), atmosphere: { useISA: true, ...ISA_DEFAULTS } };
 	}
 };

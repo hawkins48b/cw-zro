@@ -24,6 +24,7 @@
 	import { MAX_DISTANCE } from '#lib/utils/inputLimits.js';
 	import { isUsableScopeAngle, isUsableScopeRange, scopeEffectiveRange } from '#lib/utils/scopeRange.js';
 	import { formatLimit } from '#lib/utils/format.js';
+	import { shownProfile } from '#lib/utils/storedProfiles.js';
 
 	// ── Derived computation ─────────────────────────────────────────
 
@@ -59,14 +60,16 @@
 		return calculateShotPoint(profile, effectiveRange, atmoParams, scopeView.storedWind, { cantAngle: scopeView.rotation });
 	});
 
-	let elevUnit = $derived(activeProfile.profile?.elevationClickUnit ?? 'MOA');
-	let windUnit = $derived(activeProfile.profile?.windageClickUnit ?? 'MOA');
+	// The profile as the page shows it (#120): its click values and units can be read as text.
+	let shown = $derived(shownProfile(activeProfile.profile));
+	let elevUnit = $derived(shown?.elevationClickUnit ?? 'MOA');
+	let windUnit = $derived(shown?.windageClickUnit ?? 'MOA');
 
 	let elevValue = $derived(getElevationValue(point, elevUnit));
 	let windValue = $derived(getWindageValue(point, windUnit));
 
-	let elevClickVal = $derived(readDecimal(activeProfile.profile?.elevationClickValue) || 0.5);
-	let windClickVal = $derived(readDecimal(activeProfile.profile?.windageClickValue) || 0.5);
+	let elevClickVal = $derived(readDecimal(shown?.elevationClickValue) || 0.5);
+	let windClickVal = $derived(readDecimal(shown?.windageClickValue) || 0.5);
 
 	let elevClicks = $derived(elevValue !== null ? Math.round(Math.abs(elevValue) / elevClickVal) : null);
 	let windClicks = $derived(windValue !== null ? Math.round(Math.abs(windValue) / windClickVal) : null);
@@ -183,8 +186,8 @@
 		<div class="card preset-filled-surface-100-900 p-4 space-y-4">
 			<h2 class="h5 border-b border-surface-200-800 pb-2 flex items-center gap-2">
 				{m.scope_view_adjustments()}
-				{#if activeProfile.profile?.reticleType}
-					<span class="badge preset-outlined-surface-200-800 text-xs font-normal">{activeProfile.profile.reticleType.toUpperCase()}</span>
+				{#if shown?.reticleType}
+					<span class="badge preset-outlined-surface-200-800 text-xs font-normal">{shown.reticleType.toUpperCase()}</span>
 				{/if}
 			</h2>
 

@@ -81,6 +81,15 @@
 		const xaxisAnnotations = [];
 		const pointAnnotations = [];
 
+		// A point label is centred on its marker by default. Near either end of
+		// the x-axis that pushes it over the y-axis ticks or past the plot edge,
+		// so anchor it on the side that faces into the plot instead (#100).
+		const pointLabelAnchor = (x) => {
+			if (maxX > 0 && x < maxX * 0.15) return { textAnchor: 'start' };
+			if (maxX > 0 && x > maxX * 0.85) return { textAnchor: 'end' };
+			return { textAnchor: 'middle' };
+		};
+
 		if (annotations) {
 			// Target zone band (±halfTarget around LoS)
 			yaxisAnnotations.push({
@@ -108,7 +117,14 @@
 						text: m.mpbr_point_blank(),
 						borderColor: cPrimary,
 						style: { color: '#fff', background: cPrimary, fontSize: '11px' },
-						position: 'bottom'
+						// Horizontal and anchored at the band's left edge, inside the
+						// plot. Vertical (the default) is drawn to the left of the
+						// edge, over the y-axis ticks when the band starts at 0 (#100).
+						position: 'bottom',
+						orientation: 'horizontal',
+						textAnchor: 'start',
+						offsetX: 6,
+						offsetY: -8
 					}
 				});
 			}
@@ -123,7 +139,8 @@
 						text: m.mpbr_near_zero(),
 						borderColor: cSuccess,
 						style: { color: '#fff', background: cSuccess, fontSize: '11px' },
-						offsetY: -10
+						offsetY: -10,
+						...pointLabelAnchor(result.nearZero)
 					}
 				});
 			}
@@ -138,7 +155,8 @@
 						text: m.mpbr_far_zero(),
 						borderColor: cPrimary,
 						style: { color: '#fff', background: cPrimary, fontSize: '11px' },
-						offsetY: -10
+						offsetY: -10,
+						...pointLabelAnchor(result.farZero)
 					}
 				});
 			}
@@ -153,7 +171,8 @@
 						text: m.mpbr_max_ord(),
 						borderColor: cWarning,
 						style: { color: '#fff', background: cWarning, fontSize: '11px' },
-						offsetY: -10
+						offsetY: -10,
+						...pointLabelAnchor(result.maxOrdinate.distance)
 					}
 				});
 			}
