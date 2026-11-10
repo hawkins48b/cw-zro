@@ -197,6 +197,10 @@
 
 	"validation_required": "Required",
 	"validation_positive_number": "Must be a positive number",
+	"validation_range": "Enter a number from {min} to {max} {unit}",
+	"validation_range_above_zero": "Enter a number above 0 and up to {max} {unit}",
+	"validation_min": "Enter a number of at least {min}",
+	"validation_range_below_max": "Enter a number from {min} to under {max} {unit}",
 
 	"settings_dark_mode": "Dark Mode",
 	"settings_language": "Language",
@@ -286,6 +290,7 @@
 	"mpbr_about_beyond": "Beyond the MPBR maximum, the bullet drops below the target zone. You must hold over or dial elevation to compensate.",
 	"mpbr_about_ideal": "Ideal for red dots and iron sights where quick shots leave no time for elevation adjustments.",
 	"mpbr_save_zero": "Set MPBR for current profile",
+	"mpbr_zero_out_of_range": "This zero is past {max}, the longest zero the other calculators take, so it cannot be saved to the profile.",
 
 	"traj_val_title": "Trajectory Validation",
 	"traj_val_range": "Observation Range",
@@ -327,7 +332,8 @@
 	"compare_select_profile": "Select a profile",
 	"compare_zero_override": "Zero Distance",
 	"compare_zero_hint": "Override zero distance for this entry",
-	"compare_zero_invalid": "Enter a zero distance greater than 0",
+	"compare_zero_invalid": "Enter a zero distance from {min} to {max}",
+	"compare_zero_no_result": "No trajectory with this zero distance — check the zero and the profile.",
 	"compare_remove": "Remove trajectory",
 	"compare_no_profiles": "No profiles available. Create a profile first.",
 	"compare_no_entries": "Add profiles to compare their trajectories.",

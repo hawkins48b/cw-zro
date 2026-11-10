@@ -5,6 +5,8 @@
 	import { mpbr } from '#lib/stores/mpbr.svelte.js';
 	import { settings } from '#lib/stores/settings.svelte.js';
 	import { calculateMPBR } from '#lib/utils/ballisticCalculator.js';
+	import { isUsableZeroDistance, MAX_ZERO_DISTANCE } from '#lib/utils/zeroDistance.js';
+	import { formatLimit } from '#lib/utils/format.js';
 	import { goto } from '$app/navigation';
 	import { profiles } from '#lib/stores/profiles.svelte.js';
 	import { Calculator, MapPin, Crosshair, Ruler, TrendingUp, Info, ChevronDown, BookmarkPlus } from '@lucide/svelte';
@@ -438,7 +440,11 @@
 				<div bind:this={chartEl}></div>
 			</div>
 
-			<!-- Save MPBR zero button -->
+			<!-- Save MPBR zero button. A zero past MAX_ZERO_DISTANCE (a huge target) would give no
+			     result anywhere else, so it is not offered (#93). -->
+			{#if !isUsableZeroDistance(mpbrResult.optimalZero)}
+				<p class="text-sm text-warning-800-200">{m.mpbr_zero_out_of_range({ max: formatLimit(MAX_ZERO_DISTANCE) })}</p>
+			{:else}
 			<button
 				type="button"
 				class="btn preset-tonal-primary gap-2"
@@ -454,6 +460,7 @@
 				<BookmarkPlus class="size-5" />
 				{m.mpbr_save_zero()}
 			</button>
+			{/if}
 
 		{:else if !calculating && hasCalculated}
 			<!-- Calculation returned no result -->

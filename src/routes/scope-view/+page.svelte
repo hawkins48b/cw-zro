@@ -20,6 +20,10 @@
 	import { scopeView } from '#lib/stores/scopeView.svelte.js';
 	import { calculateShotPoint, getElevationValue, getWindageValue } from '#lib/utils/ballisticCalculator.js';
 	import { Unit } from 'js-ballistics';
+	import { readDecimal } from '#lib/utils/decimal.js';
+	import { MAX_DISTANCE } from '#lib/utils/inputLimits.js';
+	import { isUsableScopeRange, scopeEffectiveRange } from '#lib/utils/scopeRange.js';
+	import { formatLimit } from '#lib/utils/format.js';
 
 	// ── Derived computation ─────────────────────────────────────────
 
@@ -27,16 +31,11 @@
 	 * Compute the effective horizontal distance using the cosine rule.
 	 * Elevation angle is applied so bullet drop reflects true horizontal range.
 	 */
-	let effectiveRange = $derived.by(() => {
-		const raw = parseFloat(scopeView.range.distance);
-		if (!raw || raw <= 0) return null;
-		if (!showElevation) return { distance: raw, unit: scopeView.range.unit };
-		const { angle, unit } = scopeView.elevation;
-		const a = parseFloat(angle) || 0;
-		const cosAngle = unit === 'deg' ? Math.cos((a * Math.PI) / 180) : parseFloat(angle) || 1;
-		const dist = raw * cosAngle;
-		return { distance: dist, unit: scopeView.range.unit };
-	});
+	let effectiveRange = $derived(
+		scopeEffectiveRange(scopeView.range, showElevation ? scopeView.elevation : null)
+	);
+	let rangeUsable = $derived(isUsableScopeRange(scopeView.range.distance));
+	let distLabel = $derived(scopeView.range.unit === 'm' ? m.unit_m() : m.unit_yd());
 
 	let atmoParams = $derived(
 		scopeView.atmosphere.useISA ? null : scopeView.atmosphere
@@ -61,8 +60,8 @@
 	let elevValue = $derived(getElevationValue(point, elevUnit));
 	let windValue = $derived(getWindageValue(point, windUnit));
 
-	let elevClickVal = $derived(parseFloat(activeProfile.profile?.elevationClickValue) || 0.5);
-	let windClickVal = $derived(parseFloat(activeProfile.profile?.windageClickValue) || 0.5);
+	let elevClickVal = $derived(readDecimal(activeProfile.profile?.elevationClickValue) || 0.5);
+	let windClickVal = $derived(readDecimal(activeProfile.profile?.windageClickValue) || 0.5);
 
 	let elevClicks = $derived(elevValue !== null ? Math.round(Math.abs(elevValue) / elevClickVal) : null);
 	let windClicks = $derived(windValue !== null ? Math.round(Math.abs(windValue) / windClickVal) : null);
@@ -107,6 +106,7 @@
 				unit={scopeView.range.unit}
 				onchange={(v) => scopeView.setRange({ distance: v })}
 				onunitchange={(u) => scopeView.setRange({ unit: u })}
+				invalid={rangeUsable ? '' : m.validation_range_above_zero({ max: formatLimit(MAX_DISTANCE), unit: distLabel })}
 			/>
 
 			<!-- Elevation angle -->

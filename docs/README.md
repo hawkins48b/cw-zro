@@ -14,6 +14,7 @@ Living documents. They describe the current state of `develop`.
 
 ## Delivery documentation
 
+- [2026-11-10: Input limits, strict profile form and decimal comma](2026-11-10-89-input-limits.md): one set of limits for BC, velocity, sight height, range, zero (now 1 to 3000) and custom atmosphere, in the form and on every path; `1,5` reads as 1.5; a dope card with no data is not saved; two dope card baselines changed with owner approval; eight issues in one branch
 - [2026-11-06: Small fixes: stored values, language, version, muted text, solver timeout](2026-11-06-101-97-small-fixes.md): damaged stored wind and compare entries no longer crash pages; `lang` follows the locale; muted text is muted at last; a solver timeout has its own message; seven issues in one branch
 - [2026-11-06: Stopping hangs from an empty wind direction](2026-11-06-116-wind-guard.md): clearing the direction box no longer freezes the app and counts as 0°; a bad direction, or a speed above 100 m/s, gives no result; a decimal comma is still cut off
 - [2026-11-06: Stopping hangs from an empty optic height](2026-11-06-113-nan-elevation.md): an empty or non-numeric optic height no longer freezes the app, and a non-finite elevation is never fired; no result changes, and an empty wind direction still hangs

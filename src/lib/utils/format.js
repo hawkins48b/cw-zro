@@ -24,6 +24,16 @@ export function formatFixed(value, decimals = 1) {
 }
 
 /**
+ * A limit as shown in a message: in the current locale, without thousands grouping, so that it
+ * reads back as the same number when typed (`3000`, and `25,4` in French and German, #117).
+ * @param {number} value
+ * @returns {string}
+ */
+export function formatLimit(value) {
+	return formatNumber(value, { useGrouping: false, maximumFractionDigits: 6 });
+}
+
+/**
  * Escape a string for use as HTML text content, such as a chart series name
  * that ApexCharts writes with innerHTML.
  * Quotes stay as they are, because ApexCharts also writes the same string to

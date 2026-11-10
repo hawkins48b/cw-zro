@@ -11,7 +11,7 @@ npx vitest run -t "MPBR search"                        # By name
 
 Vitest is configured in [`vite.config.js`](../vite.config.js): `src/**/*.test.js`, jsdom, globals on. The tests need no build.
 
-On 2026-11-06: **1014 passed, 1 todo**, in 15 files.
+On 2026-11-10: **1830 passed, 1 todo**, in 20 files.
 
 | File | Tests | Covers |
 |------|-------|--------|
@@ -19,15 +19,20 @@ On 2026-11-06: **1014 passed, 1 todo**, in 15 files.
 | [`dopeCard.baseline.test.js`](../src/test/dopeCard.baseline.test.js) | 39 | Layer 1: figures printed on the cards |
 | [`ballistics.published.test.js`](../src/test/ballistics.published.test.js) | 17, 1 todo | Layer 2: published manufacturer tables |
 | [`ballistics.units.test.js`](../src/test/ballistics.units.test.js) | 24 | Unit conversions by definition, number formatting |
-| [`trajectoryValidation.search.test.js`](../src/test/trajectoryValidation.search.test.js) | 17 | The validation search, on fake curves and a fake clock |
-| [`profileValidation.test.js`](../src/test/profileValidation.test.js) | 59 | Profile form rules |
+| [`trajectoryValidation.search.test.js`](../src/test/trajectoryValidation.search.test.js) | 19 | The validation search, on fake curves and a fake clock |
+| [`profileValidation.test.js`](../src/test/profileValidation.test.js) | 172 | Profile form rules: plain decimals, decimal comma, limits |
 | [`profileOps.test.js`](../src/test/profileOps.test.js) | 37 | Profile list operations, ammo selector return path |
 | [`auditCheck.test.js`](../src/test/auditCheck.test.js) | 84 | The audit check |
 | [`electronNavigation.test.js`](../src/test/electronNavigation.test.js) | 34 | Electron URL rules |
 | [`messages.test.js`](../src/test/messages.test.js) | 6 | Message catalogs |
-| [`format.test.js`](../src/test/format.test.js) | 6 | Escaping of text for chart labels |
+| [`format.test.js`](../src/test/format.test.js) | 7 | Escaping of text for chart labels, limits in messages |
+| [`decimal.test.js`](../src/test/decimal.test.js) | 85 | Reading typed numbers: plain decimals, decimal comma |
+| [`compareEntries.test.js`](../src/test/compareEntries.test.js) | 27 | Stored compare entries, chart series names |
+| [`storedWind.test.js`](../src/test/storedWind.test.js) | 34 | Stored wind as pages show it |
 | [`yAxisUnit.test.js`](../src/test/yAxisUnit.test.js) | 7 | Stored unit of the compare chart |
-| [`zeroDistance.test.js`](../src/test/zeroDistance.test.js) | 102 | Zero distance guard, with the engine stubbed |
+| [`zeroDistance.test.js`](../src/test/zeroDistance.test.js) | 176 | Zero distance guard, 1 to 3000, with the engine stubbed |
+| [`scopeRange.test.js`](../src/test/scopeRange.test.js) | 22 | Scope view range: a stored range above the limit gives no result, so the message shows |
+| [`inputLimits.test.js`](../src/test/inputLimits.test.js) | 458 | BC, velocity, sight height, range and atmosphere limits on every path, dope cards with no data, decimal comma on the wind path. The engine is stubbed for values past a limit |
 | [`nanElevation.test.js`](../src/test/nanElevation.test.js) | 47 | Optic height and barrel elevation guards, with the engine stubbed |
 | [`windGuard.test.js`](../src/test/windGuard.test.js) | 311 | Wind speed and direction guard, with the engine stubbed for rejected winds |
 
@@ -78,7 +83,8 @@ A known defect is not pinned, so that a test does not make it look correct. The 
 
 So a test for a hang must not run the hang:
 
-- Stub the solver to throw, then check that the guard stops the call before it. Without the guard, the test fails on the stub. See `vi.spyOn(Calculator.prototype, 'setWeaponZero')` in the baseline tests.
+- Stub the solver to throw, then check that the guard stops the call before it. Without the guard, the test fails on the stub. See `vi.spyOn(Calculator.prototype, 'setWeaponZero')` in the baseline tests. `calculateMPBR` fires before it solves a zero, so stub `fire` too, as `inputLimits.test.js` does.
+- Check the value at each limit too: it must reach the stub. That proves the stub is live and the limit is not stricter than decided.
 - If a run stalls, stop it by hand and run the file with `-t` to find the test.
 
 ## What the tests do not cover

@@ -7,7 +7,10 @@
 	import { compareTrajectories } from '#lib/stores/compareTrajectories.svelte.js';
 	import { calculateFullTrajectory } from '#lib/utils/ballisticCalculator.js';
 	import { compareSeriesName } from '#lib/utils/compareEntries.js';
-	import { isUsableZeroDistance } from '#lib/utils/zeroDistance.js';
+	import { isUsableZeroDistance, MIN_ZERO_DISTANCE, MAX_ZERO_DISTANCE } from '#lib/utils/zeroDistance.js';
+	import { readDecimal } from '#lib/utils/decimal.js';
+	import { formatLimit } from '#lib/utils/format.js';
+	import { isUsableRange, MAX_DISTANCE } from '#lib/utils/inputLimits.js';
 	import { Unit } from 'js-ballistics';
 	import { Plus, X } from '@lucide/svelte';
 
@@ -59,23 +62,29 @@
 	);
 
 	// ── Compute trajectories for all entries ─────────────────────────
+	let rangeDist = $derived(readDecimal(compareTrajectories.range.distance));
+	let rangeUsable = $derived(isUsableRange(rangeDist));
+
+	/** The trajectory of each entry, in the order of resolvedEntries: null when it has none. */
+	let entryResults = $derived.by(() => {
+		if (!rangeUsable) return resolvedEntries.map(() => null);
+		const rangeObj = { distance: rangeDist, unit: compareTrajectories.range.unit, step: 1 };
+		return resolvedEntries.map((entry) =>
+			calculateFullTrajectory(
+				{ ...entry.profile, zeroDist: entry.zeroDist, zeroUnit: entry.zeroUnit },
+				rangeObj,
+				null,
+				null
+			)
+		);
+	});
+
 	let chartData = $derived.by(() => {
 		if (resolvedEntries.length === 0) return null;
 
-		const rangeDist = parseFloat(compareTrajectories.range.distance);
-		if (!isFinite(rangeDist) || rangeDist <= 0) return null;
-
-		const step = 1;
-		const rangeObj = { distance: rangeDist, unit: compareTrajectories.range.unit, step };
-
 		const series = [];
 		for (const [i, entry] of resolvedEntries.entries()) {
-			const overriddenProfile = {
-				...entry.profile,
-				zeroDist: entry.zeroDist,
-				zeroUnit: entry.zeroUnit
-			};
-			const result = calculateFullTrajectory(overriddenProfile, rangeObj, null, null);
+			const result = entryResults[i];
 			if (!result) continue;
 
 			const distUnit = isMetric ? Unit.Meter : Unit.Yard;
@@ -268,7 +277,12 @@
 								</div>
 							</div>
 							{#if !isUsableZeroDistance(entry.zeroDist)}
-								<p id={`zero-error-${i}`} class="mt-1 text-xs text-error-500">{m.compare_zero_invalid()}</p>
+								<p id={`zero-error-${i}`} class="mt-1 text-xs text-error-500">
+									{m.compare_zero_invalid({ min: formatLimit(MIN_ZERO_DISTANCE), max: formatLimit(MAX_ZERO_DISTANCE) })}
+								</p>
+							{:else if rangeUsable && !entryResults[i]}
+								<!-- A usable zero can still give no trajectory, e.g. a short zero on a slow load (#114). -->
+								<p class="mt-1 text-xs text-warning-800-200">{m.compare_zero_no_result()}</p>
 							{/if}
 						</div>
 					{/each}
@@ -290,6 +304,7 @@
 						inputmode="decimal"
 						placeholder="500"
 						value={compareTrajectories.range.distance}
+						aria-invalid={!rangeUsable}
 						oninput={(e) => compareTrajectories.setRange({ distance: e.target.value })}
 					/>
 					<div class="flex items-center gap-1 shrink-0">
@@ -304,6 +319,9 @@
 						{/each}
 					</div>
 				</div>
+				{#if !rangeUsable}
+					<p class="text-xs text-error-500">{m.validation_range_above_zero({ max: formatLimit(MAX_DISTANCE), unit: distLabel })}</p>
+				{/if}
 			</div>
 
 			<!-- Y axis unit -->

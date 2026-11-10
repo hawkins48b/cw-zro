@@ -197,6 +197,10 @@
 
 	"validation_required": "Pflichtfeld",
 	"validation_positive_number": "Muss eine positive Zahl sein",
+	"validation_range": "Geben Sie eine Zahl von {min} bis {max} {unit} ein",
+	"validation_range_above_zero": "Geben Sie eine Zahl über 0 und bis {max} {unit} ein",
+	"validation_min": "Geben Sie eine Zahl von mindestens {min} ein",
+	"validation_range_below_max": "Geben Sie eine Zahl von {min} bis unter {max} {unit} ein",
 
 	"settings_dark_mode": "Dunkelmodus",
 	"settings_language": "Sprache",
@@ -286,6 +290,7 @@
 	"mpbr_about_beyond": "Jenseits des MPBR-Maximums verlässt das Geschoss die Zielzone nach unten. Eine Elevationskorrektur ist erforderlich.",
 	"mpbr_about_ideal": "Ideal für Red-Dot-Visiere und Kimme/Korn, wo schnelle Schüsse keine Zeit für Elevationskorrekturen lassen.",
 	"mpbr_save_zero": "MPBR für aktuelles Profil setzen",
+	"mpbr_zero_out_of_range": "Diese Nulldistanz liegt über {max}, der längsten, die die anderen Rechner annehmen. Sie kann nicht im Profil gespeichert werden.",
 
 	"traj_val_title": "Trajektorienvalidierung",
 	"traj_val_range": "Beobachtungsdistanz",
@@ -327,7 +332,8 @@
 	"compare_select_profile": "Profil auswählen",
 	"compare_zero_override": "Nulldistanz",
 	"compare_zero_hint": "Nulldistanz für diesen Eintrag überschreiben",
-	"compare_zero_invalid": "Geben Sie eine Nulldistanz über 0 ein",
+	"compare_zero_invalid": "Geben Sie eine Nulldistanz von {min} bis {max} ein",
+	"compare_zero_no_result": "Keine Flugbahn mit dieser Nulldistanz — Nullpunkt und Profil prüfen.",
 	"compare_remove": "Trajektorie entfernen",
 	"compare_no_profiles": "Keine Profile vorhanden. Erstellen Sie zuerst ein Profil.",
 	"compare_no_entries": "Fügen Sie Profile hinzu, um deren Trajektorien zu vergleichen.",

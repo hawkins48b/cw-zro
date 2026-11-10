@@ -1,6 +1,7 @@
 <script>
 	import { Plus, Minus } from '@lucide/svelte';
 	import { m } from '#lib/paraglide/messages.js';
+	import { MAX_DISTANCE } from '#lib/utils/inputLimits.js';
 
 	/**
 	 * Mobile-optimised 4-digit distance input.
@@ -11,16 +12,21 @@
 	 * @prop {string}   value          - Current distance as a numeric string.
 	 * @prop {string}   unit           - Active unit: 'yd' or 'm'.
 	 * @prop {string}   hint           - Optional helper text below.
+	 * @prop {string}   invalid        - Error message, shown instead of the hint when not empty.
 	 * @prop {Function} onchange       - Called with new value string when value changes.
 	 * @prop {Function} onunitchange   - Called with new unit string when unit changes.
 	 */
-	let { label = '', value = '500', unit = 'yd', hint = null, onchange, onunitchange } = $props();
+	let { label = '', value = '500', unit = 'yd', hint = null, invalid = '', onchange, onunitchange } = $props();
 
 	const PLACES = [1000, 100, 10, 1];
 	const MIN = 1;
-	const MAX = 9999;
+	// The buttons stop at the longest range the calculators take (MAX_DISTANCE, #93).
+	const MAX = MAX_DISTANCE;
+	// The digits show a stored value as it is, up to what four digits hold, so that an old range
+	// above MAX (the box used to allow 9999) is not shown as MAX. The page shows its message.
+	const SHOWN_MAX = 9999;
 
-	let numValue = $derived(Math.max(MIN, Math.min(MAX, parseInt(value) || MIN)));
+	let numValue = $derived(Math.max(MIN, Math.min(SHOWN_MAX, parseInt(value) || MIN)));
 	let digits = $derived(PLACES.map((place) => Math.floor((numValue % (place * 10)) / place)));
 
 	function adjust(place, delta) {
@@ -108,7 +114,9 @@
 		{/each}
 	</div>
 
-	{#if hint}
+	{#if invalid}
+		<p class="text-xs text-error-500" role="alert">{invalid}</p>
+	{:else if hint}
 		<p class="text-xs text-surface-600-400">{hint}</p>
 	{/if}
 </div>

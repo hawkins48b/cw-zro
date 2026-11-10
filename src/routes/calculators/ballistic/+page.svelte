@@ -5,6 +5,7 @@
 	import { ballistic } from '#lib/stores/ballistic.svelte.js';
 	import { settings } from '#lib/stores/settings.svelte.js';
 	import { calculateFullTrajectory } from '#lib/utils/ballisticCalculator.js';
+	import { readDecimal } from '#lib/utils/decimal.js';
 	import WindInput from '#lib/components/WindInput.svelte';
 	import AtmosphereCard from '#lib/components/AtmosphereCard.svelte';
 	import {
@@ -276,7 +277,7 @@
 			farZero,
 			maxApex,
 			maxDrop,
-			parseFloat(ballistic.range.step) || 25
+			readDecimal(ballistic.range.step) || 25
 		);
 		const chart = new ac(el, opts);
 		chart.render();
@@ -289,7 +290,7 @@
 		if (!ac || !el || !ballistic.options.showVelocityChart) return;
 
 		const velUnit = ballistic.options.velChartUnit ?? 'fps';
-		const opts = buildVelChartOptions(chartPoints, settings.darkMode, isMetric, velUnit, soundSpeedFPS, parseFloat(ballistic.range.step) || 25);
+		const opts = buildVelChartOptions(chartPoints, settings.darkMode, isMetric, velUnit, soundSpeedFPS, readDecimal(ballistic.range.step) || 25);
 		const chart = new ac(el, opts);
 		chart.render();
 		return () => chart.destroy();
@@ -489,7 +490,7 @@
 						<ChevronRight class="size-4 text-surface-600-400 shrink-0" />
 					{/if}
 					<span class="text-sm font-medium">{m.ballistic_wind()}</span>
-					{#if parseFloat(ballistic.wind.speed) > 0}
+					{#if readDecimal(ballistic.wind.speed) > 0}
 						<span class="ml-auto text-xs preset-tonal-primary chip">
 							{ballistic.wind.speed} {ballistic.wind.speedUnit === 'mph' ? m.unit_mph() : m.unit_mps()}
 						</span>

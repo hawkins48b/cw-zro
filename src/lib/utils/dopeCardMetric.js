@@ -1,7 +1,9 @@
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { Calculator, Weapon, DragModel, Ammo, Atmo, Wind, Shot, UNew, Unit, Table, TrajectoryRangeError } from 'js-ballistics';
 import { findZeroCrossings, ZERO_SEARCH_RANGE, isFlyableZeroElevation } from './dopeCardZeros.js';
-import { hasFiniteElevation, isUsableZeroDistance } from './zeroDistance.js';
+import { hasFiniteElevation, isUsableZeroDistance, zeroDistanceValue } from './zeroDistance.js';
+import { readDecimal } from './decimal.js';
+import { hasFlyableVelocity, isUsableBc, isUsableSightHeight } from './inputLimits.js';
 
 const PDF_UNIT = 1 / 72;
 const PDF_PRIMARY_COLOR = rgb(0.03529411764705882, 0.47843137254901963, 0.20392156862745098);
@@ -9,7 +11,8 @@ const PDF_PRIMARY_COLOR = rgb(0.03529411764705882, 0.47843137254901963, 0.203921
 /**
  * Generate the Metric mid-range dope card PDF for a v2 profile.
  * @param {object} profile - flat v2 profile from profiles store
- * @returns {Promise<PDFDocument>}
+ * @returns {Promise<PDFDocument|null>} null when the profile gives no trajectory, so that the page
+ *   can say so instead of saving a blank card (#91)
  */
 export async function generateMetricDopeCard(profile) {
 	const existingPdfBytes = await fetch('/pdf/rifle-dataset-metric.pdf').then((r) =>
@@ -28,7 +31,7 @@ export async function generateMetricDopeCard(profile) {
 	const shot25Wind3 = computeTrajectory(profile, { distance: 500, unit: 'm', step: 25 }, 3.5);
 	const shot25Wind9 = computeTrajectory(profile, { distance: 500, unit: 'm', step: 25 }, 9);
 
-	if (!shot1 || !shot25 || !shot25Wind3 || !shot25Wind9) return pdfDoc;
+	if (!shot1 || !shot25 || !shot25Wind3 || !shot25Wind9) return null;
 
 	// The crossings can lie past the 500 units of the card, so this one goes further.
 	const shotZeros = computeTrajectory(profile, { distance: ZERO_SEARCH_RANGE, unit: 'm', step: 1 }, 0, true);
@@ -66,11 +69,11 @@ export async function generateMetricDopeCard(profile) {
 			drawText(drop100, 9.32, 0.97, 11);
 		}
 		// Height over bore (cm)
-		let hob = parseFloat(profile.opticHeight);
+		let hob = readDecimal(profile.opticHeight);
 		if (profile.opticHeightUnit === 'in') hob = Math.round(UNew.Inch(hob).In(Unit.Centimeter) * 10) / 10;
 		drawText(String(hob), 2.81, 1.36, 11);
 		// Muzzle velocity (m/s)
-		let mv = parseFloat(profile.velocity);
+		let mv = readDecimal(profile.velocity);
 		if (profile.velocityUnit === 'fps') mv = Math.round(UNew.FPS(mv).In(Unit.MPS) * 10) / 10;
 		drawText(String(mv), 4.6, 1.36, 11);
 	}
@@ -178,30 +181,32 @@ function computeTrajectory(profile, range, windSpeedMps, forZeros = false) {
 	try {
 		if (!isUsableZeroDistance(profile.zeroDist)) return null;
 
+		// The same limits as the other calculators: out of them the engine can loop for good.
+		const opticHeight = readDecimal(profile.opticHeight);
+		if (!isUsableSightHeight(opticHeight, profile.opticHeightUnit)) return null;
 		const sightHeight = profile.opticHeightUnit === 'cm'
-			? UNew.Centimeter(parseFloat(profile.opticHeight))
-			: UNew.Inch(parseFloat(profile.opticHeight));
-		// An empty height is NaN, which the engine never leaves its loop on.
-		if (!Number.isFinite(sightHeight.In(Unit.Inch))) return null;
+			? UNew.Centimeter(opticHeight)
+			: UNew.Inch(opticHeight);
 		const weapon = new Weapon({ sightHeight });
 
 		const weight = profile.bulletWeightUnit === 'g'
-			? UNew.Gram(parseFloat(profile.bulletWeight))
-			: UNew.Grain(parseFloat(profile.bulletWeight));
+			? UNew.Gram(readDecimal(profile.bulletWeight))
+			: UNew.Grain(readDecimal(profile.bulletWeight));
 		const diameter = profile.bulletDiameterUnit === 'mm'
-			? UNew.Millimeter(parseFloat(profile.bulletDiameter))
-			: UNew.Inch(parseFloat(profile.bulletDiameter));
-		const bc = parseFloat(profile.bc);
-		if (!bc || bc <= 0) return null;
+			? UNew.Millimeter(readDecimal(profile.bulletDiameter))
+			: UNew.Inch(readDecimal(profile.bulletDiameter));
+		const bc = readDecimal(profile.bc);
+		if (!isUsableBc(bc)) return null;
 		const dragTable = profile.bcType === 'G7' ? Table.G7 : Table.G1;
 		const dm = new DragModel({ bc, dragTable, weight, diameter });
 
 		const mv = profile.velocityUnit === 'mps'
-			? UNew.MPS(parseFloat(profile.velocity))
-			: UNew.FPS(parseFloat(profile.velocity));
+			? UNew.MPS(readDecimal(profile.velocity))
+			: UNew.FPS(readDecimal(profile.velocity));
 		const ammo = new Ammo({ dm, mv });
 
 		const atmo = new Atmo();
+		if (!hasFlyableVelocity(ammo, atmo)) return null;
 
 		const winds = [];
 		if (windSpeedMps > 0) {
@@ -209,9 +214,8 @@ function computeTrajectory(profile, range, windSpeedMps, forZeros = false) {
 		}
 
 		const isMetric = range.unit === 'm';
-		const zeroDist = profile.zeroUnit === 'm'
-			? UNew.Meter(Math.abs(parseFloat(profile.zeroDist)))
-			: UNew.Yard(Math.abs(parseFloat(profile.zeroDist)));
+		const zeroValue = zeroDistanceValue(profile.zeroDist);
+		const zeroDist = profile.zeroUnit === 'm' ? UNew.Meter(zeroValue) : UNew.Yard(zeroValue);
 		const trajRange = isMetric ? UNew.Meter(range.distance) : UNew.Yard(range.distance);
 		const trajStep = isMetric ? UNew.Meter(range.step) : UNew.Yard(range.step);
 

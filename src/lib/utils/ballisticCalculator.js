@@ -13,7 +13,20 @@ import {
 	defaultEngineConfig
 } from 'js-ballistics';
 import { shotWinds } from './shotWind.js';
-import { hasFiniteElevation, isUsableZeroDistance } from './zeroDistance.js';
+import {
+	hasFiniteElevation,
+	isUsableZeroDistance,
+	zeroDistanceValue,
+	MIN_ZERO_DISTANCE
+} from './zeroDistance.js';
+import { readDecimal } from './decimal.js';
+import {
+	hasFlyableVelocity,
+	isUsableAtmosphere,
+	isUsableBc,
+	isUsableRange,
+	isUsableSightHeight
+} from './inputLimits.js';
 
 /**
  * Relative humidity for Atmo, as a fraction: 0 is 0 %, 1 is 100 %.
@@ -48,8 +61,8 @@ function powderSensitivity(profile, mv) {
 		return { tempModifier: 0, powderTemp: null, usePowderSensitivity: false };
 	}
 	const isCelsius = profile.temperatureUnit === 'c';
-	const fpsPerCelsius = parseFloat(profile.tempModifier) * (isCelsius ? 1 : 1.8);
-	const temperature = parseFloat(profile.temperature);
+	const fpsPerCelsius = readDecimal(profile.tempModifier) * (isCelsius ? 1 : 1.8);
+	const temperature = readDecimal(profile.temperature);
 	return {
 		tempModifier: (fpsPerCelsius * 15) / mv.In(Unit.FPS),
 		powderTemp: isCelsius ? UNew.Celsius(temperature) : UNew.Fahrenheit(temperature),
@@ -58,19 +71,31 @@ function powderSensitivity(profile, mv) {
 }
 
 /**
- * Whether the muzzle velocity at the current temperature is one the solver can work with.
+ * The Atmo of a calculation: the standard atmosphere without custom values, or null when a custom
+ * value is out of its limits (isUsableAtmosphere). An extreme temperature or pressure can hang the
+ * engine for good, which try/catch cannot stop.
  *
- * A sensitivity setting can take it to 0 or NaN, and js-ballistics then never leaves its
- * integration loop (the zero search returns NaN instead of throwing), which try/catch cannot
- * stop. Below cMinimumVelocity (fps) the engine stops on its first step anyway.
- *
- * @param {Ammo} ammo
- * @param {Atmo} atmo
- * @returns {boolean}
+ * @param {object|null} atmosphere - { altitude, altitudeUnit, pressure, pressureUnit, temperature, temperatureUnit, humidity }
+ * @returns {Atmo|null}
  */
-function hasFlyableVelocity(ammo, atmo) {
-	const fps = ammo.getVelocityForTemp(atmo.powderTemp).In(Unit.FPS);
-	return Number.isFinite(fps) && fps >= defaultEngineConfig.cMinimumVelocity;
+function shotAtmosphere(atmosphere) {
+	if (!atmosphere) return new Atmo(); // ICAO standard atmosphere
+	const values = {
+		altitude: readDecimal(atmosphere.altitude),
+		pressure: readDecimal(atmosphere.pressure),
+		temperature: readDecimal(atmosphere.temperature),
+		humidity: readDecimal(atmosphere.humidity)
+	};
+	if (!isUsableAtmosphere(values, atmosphere)) return null;
+	const altitude =
+		atmosphere.altitudeUnit === 'm' ? UNew.Meter(values.altitude) : UNew.Foot(values.altitude);
+	const pressure =
+		atmosphere.pressureUnit === 'hpa' ? UNew.hPa(values.pressure) : UNew.InHg(values.pressure);
+	const temperature =
+		atmosphere.temperatureUnit === 'c'
+			? UNew.Celsius(values.temperature)
+			: UNew.Fahrenheit(values.temperature);
+	return new Atmo({ altitude, pressure, temperature, humidity: humidityFraction(values.humidity) });
 }
 
 /**
@@ -86,25 +111,23 @@ function hasFlyableVelocity(ammo, atmo) {
  */
 export function calculateShotPoint(profile, range, atmosphere, wind, options = {}) {
 	try {
-		const dist = Math.abs(parseFloat(range.distance));
-		if (!dist || dist <= 0) return null;
+		const dist = Math.abs(readDecimal(range.distance));
+		if (!isUsableRange(dist)) return null;
 		if (!isUsableZeroDistance(profile.zeroDist)) return null;
 
 		// --- Optic height ---
+		const opticHeight = readDecimal(profile.opticHeight);
+		if (!isUsableSightHeight(opticHeight, profile.opticHeightUnit)) return null;
 		const sightHeight =
-			profile.opticHeightUnit === 'cm'
-				? UNew.Centimeter(parseFloat(profile.opticHeight))
-				: UNew.Inch(parseFloat(profile.opticHeight));
-		// An empty height is NaN, which the engine never leaves its loop on.
-		if (!Number.isFinite(sightHeight.In(Unit.Inch))) return null;
+			profile.opticHeightUnit === 'cm' ? UNew.Centimeter(opticHeight) : UNew.Inch(opticHeight);
 
 		// --- Barrel twist (spin drift only) ---
 		let twist = UNew.Inch(0);
 		if (profile.spinDrift && profile.barrelTwist) {
 			twist =
 				profile.barrelTwistUnit === 'mm'
-					? UNew.Millimeter(parseFloat(profile.barrelTwist))
-					: UNew.Inch(parseFloat(profile.barrelTwist));
+					? UNew.Millimeter(readDecimal(profile.barrelTwist))
+					: UNew.Inch(readDecimal(profile.barrelTwist));
 		}
 
 		const weapon = new Weapon({ sightHeight, twist });
@@ -112,74 +135,49 @@ export function calculateShotPoint(profile, range, atmosphere, wind, options = {
 		// --- Bullet weight ---
 		const weight =
 			profile.bulletWeightUnit === 'g'
-				? UNew.Gram(parseFloat(profile.bulletWeight))
-				: UNew.Grain(parseFloat(profile.bulletWeight));
+				? UNew.Gram(readDecimal(profile.bulletWeight))
+				: UNew.Grain(readDecimal(profile.bulletWeight));
 
 		// --- Bullet diameter ---
 		const diameter =
 			profile.bulletDiameterUnit === 'mm'
-				? UNew.Millimeter(parseFloat(profile.bulletDiameter))
-				: UNew.Inch(parseFloat(profile.bulletDiameter));
+				? UNew.Millimeter(readDecimal(profile.bulletDiameter))
+				: UNew.Inch(readDecimal(profile.bulletDiameter));
 
 		// --- Bullet length (spin drift only) ---
 		let length = UNew.Inch(2);
 		if (profile.spinDrift && profile.bulletLength) {
 			length =
 				profile.bulletLengthUnit === 'mm'
-					? UNew.Millimeter(parseFloat(profile.bulletLength))
-					: UNew.Inch(parseFloat(profile.bulletLength));
+					? UNew.Millimeter(readDecimal(profile.bulletLength))
+					: UNew.Inch(readDecimal(profile.bulletLength));
 		}
 
 		// --- Drag model ---
-		const bc = parseFloat(profile.bc);
-		if (!bc || bc <= 0) return null;
+		const bc = readDecimal(profile.bc);
+		if (!isUsableBc(bc)) return null;
 		const dragTable = profile.bcType === 'G7' ? Table.G7 : Table.G1;
 		const dm = new DragModel({ bc, dragTable, weight, diameter, length });
 
 		// --- Muzzle velocity ---
 		const mv =
 			profile.velocityUnit === 'mps'
-				? UNew.MPS(parseFloat(profile.velocity))
-				: UNew.FPS(parseFloat(profile.velocity));
+				? UNew.MPS(readDecimal(profile.velocity))
+				: UNew.FPS(readDecimal(profile.velocity));
 
 		const ammo = new Ammo({ dm, mv, ...powderSensitivity(profile, mv) });
 
 		// --- Atmosphere ---
-		let atmo;
-		if (atmosphere) {
-			const altVal = parseFloat(atmosphere.altitude);
-			const pressVal = parseFloat(atmosphere.pressure);
-			const tempVal = parseFloat(atmosphere.temperature);
-			const humVal = parseFloat(atmosphere.humidity);
-
-			// All values must be finite; pressure must be positive; humidity 0–100
-			if (
-				!isFinite(altVal) ||
-				!isFinite(pressVal) || pressVal <= 0 ||
-				!isFinite(tempVal) ||
-				!isFinite(humVal) || humVal < 0 || humVal > 100
-			) return null;
-
-			const altitude =
-				atmosphere.altitudeUnit === 'm' ? UNew.Meter(altVal) : UNew.Foot(altVal);
-			const pressure =
-				atmosphere.pressureUnit === 'hpa' ? UNew.hPa(pressVal) : UNew.InHg(pressVal);
-			const temperature =
-				atmosphere.temperatureUnit === 'c' ? UNew.Celsius(tempVal) : UNew.Fahrenheit(tempVal);
-			atmo = new Atmo({ altitude, pressure, temperature, humidity: humidityFraction(humVal) });
-		} else {
-			atmo = new Atmo(); // ICAO standard atmosphere
-		}
+		const atmo = shotAtmosphere(atmosphere);
+		if (!atmo) return null;
 
 		// --- Wind ---
 		const winds = shotWinds(wind);
 		if (!winds) return null;
 
 		// --- Zero distance ---
-		const zeroDistance =
-			profile.zeroUnit === 'm'
-				? UNew.Meter(Math.abs(parseFloat(profile.zeroDist)))
-				: UNew.Yard(Math.abs(parseFloat(profile.zeroDist)));
+		const zeroValue = zeroDistanceValue(profile.zeroDist);
+		const zeroDistance = profile.zeroUnit === 'm' ? UNew.Meter(zeroValue) : UNew.Yard(zeroValue);
 
 		// --- Target range ---
 		const trajectoryRange =
@@ -283,92 +281,67 @@ const round2 = (v) => Math.round(v * 100) / 100;
  */
 export function calculateFullTrajectory(profile, range, atmosphere, wind) {
 	try {
-		const maxDist = Math.abs(parseFloat(range.distance));
-		const stepVal = Math.max(1, Math.abs(parseFloat(range.step)) || 25);
-		if (!maxDist || maxDist <= 0 || maxDist > 3000) return null;
+		const maxDist = Math.abs(readDecimal(range.distance));
+		const stepVal = Math.max(1, Math.abs(readDecimal(range.step)) || 25);
+		if (!isUsableRange(maxDist)) return null;
 		if (!isUsableZeroDistance(profile.zeroDist)) return null;
 
 		// --- Optic height ---
+		const opticHeight = readDecimal(profile.opticHeight);
+		if (!isUsableSightHeight(opticHeight, profile.opticHeightUnit)) return null;
 		const sightHeight =
-			profile.opticHeightUnit === 'cm'
-				? UNew.Centimeter(parseFloat(profile.opticHeight))
-				: UNew.Inch(parseFloat(profile.opticHeight));
-		// An empty height is NaN, which the engine never leaves its loop on.
-		if (!Number.isFinite(sightHeight.In(Unit.Inch))) return null;
+			profile.opticHeightUnit === 'cm' ? UNew.Centimeter(opticHeight) : UNew.Inch(opticHeight);
 
 		// --- Barrel twist ---
 		let twist = UNew.Inch(0);
 		if (profile.spinDrift && profile.barrelTwist) {
 			twist =
 				profile.barrelTwistUnit === 'mm'
-					? UNew.Millimeter(parseFloat(profile.barrelTwist))
-					: UNew.Inch(parseFloat(profile.barrelTwist));
+					? UNew.Millimeter(readDecimal(profile.barrelTwist))
+					: UNew.Inch(readDecimal(profile.barrelTwist));
 		}
 		const weapon = new Weapon({ sightHeight, twist });
 
 		// --- Bullet ---
 		const weight =
 			profile.bulletWeightUnit === 'g'
-				? UNew.Gram(parseFloat(profile.bulletWeight))
-				: UNew.Grain(parseFloat(profile.bulletWeight));
+				? UNew.Gram(readDecimal(profile.bulletWeight))
+				: UNew.Grain(readDecimal(profile.bulletWeight));
 		const diameter =
 			profile.bulletDiameterUnit === 'mm'
-				? UNew.Millimeter(parseFloat(profile.bulletDiameter))
-				: UNew.Inch(parseFloat(profile.bulletDiameter));
+				? UNew.Millimeter(readDecimal(profile.bulletDiameter))
+				: UNew.Inch(readDecimal(profile.bulletDiameter));
 		let length = UNew.Inch(2);
 		if (profile.spinDrift && profile.bulletLength) {
 			length =
 				profile.bulletLengthUnit === 'mm'
-					? UNew.Millimeter(parseFloat(profile.bulletLength))
-					: UNew.Inch(parseFloat(profile.bulletLength));
+					? UNew.Millimeter(readDecimal(profile.bulletLength))
+					: UNew.Inch(readDecimal(profile.bulletLength));
 		}
-		const bc = parseFloat(profile.bc);
-		if (!bc || bc <= 0) return null;
+		const bc = readDecimal(profile.bc);
+		if (!isUsableBc(bc)) return null;
 		const dragTable = profile.bcType === 'G7' ? Table.G7 : Table.G1;
 		const dm = new DragModel({ bc, dragTable, weight, diameter, length });
 
 		// --- Muzzle velocity ---
 		const mv =
 			profile.velocityUnit === 'mps'
-				? UNew.MPS(parseFloat(profile.velocity))
-				: UNew.FPS(parseFloat(profile.velocity));
+				? UNew.MPS(readDecimal(profile.velocity))
+				: UNew.FPS(readDecimal(profile.velocity));
 
 		const ammo = new Ammo({ dm, mv, ...powderSensitivity(profile, mv) });
 
 		// --- Atmosphere ---
-		let atmo;
-		if (atmosphere) {
-			const altVal = parseFloat(atmosphere.altitude);
-			const pressVal = parseFloat(atmosphere.pressure);
-			const tempVal = parseFloat(atmosphere.temperature);
-			const humVal = parseFloat(atmosphere.humidity);
-			if (
-				!isFinite(altVal) ||
-				!isFinite(pressVal) || pressVal <= 0 ||
-				!isFinite(tempVal) ||
-				!isFinite(humVal) || humVal < 0 || humVal > 100
-			)
-				return null;
-			const altitude =
-				atmosphere.altitudeUnit === 'm' ? UNew.Meter(altVal) : UNew.Foot(altVal);
-			const pressure =
-				atmosphere.pressureUnit === 'hpa' ? UNew.hPa(pressVal) : UNew.InHg(pressVal);
-			const temperature =
-				atmosphere.temperatureUnit === 'c' ? UNew.Celsius(tempVal) : UNew.Fahrenheit(tempVal);
-			atmo = new Atmo({ altitude, pressure, temperature, humidity: humidityFraction(humVal) });
-		} else {
-			atmo = new Atmo();
-		}
+		const atmo = shotAtmosphere(atmosphere);
+		if (!atmo) return null;
 
 		// --- Wind ---
 		const winds = shotWinds(wind);
 		if (!winds) return null;
 
 		// --- Zero distance ---
-		const zeroDistance =
-			profile.zeroUnit === 'm'
-				? UNew.Meter(Math.abs(parseFloat(profile.zeroDist)))
-				: UNew.Yard(Math.abs(parseFloat(profile.zeroDist)));
+		const zeroValue = zeroDistanceValue(profile.zeroDist);
+		const zeroDistance = profile.zeroUnit === 'm' ? UNew.Meter(zeroValue) : UNew.Yard(zeroValue);
 
 		// --- Range ---
 		const isMetric = range.unit === 'm';
@@ -480,14 +453,6 @@ const MPBR_MAX_ELEVATION = 0.5;
  */
 const MPBR_MAX_RANGE = 20000;
 
-/**
- * Limits of the inputs the MPBR search fires, the same as the validation solver's. Far outside
- * them an engine step overshoots and js-ballistics can stay in its loop for good: it does at a
- * BC of 0.00001 or 1e15 fps, while values on either side return. A hang cannot be caught.
- */
-const MPBR_MIN_BC = 0.01;
-const MPBR_MAX_VELOCITY_FPS = 10000;
-
 /** Fire a shot and return its rows, up to where the engine stopped it if it stopped early. */
 function flightRows(calc, shot, trajectoryRange, trajectoryStep, extraData = false) {
 	try {
@@ -558,7 +523,7 @@ function descentCrossing(rows, top, height) {
  */
 export function calculateMPBR(profile, targetSizeStr, targetUnit) {
 	try {
-		const targetSize = parseFloat(targetSizeStr);
+		const targetSize = readDecimal(targetSizeStr);
 		if (!targetSize || targetSize <= 0 || !profile) return null;
 
 		const useMetric = targetUnit === 'cm';
@@ -570,46 +535,44 @@ export function calculateMPBR(profile, targetSizeStr, targetUnit) {
 		const distUnitEnum = useMetric ? Unit.Meter : Unit.Yard;
 
 		// ── Build weapon (shared across all iterations) ──────────────────
+		const opticHeight = readDecimal(profile.opticHeight);
+		if (!isUsableSightHeight(opticHeight, profile.opticHeightUnit)) return null;
 		const sightHeight =
-			profile.opticHeightUnit === 'cm'
-				? UNew.Centimeter(parseFloat(profile.opticHeight))
-				: UNew.Inch(parseFloat(profile.opticHeight));
+			profile.opticHeightUnit === 'cm' ? UNew.Centimeter(opticHeight) : UNew.Inch(opticHeight);
 		let twist = UNew.Inch(0);
 		if (profile.spinDrift && profile.barrelTwist) {
 			twist =
 				profile.barrelTwistUnit === 'mm'
-					? UNew.Millimeter(parseFloat(profile.barrelTwist))
-					: UNew.Inch(parseFloat(profile.barrelTwist));
+					? UNew.Millimeter(readDecimal(profile.barrelTwist))
+					: UNew.Inch(readDecimal(profile.barrelTwist));
 		}
-		// An empty height is NaN, which the engine never leaves its loop on.
-		if (!Number.isFinite(sightHeight.In(Unit.Inch))) return null;
 		const weapon = new Weapon({ sightHeight, twist });
 
 		// ── Build ammo ───────────────────────────────────────────────────
 		const weight =
 			profile.bulletWeightUnit === 'g'
-				? UNew.Gram(parseFloat(profile.bulletWeight))
-				: UNew.Grain(parseFloat(profile.bulletWeight));
+				? UNew.Gram(readDecimal(profile.bulletWeight))
+				: UNew.Grain(readDecimal(profile.bulletWeight));
 		const diameter =
 			profile.bulletDiameterUnit === 'mm'
-				? UNew.Millimeter(parseFloat(profile.bulletDiameter))
-				: UNew.Inch(parseFloat(profile.bulletDiameter));
+				? UNew.Millimeter(readDecimal(profile.bulletDiameter))
+				: UNew.Inch(readDecimal(profile.bulletDiameter));
 		let length = UNew.Inch(2);
 		if (profile.spinDrift && profile.bulletLength) {
 			length =
 				profile.bulletLengthUnit === 'mm'
-					? UNew.Millimeter(parseFloat(profile.bulletLength))
-					: UNew.Inch(parseFloat(profile.bulletLength));
+					? UNew.Millimeter(readDecimal(profile.bulletLength))
+					: UNew.Inch(readDecimal(profile.bulletLength));
 		}
-		const bc = parseFloat(profile.bc);
-		if (!(bc >= MPBR_MIN_BC)) return null;
+		const bc = readDecimal(profile.bc);
+		if (!isUsableBc(bc)) return null;
 		const dragTable = profile.bcType === 'G7' ? Table.G7 : Table.G1;
 		const dm = new DragModel({ bc, dragTable, weight, diameter, length });
 
 		const mv =
 			profile.velocityUnit === 'mps'
-				? UNew.MPS(parseFloat(profile.velocity))
-				: UNew.FPS(parseFloat(profile.velocity));
+				? UNew.MPS(readDecimal(profile.velocity))
+				: UNew.FPS(readDecimal(profile.velocity));
 		const ammo = new Ammo({ dm, mv });
 
 		// ── Standard atmosphere (ISA) ────────────────────────────────────
@@ -617,7 +580,6 @@ export function calculateMPBR(profile, targetSizeStr, targetUnit) {
 
 		if (!hasFlyableVelocity(ammo, atmo)) return null;
 		const muzzleFps = ammo.getVelocityForTemp(atmo.powderTemp).In(Unit.FPS);
-		if (muzzleFps >= MPBR_MAX_VELOCITY_FPS) return null;
 
 		const toDistance = useMetric ? UNew.Meter : UNew.Yard;
 		const oneUnit = toDistance(1);
@@ -667,15 +629,16 @@ export function calculateMPBR(profile, targetSizeStr, targetUnit) {
 			if (!hasFiniteElevation(shot)) return null;
 			return heightRows(flightRows(calc, shot, longestFlight, oneUnit));
 		};
-		// A zero of 0 would hang the solver.
-		if (optimalZero < 1) return null;
+		// A zero of 0 would hang the solver. A zero above MAX_ZERO_DISTANCE is still returned: the
+		// page does not offer to save it, since every other calculation would reject it.
+		if (optimalZero < MIN_ZERO_DISTANCE) return null;
 		let rows = zeroedRows(optimalZero);
 		if (!rows) return null;
 		// The solver zeroes on its first step past the distance, about 0.1 yd further out, so a far
 		// crossing just over a whole unit can put the apex over the top: take the unit below.
 		if (rows[apexIndex(rows)].y > halfTargetMM) {
 			optimalZero -= 1;
-			if (optimalZero < 1) return null;
+			if (optimalZero < MIN_ZERO_DISTANCE) return null;
 			rows = zeroedRows(optimalZero);
 			if (!rows) return null;
 		}

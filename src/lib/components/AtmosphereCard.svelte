@@ -1,7 +1,37 @@
 <script>
 	import { m } from '#lib/paraglide/messages.js';
+	import { readDecimal } from '#lib/utils/decimal.js';
+	import { formatLimit } from '#lib/utils/format.js';
+	import { HUMIDITY_LIMITS, pressureLimits, temperatureLimits } from '#lib/utils/inputLimits.js';
 
 	let { atmosphere, onchange } = $props();
+
+	/**
+	 * The range message of a box whose value the calculators reject (isUsableAtmosphere), or ''.
+	 * The box is read as the calculators read it, with a comma as a decimal point.
+	 */
+	function rangeError(value, limits, unit) {
+		const number = readDecimal(value);
+		if (number >= limits.min && number <= limits.max) return '';
+		return m.validation_range({ min: formatLimit(limits.min), max: formatLimit(limits.max), unit });
+	}
+
+	let altitudeError = $derived(Number.isFinite(readDecimal(atmosphere.altitude)) ? '' : m.validation_required());
+	let pressureError = $derived(
+		rangeError(
+			atmosphere.pressure,
+			pressureLimits(atmosphere.pressureUnit),
+			atmosphere.pressureUnit === 'hpa' ? m.unit_hpa() : m.unit_inhg()
+		)
+	);
+	let temperatureError = $derived(
+		rangeError(
+			atmosphere.temperature,
+			temperatureLimits(atmosphere.temperatureUnit),
+			atmosphere.temperatureUnit === 'c' ? m.unit_c() : m.unit_f()
+		)
+	);
+	let humidityError = $derived(rangeError(atmosphere.humidity, HUMIDITY_LIMITS, '%'));
 </script>
 
 <div class="card preset-filled-surface-100-900">
@@ -39,6 +69,9 @@
 						{/each}
 					</div>
 				</div>
+				{#if altitudeError}
+					<p class="text-xs text-error-500">{altitudeError}</p>
+				{/if}
 			</div>
 
 			<!-- Pressure -->
@@ -62,6 +95,9 @@
 						{/each}
 					</div>
 				</div>
+				{#if pressureError}
+					<p class="text-xs text-error-500">{pressureError}</p>
+				{/if}
 			</div>
 
 			<!-- Temperature -->
@@ -85,6 +121,9 @@
 						{/each}
 					</div>
 				</div>
+				{#if temperatureError}
+					<p class="text-xs text-error-500">{temperatureError}</p>
+				{/if}
 			</div>
 
 			<!-- Humidity -->
@@ -100,6 +139,9 @@
 					/>
 					<span class="text-sm text-surface-600-400 shrink-0">%</span>
 				</div>
+				{#if humidityError}
+					<p class="text-xs text-error-500">{humidityError}</p>
+				{/if}
 			</div>
 		{:else}
 			<!-- ICAO standard values -->

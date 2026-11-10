@@ -7,6 +7,9 @@
 	import { trajectoryValidation } from '#lib/stores/trajectoryValidation.svelte.js';
 	import { calculateTrajectoryValidation } from '#lib/utils/trajectoryValidation.js';
 	import { calculateFullTrajectory } from '#lib/utils/ballisticCalculator.js';
+	import { readDecimal } from '#lib/utils/decimal.js';
+	import { formatLimit } from '#lib/utils/format.js';
+	import { MAX_DISTANCE } from '#lib/utils/inputLimits.js';
 	import { Unit } from 'js-ballistics';
 	import { CheckCircle } from '@lucide/svelte';
 	import AtmosphereCard from '#lib/components/AtmosphereCard.svelte';
@@ -81,8 +84,8 @@
 		const profile = activeProfile.profile;
 		if (!profile) return null;
 
-		const rangeDist = parseFloat(trajectoryValidation.range.distance);
-		if (!isFinite(rangeDist) || rangeDist < 100) return null;
+		const rangeDist = readDecimal(trajectoryValidation.range.distance);
+		if (!isFinite(rangeDist) || rangeDist < 100 || rangeDist > MAX_DISTANCE) return null;
 
 		const step = 1;
 		const chartRange = { distance: rangeDist, unit: trajectoryValidation.range.unit, step };
@@ -235,7 +238,7 @@
 		const data = chartData;
 		if (!ac || !el || !data) return;
 
-		const rangeVal = parseFloat(trajectoryValidation.range.distance) || 100;
+		const rangeVal = readDecimal(trajectoryValidation.range.distance) || 100;
 		const opts = buildChartOptions(
 			data,
 			settings.darkMode,
@@ -326,8 +329,10 @@
 							{/each}
 						</div>
 					</div>
-					{#if parseFloat(trajectoryValidation.range.distance) > 0 && parseFloat(trajectoryValidation.range.distance) < 100}
+					{#if readDecimal(trajectoryValidation.range.distance) > 0 && readDecimal(trajectoryValidation.range.distance) < 100}
 						<p class="text-xs text-error-500">{m.traj_val_range_min_error()}</p>
+					{:else if readDecimal(trajectoryValidation.range.distance) > MAX_DISTANCE}
+						<p class="text-xs text-error-500">{m.validation_range({ min: formatLimit(100), max: formatLimit(MAX_DISTANCE), unit: distLabel })}</p>
 					{:else}
 						<p class="text-xs text-surface-600-400">{m.traj_val_range_hint()}</p>
 					{/if}

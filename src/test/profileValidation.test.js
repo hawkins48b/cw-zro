@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
 	validateProfile,
 	isValid,
-	buildAmmoString
+	buildAmmoString,
+	profileFieldLimits,
+	normalizedNumbers
 } from '#lib/utils/profileValidation.js';
 
 // A fully valid form (all visible fields populated, no toggles)
@@ -217,6 +219,198 @@ describe('validateProfile — click adjustment fields', () => {
 	it('passes windage validation when unlinked and valid', () => {
 		const e = validateProfile({ ...validForm, clickLink: false, windageClickValue: '0.25' }, false, false);
 		expect(e.windageClickValue).toBeUndefined();
+	});
+});
+
+// ── Plain finite decimals only (#89) and the decimal comma (#117) ─────────
+
+describe('validateProfile — numbers that are not plain decimals (#89)', () => {
+	const POSITIVE_FIELDS = [
+		'opticHeight',
+		'zeroDist',
+		'bulletDiameter',
+		'bulletWeight',
+		'bc',
+		'velocity',
+		'elevationClickValue'
+	];
+	const NOT_PLAIN = [
+		['Infinity', 'Infinity'],
+		['an overflow', '1e999'],
+		['hex', '0x10'],
+		['binary', '0b1'],
+		['trailing text', '100abc'],
+		['two separators', '1,500,000']
+	];
+
+	for (const field of POSITIVE_FIELDS) {
+		it.each(NOT_PLAIN)(`flags %s in ${field} as invalid_number`, (_, value) => {
+			const e = validateProfile({ ...validForm, [field]: value }, false, false);
+			expect(e[field]).toBe('invalid_number');
+		});
+	}
+
+	it.each(NOT_PLAIN)('flags %s in the unlinked windage click value', (_, value) => {
+		const e = validateProfile({ ...validForm, clickLink: false, windageClickValue: value }, false, false);
+		expect(e.windageClickValue).toBe('invalid_number');
+	});
+
+	it.each(NOT_PLAIN)('flags %s in the spin drift fields', (_, value) => {
+		const e = validateProfile({ ...validForm, barrelTwist: value, bulletLength: value }, true, false);
+		expect(e.barrelTwist).toBe('invalid_number');
+		expect(e.bulletLength).toBe('invalid_number');
+	});
+
+	it.each([...NOT_PLAIN, ['-Infinity', '-Infinity']])(
+		'flags %s in the temperature sensitivity fields',
+		(_, value) => {
+			const e = validateProfile({ ...validForm, temperature: value, tempModifier: value }, false, true);
+			expect(e.temperature).toBe('invalid_number');
+			expect(e.tempModifier).toBe('invalid_number');
+		}
+	);
+
+	// Security review of this change: String(['1', '2']) is '1,2', which would pass as 1.2 while the
+	// calculators read 1.
+	it.each([
+		['an array of two numbers', ['1', '2']],
+		['an array holding a number', [2650]],
+		['an object', {}],
+		['an object that cannot become text', { toString: 1 }],
+		['true', true],
+		['false', false]
+	])('flags a stored %s as invalid_number', (_, value) => {
+		for (const field of POSITIVE_FIELDS) {
+			expect(validateProfile({ ...validForm, [field]: value }, false, false)[field]).toBe('invalid_number');
+		}
+		const e = validateProfile({ ...validForm, temperature: value, tempModifier: value }, false, true);
+		expect(e.temperature).toBe('invalid_number');
+		expect(e.tempModifier).toBe('invalid_number');
+	});
+
+	it.each([[NaN], [Infinity], [-Infinity]])('flags a stored number %s as invalid_number', (value) => {
+		expect(validateProfile({ ...validForm, velocity: value }, false, false).velocity).toBe('invalid_number');
+	});
+
+	it('reads a stored number in a field without throwing', () => {
+		const e = validateProfile({ ...validForm, elevationClickValue: 0.25, zeroDist: 100 }, false, false);
+		expect(isValid(e)).toBe(true);
+	});
+});
+
+describe('validateProfile — decimal comma (#117)', () => {
+	it('accepts a comma in every numeric field', () => {
+		const form = {
+			...validForm,
+			opticHeight: '1,5',
+			zeroDist: '100,5',
+			bulletDiameter: '0,308',
+			bulletWeight: '168,5',
+			bc: '0,475',
+			velocity: '2650,5',
+			elevationClickValue: '0,25',
+			clickLink: false,
+			windageClickValue: '0,1',
+			barrelTwist: '10,5',
+			bulletLength: '1,225',
+			temperature: '-5,5',
+			tempModifier: '1,5'
+		};
+		expect(validateProfile(form, true, true)).toEqual({});
+	});
+
+	it('stores a comma as a decimal point', () => {
+		expect(
+			normalizedNumbers({ ...validForm, opticHeight: ' 1,5 ', bc: '0,475', velocity: '2650', temperature: '-5,5' })
+		).toMatchObject({ opticHeight: '1.5', bc: '0.475', velocity: '2650', temperature: '-5.5' });
+	});
+
+	it('leaves text fields and unit fields alone', () => {
+		const result = normalizedNumbers({ ...validForm, name: 'Rifle, 1,5', opticHeightUnit: 'in' });
+		expect(result).not.toHaveProperty('name');
+		expect(result).not.toHaveProperty('opticHeightUnit');
+	});
+});
+
+// ── Limits shared with the calculators (#90, #92, #93, #114, #119) ─────────
+
+describe('validateProfile — limits', () => {
+	const errorFor = (change, key) => validateProfile({ ...validForm, ...change }, false, false)[key];
+
+	it.each([
+		['10 in', { opticHeight: '10' }],
+		['25.4 cm', { opticHeight: '25.4', opticHeightUnit: 'cm' }],
+		['25,4 cm', { opticHeight: '25,4', opticHeightUnit: 'cm' }]
+	])('accepts a sight height of %s', (_, change) => {
+		expect(errorFor(change, 'opticHeight')).toBeUndefined();
+	});
+
+	it.each([
+		['10.01 in', { opticHeight: '10.01' }],
+		['25.41 cm', { opticHeight: '25.41', opticHeightUnit: 'cm' }],
+		['11 in', { opticHeight: '11', opticHeightUnit: 'in' }]
+	])('rejects a sight height of %s', (_, change) => {
+		expect(errorFor(change, 'opticHeight')).toBe('out_of_range');
+	});
+
+	it.each([['1'], ['3000'], ['1,5'], ['100']])('accepts a zero distance of %s', (zeroDist) => {
+		expect(errorFor({ zeroDist }, 'zeroDist')).toBeUndefined();
+		expect(errorFor({ zeroDist, zeroUnit: 'm' }, 'zeroDist')).toBeUndefined();
+	});
+
+	it.each([['0.99'], ['0.2'], ['0.001'], ['3000.01'], ['3500']])('rejects a zero distance of %s', (zeroDist) => {
+		expect(errorFor({ zeroDist }, 'zeroDist')).toBe('out_of_range');
+		expect(errorFor({ zeroDist, zeroUnit: 'm' }, 'zeroDist')).toBe('out_of_range');
+	});
+
+	it.each([['0.01'], ['0,01'], ['2.5']])('accepts a BC of %s', (bc) => {
+		expect(errorFor({ bc }, 'bc')).toBeUndefined();
+	});
+
+	it.each([['0.0099'], ['0.001'], ['1e-9']])('rejects a BC of %s', (bc) => {
+		expect(errorFor({ bc }, 'bc')).toBe('out_of_range');
+	});
+
+	it.each([
+		['50 fps', '50', 'fps'],
+		['9999.99 fps', '9999.99', 'fps'],
+		['15.24 m/s', '15.24', 'mps'],
+		['3047.99 m/s', '3047.99', 'mps']
+	])('accepts a velocity of %s', (_, velocity, velocityUnit) => {
+		expect(errorFor({ velocity, velocityUnit }, 'velocity')).toBeUndefined();
+	});
+
+	it.each([
+		['49.99 fps', '49.99', 'fps'],
+		['10000 fps', '10000', 'fps'],
+		['1e15 fps', '1e15', 'fps'],
+		['15.23 m/s', '15.23', 'mps'],
+		['3048 m/s', '3048', 'mps']
+	])('rejects a velocity of %s', (_, velocity, velocityUnit) => {
+		expect(errorFor({ velocity, velocityUnit }, 'velocity')).toBe('out_of_range');
+	});
+
+	it('keeps invalid_number for a value that is not positive', () => {
+		expect(errorFor({ zeroDist: '0' }, 'zeroDist')).toBe('invalid_number');
+		expect(errorFor({ opticHeight: '-1' }, 'opticHeight')).toBe('invalid_number');
+	});
+});
+
+describe('profileFieldLimits', () => {
+	it.each([
+		['opticHeight', { opticHeightUnit: 'in' }, { kind: 'above_zero_max', max: 10, unit: 'in' }],
+		['opticHeight', { opticHeightUnit: 'cm' }, { kind: 'above_zero_max', max: 25.4, unit: 'cm' }],
+		['zeroDist', { zeroUnit: 'yd' }, { kind: 'range', min: 1, max: 3000, unit: 'yd' }],
+		['zeroDist', { zeroUnit: 'm' }, { kind: 'range', min: 1, max: 3000, unit: 'm' }],
+		['bc', {}, { kind: 'min', min: 0.01 }],
+		['velocity', { velocityUnit: 'fps' }, { kind: 'min_below_max', min: 50, max: 10000, unit: 'fps' }],
+		['velocity', { velocityUnit: 'mps' }, { kind: 'min_below_max', min: 15.24, max: 3048, unit: 'mps' }]
+	])('states the limits of %s with %j', (key, units, expected) => {
+		expect(profileFieldLimits(key, { ...validForm, ...units })).toEqual(expected);
+	});
+
+	it('has none for a field that only has to be positive', () => {
+		expect(profileFieldLimits('bulletWeight', validForm)).toBeNull();
 	});
 });
 

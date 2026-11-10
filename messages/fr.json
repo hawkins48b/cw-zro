@@ -197,6 +197,10 @@
 
 	"validation_required": "Obligatoire",
 	"validation_positive_number": "Doit être un nombre positif",
+	"validation_range": "Saisissez un nombre de {min} à {max} {unit}",
+	"validation_range_above_zero": "Saisissez un nombre supérieur à 0 et jusqu'à {max} {unit}",
+	"validation_min": "Saisissez un nombre d'au moins {min}",
+	"validation_range_below_max": "Saisissez un nombre de {min} à moins de {max} {unit}",
 
 	"settings_dark_mode": "Mode sombre",
 	"settings_language": "Langue",
@@ -286,6 +290,7 @@
 	"mpbr_about_beyond": "Au-delà du MPBR maximum, la balle sort par le bas de la zone cible. Une compensation en élévation est nécessaire.",
 	"mpbr_about_ideal": "Idéal pour les points rouges et les hausses simples, où les tirs rapides ne laissent pas le temps d'ajuster l'élévation.",
 	"mpbr_save_zero": "Définir le MPBR pour le profil actif",
+	"mpbr_zero_out_of_range": "Ce zéro dépasse {max}, le zéro le plus long accepté par les autres calculateurs : il ne peut pas être enregistré dans le profil.",
 
 	"traj_val_title": "Validation de trajectoire",
 	"traj_val_range": "Distance d'observation",
@@ -327,7 +332,8 @@
 	"compare_select_profile": "Sélectionner un profil",
 	"compare_zero_override": "Distance de mise à zéro",
 	"compare_zero_hint": "Remplacer la distance de zéro pour cette entrée",
-	"compare_zero_invalid": "Saisissez une distance de zéro supérieure à 0",
+	"compare_zero_invalid": "Saisissez une distance de zéro de {min} à {max}",
+	"compare_zero_no_result": "Aucune trajectoire avec cette distance de zéro — vérifiez le zéro et le profil.",
 	"compare_remove": "Supprimer la trajectoire",
 	"compare_no_profiles": "Aucun profil disponible. Créez d'abord un profil.",
 	"compare_no_entries": "Ajoutez des profils pour comparer leurs trajectoires.",

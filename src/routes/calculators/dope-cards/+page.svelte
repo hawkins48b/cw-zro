@@ -2,26 +2,28 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { activeProfile } from '#lib/stores/activeProfile.svelte.js';
 	import { ChevronDown, ChevronRight, Download, Loader } from '@lucide/svelte';
+	import { downloadDopeCard } from '#lib/utils/dopeCardDownload.js';
 
 	// ── Download state ────────────────────────────────────────────────
 	let loading = $state({ imperial: false, metric: false });
+	// A card the profile gives no data for is not saved: the page says so instead (#91).
+	let noResult = $state(false);
 
 	async function download(type) {
 		const profile = activeProfile.profile;
 		if (!profile || loading[type]) return;
 		loading[type] = true;
+		noResult = false;
 		try {
-			if (type === 'imperial') {
-				const { generateImperialDopeCard } = await import('#lib/utils/dopeCardImperial.js');
-				const pdfDoc = await generateImperialDopeCard(profile);
-				await savePDF(pdfDoc, 'mid-range-dope-card-imperial.pdf');
-			} else {
-				const { generateMetricDopeCard } = await import('#lib/utils/dopeCardMetric.js');
-				const pdfDoc = await generateMetricDopeCard(profile);
-				await savePDF(pdfDoc, 'mid-range-dope-card-metric.pdf');
-			}
-		} catch (e) {
-			console.error('Dope card generation failed:', e);
+			// Loaded on demand, inside downloadDopeCard so that a failed load shows the message too.
+			const generate = async (p) =>
+				type === 'imperial'
+					? (await import('#lib/utils/dopeCardImperial.js')).generateImperialDopeCard(p)
+					: (await import('#lib/utils/dopeCardMetric.js')).generateMetricDopeCard(p);
+			const saved = await downloadDopeCard(generate, profile, (pdfDoc) =>
+				savePDF(pdfDoc, `mid-range-dope-card-${type}.pdf`)
+			);
+			noResult = !saved;
 		} finally {
 			loading[type] = false;
 		}
@@ -103,6 +105,10 @@
 							{m.dope_metric()}
 						</button>
 					</div>
+
+					{#if noResult}
+						<p class="text-sm text-warning-800-200" role="alert">{m.dope_no_result()}</p>
+					{/if}
 				</div>
 			{/if}
 		</div>

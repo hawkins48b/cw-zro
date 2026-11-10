@@ -1,5 +1,6 @@
 import { UNew, Unit, Wind } from 'js-ballistics';
 import { isNumberOrText } from './storedWind.js';
+import { readDecimal } from './decimal.js';
 
 /**
  * Fastest wind the engine is given, in m/s: about 224 mph (owner decision on #116).
@@ -42,7 +43,9 @@ const MAX_WIND_DIRECTION_DEGREES = 1e6;
  * value. Only a number or a string is read at all: parseFloat alone would read the array [90] as 90,
  * and throw on an object that cannot become text. A stored speed of any other shape gives no result
  * rather than no wind, because the page can still show it as a speed (owner decision on #116). Text is read as parseFloat reads it, as the dial
- * does, so '90abc' stays 90.
+ * does, so '90abc' stays 90, except that a comma reads as a decimal point: '1,5' is 1.5, not 1
+ * (readDecimal, owner decision on #117). WindInput reads the box with the same function, so the
+ * dial, the badge and the result agree.
  *
  * @param {object|null} [wind] - { speed, speedUnit: 'mph'|'mps', direction }
  * @returns {Wind[]|null} the winds of the shot, or null when no shot can be calculated
@@ -50,7 +53,7 @@ const MAX_WIND_DIRECTION_DEGREES = 1e6;
 export function shotWinds(wind) {
 	if (!wind || wind.speed === null || wind.speed === undefined) return [];
 	if (!isNumberOrText(wind.speed)) return null;
-	const speed = parseFloat(wind.speed);
+	const speed = readDecimal(wind.speed);
 	if (!(speed > 0)) return [];
 
 	const velocity = wind.speedUnit === 'mps' ? UNew.MPS(speed) : UNew.MPH(speed);
@@ -59,7 +62,7 @@ export function shotWinds(wind) {
 	const { direction } = wind;
 	if (!isNumberOrText(direction)) return null;
 	const isEmpty = typeof direction === 'string' && direction.trim() === '';
-	const degrees = isEmpty ? 0 : parseFloat(direction);
+	const degrees = isEmpty ? 0 : readDecimal(direction);
 	if (!(Math.abs(degrees) <= MAX_WIND_DIRECTION_DEGREES)) return null;
 
 	return [new Wind({ velocity, directionFrom: UNew.Degree(degrees) })];

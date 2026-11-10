@@ -246,14 +246,22 @@ describe('zero crossings on the card', () => {
 		expect(zeros()).toEqual(expected);
 	});
 
-	it.each(CARDS)('leaves far zero blank past the search range, %s', async (_, generate) => {
-		await generate({ ...P308_G1, zeroDist: 3500 });
+	// Owner approval of 2026-11-10 (#93): zero distance is limited to 3000, so this test moved from
+	// a 3500 zero to a 3000 yd zero on the imperial card, and the metric case to the null test below.
+	it('leaves far zero blank past the search range, imperial', async () => {
+		await generateImperialDopeCard({ ...P308_G1, zeroDist: 3000 });
 		const { header } = printed();
 		// Without far zero, the slot after BC holds the 100 unit impact.
 		expect(card.labels).toHaveLength(42);
 		expect(parseFloat(header[2])).toBeLessThan(1);
 		expect(header[5]).toBe('0.462 G1');
 		expect(header[6]).toMatch(/^\+/);
+	});
+
+	// Owner approval of 2026-11-10 (#93): a zero past 3000 gives no card instead of a blank far zero.
+	it('gives no card for a 3500 m zero, metric', async () => {
+		expect(await generateMetricDopeCard({ ...P308_G1, zeroDist: 3500, zeroUnit: 'm' })).toBeNull();
+		expect(card.labels).toEqual([]);
 	});
 
 	it.each([

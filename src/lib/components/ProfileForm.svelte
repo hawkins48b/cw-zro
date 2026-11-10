@@ -14,7 +14,15 @@
 	import { untrack } from 'svelte';
 	import { ToggleLeft, ToggleRight, Search, Link, Link2Off } from '@lucide/svelte';
 	import UnitField from '#lib/components/UnitField.svelte';
-	import { validateProfile, isValid, buildAmmoString } from '#lib/utils/profileValidation.js';
+	import {
+		validateProfile,
+		isValid,
+		buildAmmoString,
+		profileFieldLimits,
+		normalizedNumbers
+	} from '#lib/utils/profileValidation.js';
+	import { parseDecimal } from '#lib/utils/decimal.js';
+	import { formatLimit } from '#lib/utils/format.js';
 	import { ammoSelection } from '#lib/stores/ammoSelection.svelte.js';
 	import { formDraft } from '#lib/stores/formDraft.svelte.js';
 
@@ -129,11 +137,39 @@
 	let errors = $state({});
 	let submitted = $state(false);
 
+	const UNIT_LABELS = {
+		in: () => m.unit_in(),
+		cm: () => m.unit_cm(),
+		yd: () => m.unit_yd(),
+		m: () => m.unit_m(),
+		fps: () => m.unit_fps(),
+		mps: () => m.unit_mps()
+	};
+
+	/** The message for a value outside a field's limits, in the unit chosen now. */
+	function rangeError(key) {
+		const limits = profileFieldLimits(key, form);
+		if (!limits) return m.validation_positive_number();
+		const min = limits.min !== undefined ? formatLimit(limits.min) : '';
+		const max = limits.max !== undefined ? formatLimit(limits.max) : '';
+		const unit = limits.unit ? UNIT_LABELS[limits.unit]() : '';
+		switch (limits.kind) {
+			case 'above_zero_max':
+				return m.validation_range_above_zero({ max, unit });
+			case 'range':
+				return m.validation_range({ min, max, unit });
+			case 'min':
+				return m.validation_min({ min });
+			default:
+				return m.validation_range_below_max({ min, max, unit });
+		}
+	}
+
 	function fieldError(key) {
 		if (!submitted || !errors[key]) return '';
-		return errors[key] === 'required'
-			? m.validation_required()
-			: m.validation_positive_number();
+		if (errors[key] === 'required') return m.validation_required();
+		if (errors[key] === 'out_of_range') return rangeError(key);
+		return m.validation_positive_number();
 	}
 
 	function save() {
@@ -144,9 +180,11 @@
 			return;
 		}
 		errors = {};
+		// A comma is stored as a decimal point (#117): Number('1,5') would be NaN.
 		const data = {
 			...form,
-			zeroDist: Number(form.zeroDist) || 0,
+			...normalizedNumbers(form),
+			zeroDist: parseDecimal(form.zeroDist) ?? 0,
 			spinDrift,
 			tempSensitivity,
 			ammo: buildAmmoString(form.bulletBrand, form.bulletWeight, form.bulletWeightUnit),

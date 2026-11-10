@@ -1,11 +1,13 @@
 <script>
 	import { m } from '#lib/paraglide/messages.js';
 	import { Wind } from '@lucide/svelte';
+	import { readDecimal } from '#lib/utils/decimal.js';
 
 	let { speed, speedUnit, direction, onchange } = $props();
 
-	// Direction is always in degrees (0–360, 0 = 12 o'clock / downrange, clockwise)
-	let dirDeg = $derived(((parseFloat(direction) || 0) % 360 + 360) % 360);
+	// Direction is always in degrees (0–360, 0 = 12 o'clock / downrange, clockwise). Boxes are read
+	// as shotWinds reads them, with a comma as a decimal point, so the dial matches the result.
+	let dirDeg = $derived(((readDecimal(direction) || 0) % 360 + 360) % 360);
 
 	let dialEl = $state(null);
 	let dragging = $state(false);
@@ -37,7 +39,7 @@
 	}
 
 	function onKeyDown(e) {
-		const current = parseFloat(direction) || 0;
+		const current = readDecimal(direction) || 0;
 		let next;
 		if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
 			next = (current + 5) % 360;
@@ -60,7 +62,7 @@
 	let activePreset = $derived(
 		WIND_PRESETS.find((p) => {
 			const target = speedUnit === 'mph' ? p.mph : p.mps;
-			return Math.abs((parseFloat(speed) || 0) - target) < 0.01;
+			return Math.abs((readDecimal(speed) || 0) - target) < 0.01;
 		}) ?? null
 	);
 
@@ -97,7 +99,7 @@
 			role="slider"
 			tabindex="0"
 			aria-label={m.scope_view_wind_dir()}
-			aria-valuenow={parseFloat(direction) || 0}
+			aria-valuenow={readDecimal(direction) || 0}
 			aria-valuemin="0"
 			aria-valuemax="360"
 			onpointerdown={onPointerDown}

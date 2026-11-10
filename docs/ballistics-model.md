@@ -42,6 +42,10 @@ Everything comes from a profile or from the screen. Values are stored as entered
 
 Weight and diameter do not change the drag. The BC alone carries that.
 
+**Typed numbers.** A comma reads as a decimal point, so `1,5` is 1.5 ([#117](https://github.com/hawkins48b/cw-zro/issues/117)). There is no thousands separator: `1,500` is 1.5, not 1500. The profile form accepts only plain finite decimals (`parseDecimal` in [`decimal.js`](../src/lib/utils/decimal.js)) and saves them with a decimal point. The calculators and the boxes on the calculator pages read values as `parseFloat` does, with the first comma read as a decimal point (`readDecimal`), so a value without a comma gives the same result as before, and `90abc` still reads as 90.
+
+**Limits.** Each input with a limit is listed under [Input guards](#input-guards). They are the same in the profile form and on every calculation path ([`inputLimits.js`](../src/lib/utils/inputLimits.js)).
+
 ### Which screen uses what
 
 | Screen | Function | Atmosphere | Wind | Powder sensitivity | Spin drift |
@@ -67,7 +71,7 @@ A single BC scales the standard G1 or G7 drag table from the library. Any `bcTyp
 
 **Standard.** With "use ISA" on, the app calls `new Atmo()`: sea level, 15 °C (59 °F), 1013.25 hPa, 0 % humidity.
 
-**Custom.** The four values are passed as entered. A value that is not finite, a pressure of 0 or less, or a humidity outside 0 to 100 gives no result.
+**Custom.** The four values are passed as entered. A temperature outside -90 to 70 °C (-130 to 158 °F), a pressure outside 300 to 1200 hPa (8.86 to 35.4 inHg), a humidity outside 0 to 100, or an altitude that is not finite gives no result, and the box shows the allowed range ([#92](https://github.com/hawkins48b/cw-zro/issues/92)). The limits are in the unit entered.
 
 **Enter the pressure measured at the shooting site.** Density comes from pressure, temperature and humidity. Altitude does not enter it. Changing only the altitude from 0 to 10000 ft left drop and velocity identical on the hot altitude test atmosphere, while changing the pressure from 24.9 to 29.92 inHg moved drop at 1000 yd by 49 in. A sea-level corrected pressure, as in weather reports, gives the wrong density at altitude. The field does not say this on screen.
 
@@ -98,6 +102,8 @@ One wind applies for the whole flight, with no vertical part. Direction is in de
 On the wind dial, 0° is at the top, towards the target, and the arrowhead sits at the entered angle. So the arrowhead shows where the wind is going, not where it comes from. Entering the clock position the wind comes from gives the opposite of the table above.
 
 An empty direction box counts as 0°, a tailwind, as its placeholder and the dial show ([#116](https://github.com/hawkins48b/cw-zro/issues/116)). So clearing the box with a wind speed above 0 gives a result for a wind the user did not enter.
+
+A comma in the speed or direction box reads as a decimal point: `1,5` is 1.5, in the result, on the dial and in the badge ([#117](https://github.com/hawkins48b/cw-zro/issues/117)).
 
 ## Spin drift
 
@@ -175,39 +181,53 @@ Limits:
 
 The library runs synchronously. **Far outside normal values it can stay in its loop for good, and neither `try/catch` nor a timeout can stop that.** So guards have to run before the engine is called. These are the guards in place.
 
+The limits were set by the owner on 2026-11-10 ([#89](https://github.com/hawkins48b/cw-zro/issues/89), [#90](https://github.com/hawkins48b/cw-zro/issues/90), [#91](https://github.com/hawkins48b/cw-zro/issues/91), [#92](https://github.com/hawkins48b/cw-zro/issues/92), [#93](https://github.com/hawkins48b/cw-zro/issues/93), [#114](https://github.com/hawkins48b/cw-zro/issues/114), [#119](https://github.com/hawkins48b/cw-zro/issues/119)). They live in [`inputLimits.js`](../src/lib/utils/inputLimits.js) and [`zeroDistance.js`](../src/lib/utils/zeroDistance.js), and the form and every path read them from there. Measured on f40933f before the change, 3888 worst-case combinations inside them (G1 and G7, BC 0.01 to 2, 60 to 9999 fps, sight height -10 to 10 in, zero 1 to 3000, both ends of temperature and pressure, no wind and 223 mph at 0° and 90°) gave no hang through `calculateShotPoint` and `calculateFullTrajectory`. The slowest took 2.2 s, on a 3000 zero. The dope cards, MPBR and validation were not part of that run.
+
+| Limit | Value, in the unit entered |
+|-------|----------------------------|
+| BC | At least 0.01 (`MIN_BC`) |
+| Muzzle velocity | At least 50 fps, under 10000 fps, also when entered in m/s (15.24 to under 3048 m/s) |
+| Sight height | At most 10 in or 25.4 cm either way |
+| Range | Above 0, at most 3000 yd or m |
+| Zero distance | 1 to 3000 yd or m, after taking its absolute value |
+| Air temperature, custom | -90 to 70 °C, or -130 to 158 °F |
+| Air pressure, custom | 300 to 1200 hPa, or 8.86 to 35.4 inHg |
+| Humidity, custom | 0 to 100 % |
+
 | Where | Rule | Otherwise |
 |-------|------|-----------|
-| Profile form | Optic height, zero, diameter, weight, BC, velocity and click values must be positive numbers | Form error |
+| Profile form | Optic height, zero, diameter, weight, BC, velocity and click values must be plain finite decimals above 0. `Infinity`, `1e999`, hex and text after the number are not numbers | Form error |
+| Profile form | Optic height, zero, BC and velocity within the limits above. The form requires a positive optic height, although the calculators take a negative one | Form error stating the range, in the unit chosen |
 | Profile form, spin drift on | Twist and length must be positive | Form error |
-| Profile form, sensitivity on | Temperature and modifier must be numbers | Form error |
-| `calculateShotPoint` | Distance above 0, BC above 0 | No result |
-| `calculateFullTrajectory` | Distance above 0 and at most 3000, BC above 0. Step at least 1, 25 when empty | No result |
-| Both | Velocity at the current temperature finite and at least 50 fps (`hasFlyableVelocity`) | No result |
-| Both, and dope cards | Zero distance a finite number of at least 0.001 after taking its absolute value (`isUsableZeroDistance`) | No result. A dope card stays blank |
-| Both, and dope cards | Finite optic height | No result. A dope card stays blank |
-| Both, `calculateMPBR` and dope cards | Finite barrel elevation after the zero solve, before any shot (`hasFiniteElevation`). It only rejects NaN and Infinity, so it changes no result. It does not stop every hang: a NaN that appears during the flight solves to a finite elevation, usually 0 | No result. A dope card stays blank |
-| Compare trajectories | Same zero rule on each entry's field | Message under the field, and the entry leaves the chart |
-| Both, custom atmosphere | All values finite, pressure above 0, humidity 0 to 100 | No result |
-| Both, wind speed above 0 (`shotWinds`) | Speed at most 100 m/s, about 224 mph, in either unit. Direction a number or text that reads as a number, at most 1e6 degrees either way, so a negative angle is valid. An empty or whitespace text counts as 0°. Null, a missing value, an object or a boolean is not empty | No result |
-| Both, stored wind speed that is an array, object or boolean (`shotWinds`) | Rejected, because the page can still show it as a speed | No result |
-| Both, wind speed empty, text, 0, negative, null or missing (`shotWinds`) | No wind is used, so the direction is not checked | Normal result without wind |
-| `calculateMPBR` | BC at least 0.01, velocity 50 to under 10000 fps, finite optic height | No result |
+| Profile form, sensitivity on | Temperature and modifier must be plain finite decimals | Form error |
+| `calculateShotPoint`, `calculateFullTrajectory` | Range within the limit. Step at least 1, 25 when empty (full trajectory) | No result |
+| All five paths | BC at least 0.01 (`isUsableBc`) | No result. A dope card is not saved |
+| All five paths | Entered velocity finite and under 10000 fps, and velocity at the current temperature finite, at least 50 and under 10000 fps (`hasFlyableVelocity`). MPBR and the dope cards use no powder sensitivity | No result. A dope card is not saved |
+| All five paths | Optic height finite and within 10 in or 25.4 cm either way (`isUsableSightHeight`) | No result. A dope card is not saved |
+| Shot point, full trajectory, dope cards | Zero distance 1 to 3000 (`isUsableZeroDistance`) | No result. A dope card is not saved |
+| Shot point, full trajectory, MPBR, dope cards | Finite barrel elevation after the zero solve, before any shot (`hasFiniteElevation`). It only rejects NaN and Infinity, so it changes no result. It does not stop every hang: a NaN that appears during the flight solves to a finite elevation, usually 0 | No result. A dope card is not saved |
+| Shot point, full trajectory, custom atmosphere | Values within the limits above (`isUsableAtmosphere`). Altitude only has to be finite | No result, and a message under the box |
+| Shot point, full trajectory, wind speed above 0 (`shotWinds`) | Speed at most 100 m/s, about 224 mph, in either unit. Direction a number or text that reads as a number, at most 1e6 degrees either way, so a negative angle is valid. An empty or whitespace text counts as 0°. Null, a missing value, an object or a boolean is not empty | No result |
+| Shot point, full trajectory, stored wind speed that is an array, object or boolean (`shotWinds`) | Rejected, because the page can still show it as a speed | No result |
+| Shot point, full trajectory, wind speed empty, text, 0, negative, null or missing (`shotWinds`) | No wind is used, so the direction is not checked | Normal result without wind |
+| Compare trajectories | Same zero rule on each entry's field. Range within the limit | Message under the field, and the entry leaves the chart |
+| Compare trajectories | A usable zero whose trajectory gives no result ([#114](https://github.com/hawkins48b/cw-zro/issues/114)) | Message under the field, and the entry leaves the chart |
+| Dope cards | Any of the four card trajectories gives no result, for any reason. `generateImperialDopeCard` and `generateMetricDopeCard` return null | The page shows "Cannot compute" and saves no PDF ([#91](https://github.com/hawkins48b/cw-zro/issues/91)) |
 | `calculateMPBR` | Barrel elevation up to 0.5 rad, flight up to 20000 units, at most 54 fires and 2 zero solves | No result. A shot reaching the limit is never reported as a capped distance |
-| `calculateTrajectoryValidation` | Range at least 100 and beyond the zero, value not 0, velocity and BC above 0 | No result, or an error message for the range |
-| `calculateTrajectoryValidation` | Velocity between 0 and 10000 fps, BC between 0.01 and 2 | Shot skipped |
+| MPBR page | A suggested zero above 3000, from a huge target | Shown, but not offered for saving, with a message |
+| `calculateTrajectoryValidation` | Range at least 100 and at most 3000, beyond the zero, value not 0, velocity and BC above 0 | No result, or an error message for the range |
+| `calculateTrajectoryValidation` | Velocity between 0 and 10000 in the profile's unit, BC between 0.01 and 2. Each shot goes through `calculateShotPoint`, so its limits apply too | Shot skipped |
 | `calculateTrajectoryValidation` | At most 200 shots and 5 seconds, checked before each shot | No solution, or a timeout message when time ended a search that could still move |
 | Dope card zero search | Zero elevation at most 0.6 rad | Near and far stay blank |
 
-**Remaining gaps.** Security reviews recorded these, and they are not fixed:
+Saved profiles are read through the same guards on every path, so a stored `Infinity`, hex or out-of-limit value in a field with a limit gives no result instead of freezing a page. Weight and diameter have no limit: a stored `Infinity` or `0x10` there still gives a result (`0x10` reads as 0), checked on `calculateFullTrajectory` with the `.308` test profile, spin drift off.
 
-- `calculateShotPoint` has no upper limit on distance, and no screen limits zero distance, velocity, optic height, wind or atmosphere values, apart from the rules above.
-- Dope cards have no velocity guard.
-- A zero from 0.001 to about 0.1 passes the guards and usually gives no result, with no message, after about a second of blocked page per trajectory. The profile form accepts these values too.
-- In a review of #113 these ran until they were killed, after 12 to 60 seconds: an optic height of `-2e6` or `1e300`, a custom temperature of `-600` and a custom pressure of `1e308`.
-- BC has no lower limit in `calculateShotPoint` and `calculateFullTrajectory`. Measured on 2026-11-06 on the `.308` test profile at 1000 yd, a BC of `0.00001` at 2700 fps ran until killed at 45 seconds, with no wind and with 10 mph. A BC of `1e-9` at 200 fps with a 10 mph wind from 0° did the same on two of the four test loads tried, at every range tried from 10 to 3000 yd.
-- A custom atmosphere has no physical limits. Measured on 2026-11-06 on the `.308` test profile at 1000 yd, these ran until killed at 45 seconds: a temperature of `-273` °C with a 90° wind of 50 mph up to the wind limit, and at 2700 fps with no wind, a temperature of `100000` in °C or °F, or a pressure of `1e8` hPa. At `-273` °C, 20 mph and less, or a wind from 0° or 180°, gave no result at once.
-- A decimal comma is cut off: `1,5` reads as 1 for wind speed and direction, confirmed on `shotWinds`. This existed before #116. The boxes take text, so a French or German user can reach it by typing.
-- Saved values are not checked when read, so a tampered or absurd value in storage reaches the engine.
+**Remaining gaps.** These are known and not fixed:
+
+- Bullet weight, diameter, length and twist have no upper limit, and the powder sensitivity temperature and modifier only have to be finite in the form. The velocity they give is checked.
+- Altitude only has to be finite. It does not enter the density (see [Atmosphere](#atmosphere)).
+- The hangs measured near the limits needed a sight height about as large as the zero distance or larger (20 in with a 0.5 zero, 10 in with a 0.2 zero), which the limits rule out. No proof covers every combination inside them, and the dope cards, MPBR and validation were not part of the 3888-combination run.
+- A zero near 1 on a slow or low-BC load can still give no result. The compare page says so, the other pages show their no-result message.
 - The time budget of the validation search is checked between shots. It cannot stop one slow shot.
 - An MPBR calculation has no time limit, because it runs only from a button. It can take seconds on absurd input.
 
