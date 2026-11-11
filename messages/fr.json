@@ -176,7 +176,7 @@
 	"about_version": "Version {version}",
 	"about_description": "ZRO est un calculateur balistique de précision pour le tir sportif longue distance. Il calcule les trajectoires de projectiles, génère des fiches de tir et fournit une vue réticule pour le terrain.",
 	"about_open_source": "Open Source",
-	"about_open_source_desc": "ZRO est un logiciel open source. Consultez le code source et contribuez sur GitHub.",
+	"about_open_source_desc": "ZRO est un logiciel open source, publié sous licence MIT. Consultez le code source et contribuez sur GitHub.",
 	"about_js_ballistics": "Basé sur js-ballistics",
 	"about_js_ballistics_desc": "Les calculs balistiques sont propulsés par la bibliothèque open source js-ballistics.",
 	"about_view_on_github": "Voir sur GitHub",

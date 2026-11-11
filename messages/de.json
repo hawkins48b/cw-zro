@@ -176,7 +176,7 @@
 	"about_version": "Version {version}",
 	"about_description": "ZRO ist ein Präzisions-Ballistikrechner für den Langstrecken-Schießsport. Er berechnet Geschossflugbahnen, erstellt Schusstafeln und bietet eine Absehen-Ansicht für den Feldeinsatz.",
 	"about_open_source": "Open Source",
-	"about_open_source_desc": "ZRO ist Open-Source-Software. Den Quellcode auf GitHub einsehen und beitragen.",
+	"about_open_source_desc": "ZRO ist Open-Source-Software unter der MIT-Lizenz. Den Quellcode auf GitHub einsehen und beitragen.",
 	"about_js_ballistics": "Basiert auf js-ballistics",
 	"about_js_ballistics_desc": "Die Ballistikberechnungen werden von der Open-Source-Bibliothek js-ballistics angetrieben.",
 	"about_view_on_github": "Auf GitHub ansehen",

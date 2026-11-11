@@ -125,4 +125,4 @@ Prefer a fix. If there is none yet, or the advisory does not affect ZRO, add it 
 
 ## License
 
-Proprietary — all rights reserved.
+MIT. See [LICENSE](LICENSE). Third-party packages keep their own licences.

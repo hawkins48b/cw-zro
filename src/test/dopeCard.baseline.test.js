@@ -125,7 +125,8 @@ describe('metric dope card', () => {
 
 /**
  * The card prints the crossings of the shot, whichever one the saved zero is (#86). A saved MPBR
- * zero is the far crossing, and a usual 100 yd zero on a .308 is too.
+ * zero is the near crossing since #109, and a usual 100 yd zero on a .308 is the far one.
+ * The MPBR rows were re-recorded for #109, from the near zero the MPBR page now saves.
  */
 describe('zero crossings on the card', () => {
 	const CARDS = [
@@ -203,9 +204,9 @@ describe('zero crossings on the card', () => {
 
 	it.each([
 		['imperial', generateImperialDopeCard, '8', 'in', ['21', '249']],
-		['metric', generateMetricDopeCard, '8', 'in', ['19.3', '227.8']],
-		['imperial', generateImperialDopeCard, '20', 'cm', ['21', '247']],
-		['metric', generateMetricDopeCard, '20', 'cm', ['19.5', '226.1']]
+		['metric', generateMetricDopeCard, '8', 'in', ['19.4', '227.5']],
+		['imperial', generateImperialDopeCard, '20', 'cm', ['22', '240']],
+		['metric', generateMetricDopeCard, '20', 'cm', ['20.1', '219.8']]
 	])('prints the real crossings of a saved MPBR zero, %s card, %s %s target', async (_, generate, size, unit, expected) => {
 		await generate(saved(P308_G1, calculateMPBR(P308_G1, size, unit)));
 		expect(zeros()).toEqual(expected);
@@ -218,8 +219,8 @@ describe('zero crossings on the card', () => {
 	});
 
 	it.each([
-		['imperial', generateImperialDopeCard, ['6', '678']],
-		['metric', generateMetricDopeCard, ['5.5', '620.1']]
+		['imperial', generateImperialDopeCard, ['6', '667']],
+		['metric', generateMetricDopeCard, ['5.6', '609.6']]
 	])('prints a saved zero past the 500 units of the card, %s', async (_, generate, expected) => {
 		await generate(saved(P308_G1, calculateMPBR(P308_G1, '100', 'in')));
 		expect(zeros()).toEqual(expected);

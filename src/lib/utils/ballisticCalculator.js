@@ -548,6 +548,15 @@ function crossingDistance(a, b, height) {
 	return a.x + ((height - a.y) / (b.y - a.y)) * (b.x - a.x);
 }
 
+/** Distance where the bullet comes up through a height before the apex, or null. */
+function ascentCrossing(rows, top, height) {
+	if (rows[0].y >= height) return null;
+	for (let i = 1; i <= top; i++) {
+		if (rows[i].y >= height) return crossingDistance(rows[i - 1], rows[i], height);
+	}
+	return null;
+}
+
 /** Distance where the bullet comes down through a height after the apex, or null. */
 function descentCrossing(rows, top, height) {
 	for (let i = top + 1; i < rows.length; i++) {
@@ -564,18 +573,24 @@ function descentCrossing(rows, top, height) {
  * That elevation is found by bisection, as apex height rises steadily with it. Measured, this is
  * about 10 times faster than the old walk over 200 zeros, and it has no limit on the zero.
  *
- * The zero is always the far crossing, in whole units, rounded down so the apex stays inside the
- * zone. It also moves the shot far less per unit than a near crossing does: on a 30 in target,
- * 1 yd of near zero moves the arc by inches. Every value returned describes the shot zeroed at
- * optimalZero, the one the user saves to the profile, so optimalZero equals farZero.
+ * The zero is the near crossing of that arc, where the bullet comes up through the line of sight
+ * (#109), as the closest whole unit that keeps the apex inside the zone: the unit under the
+ * crossing when the solver's step past the distance lowers the arc enough, else the unit above.
+ * A further near zero gives a lower arc. A near crossing under 1 unit becomes MIN_ZERO_DISTANCE.
+ * Every value returned describes the shot zeroed at optimalZero, the one the user saves to the
+ * profile, so optimalZero equals nearZero.
  *
- * Tolerance: mpbrMax is at most 1 distance unit under the best any zero can give, and that is
- * the cost of a whole unit zero. Distances come from step 1 rows, read between rows, which adds
- * under 0.01 unit, and the output is rounded to 0.1.
+ * Tolerance: 1 unit of near zero moves the arc far more than 1 unit of far zero does, so
+ * mpbrMax can be several units under the best any zero can give. Measured against the arc whose
+ * apex touches the top (#109): at most 2.2% on the baseline targets (5.9 m on the .308 with
+ * 20 cm), 4% up to 30 in or 100 cm, and more on huge targets or slow loads, up to about 27% where
+ * the near crossing is under 1 unit. A walk over whole near zeros gives the same mpbrMax. Distances come from step 1 rows, read between rows, which adds under 0.01 unit,
+ * and the output is rounded to 0.1.
  *
  * Returns null when no shot fits: the arc cannot reach the top of the zone within
- * MPBR_MAX_ELEVATION, the flight ends inside the zone, or the zone is so thin that no whole
- * unit zero stays inside it.
+ * MPBR_MAX_ELEVATION, the bullet never comes up through the line of sight (a sight height of 0
+ * or below), the flight ends inside the zone, or the zone is so thin that the whole unit lands
+ * past the apex, where it would be a far zero.
  *
  * Cost, as a hard bound: at most 54 fires (10 doublings, 40 halvings, the arc, two zeroed shots,
  * the chart) and two zero solves of up to 60 integrations each, so 174 integrations. Each one
@@ -681,12 +696,15 @@ export function calculateMPBR(profile, targetSizeStr, targetUnit) {
 			else low = middle;
 		}
 
-		// ── Zero: the far crossing of that arc, down to a whole unit ─────
+		// ── Zero: the near crossing of that arc, as a whole unit ─────────
+		// A further near zero gives a lower arc, so the unit above the crossing keeps the apex
+		// inside the zone. The one below can too, see below.
 		weapon.zeroElevation = UNew.Radian(low);
 		const arc = heightRows(flightRows(calc, shot, longestFlight, oneUnit));
-		const farCrossingMM = descentCrossing(arc, apexIndex(arc), 0);
-		if (farCrossingMM === null) return null;
-		let optimalZero = Math.floor(farCrossingMM / mmPerDist);
+		const nearCrossingMM = ascentCrossing(arc, apexIndex(arc), 0);
+		// With no sight height over the bore, the bullet never comes up through the line of sight.
+		if (nearCrossingMM === null) return null;
+		const nearCrossing = nearCrossingMM / mmPerDist;
 
 		// ── The shot the user gets at that zero ──────────────────────────
 		// Starting from no elevation, as every other calculation does on a saved zero.
@@ -696,23 +714,23 @@ export function calculateMPBR(profile, targetSizeStr, targetUnit) {
 			if (!hasFiniteElevation(shot)) return null;
 			return heightRows(flightRows(calc, shot, longestFlight, oneUnit));
 		};
-		// A zero of 0 would hang the solver. A zero above MAX_ZERO_DISTANCE is still returned: the
-		// page does not offer to save it, since every other calculation would reject it.
-		if (optimalZero < MIN_ZERO_DISTANCE) return null;
+		// The solver zeroes on its first step past the distance, about 0.1 yd further out, which
+		// lowers a near zero arc. So the unit under the crossing can still keep the apex inside, as
+		// 21 yd does for a crossing at 21.06 yd: try it first, then the unit above. A crossing under
+		// 1 unit comes up to MIN_ZERO_DISTANCE, a lower arc, and never to the zero of 0 that would
+		// hang the solver.
+		let optimalZero = Math.max(Math.floor(nearCrossing), MIN_ZERO_DISTANCE);
 		let rows = zeroedRows(optimalZero);
 		if (!rows) return null;
-		// The solver zeroes on its first step past the distance, about 0.1 yd further out, so a far
-		// crossing just over a whole unit can put the apex over the top: take the unit below.
-		if (rows[apexIndex(rows)].y > halfTargetMM) {
-			optimalZero -= 1;
-			if (optimalZero < MIN_ZERO_DISTANCE) return null;
+		if (rows[apexIndex(rows)].y > halfTargetMM && optimalZero < Math.ceil(nearCrossing)) {
+			optimalZero = Math.ceil(nearCrossing);
 			rows = zeroedRows(optimalZero);
 			if (!rows) return null;
 		}
 		const top = apexIndex(rows);
 		const maxOrdMM = rows[top].y;
 		const maxOrdDistMM = rows[top].x;
-		// No whole unit lies inside a zone this thin.
+		// No whole unit zero keeps the apex inside a zone this thin.
 		if (maxOrdMM > halfTargetMM) return null;
 
 		// The flight can end inside the zone, on a slow load or a huge target.
@@ -750,8 +768,8 @@ export function calculateMPBR(profile, targetSizeStr, targetUnit) {
 			}
 		}
 
-		// On a zone a few thousandths of an inch thin, the whole unit can land on the rising side.
-		if (farZero !== optimalZero) return null;
+		// On a thin zone the whole unit can land past the apex, where it becomes a far zero.
+		if (nearZero !== optimalZero) return null;
 
 		const r1 = (v) => Math.round(v * 10) / 10;
 		return {

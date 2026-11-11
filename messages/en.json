@@ -176,7 +176,7 @@
 	"about_version": "Version {version}",
 	"about_description": "ZRO is a precision ballistic calculator for long-range shooting sports. It computes bullet trajectories, generates dope cards, and provides a scope reticle view for field use.",
 	"about_open_source": "Open Source",
-	"about_open_source_desc": "ZRO is open source software. View the source code and contribute on GitHub.",
+	"about_open_source_desc": "ZRO is open source software, released under the MIT License. View the source code and contribute on GitHub.",
 	"about_js_ballistics": "Based on js-ballistics",
 	"about_js_ballistics_desc": "Ballistic calculations are powered by the js-ballistics open-source library.",
 	"about_view_on_github": "View on GitHub",

@@ -70,7 +70,7 @@ A running deploy is never cancelled, and a newer run replaces a queued one.
 |-------|-----|-------|
 | Set `FTP_HOST` to the hostname on the server certificate | Owner | [#66](https://github.com/hawkins48b/cw-zro/issues/66) |
 | Rotate `FTP_PWD` | Owner | [#66](https://github.com/hawkins48b/cw-zro/issues/66) |
-| Decide on the deep link fix | Owner | [#67](https://github.com/hawkins48b/cw-zro/issues/67) |
+| Check `AllowOverride` includes `FileInfo`, and that no `.htaccess` at the FTP root gets overwritten (see [Deep links](#deep-links-on-the-web-host)) | Owner | [#67](https://github.com/hawkins48b/cw-zro/issues/67) |
 | Confirm that Dependabot security updates are off | Owner | [#78](https://github.com/hawkins48b/cw-zro/issues/78) |
 | Accept the shifts in saved results listed below | Owner | |
 
@@ -82,7 +82,10 @@ Saved profiles keep their values, but some results shift as soon as this is live
 
 - Powder sensitivity now means fps per degree ([#81](2026-11-04-81-powder-sensitivity.md)).
 - Saved humidity of 1 or less now means that percentage ([#84](2026-11-05-84-humidity-fraction.md)).
-- "Set MPBR" saves the far crossing as the zero, and dope cards print computed near and far zeros ([#86](2026-11-05-86-mpbr-search.md)).
+- MPBR finds a better arc, and dope cards print computed near and far zeros ([#86](2026-11-05-86-mpbr-search.md)).
+- "Set MPBR" saves the near zero as a whole unit, for example 21 yd for an 8 in target on the `.308` test profile. Between #86 and #109, `develop` saved the far zero (249 yd there). MPBR distances shrink slightly against #86, at most 2.2 % on the baseline cases. A sight height of 0 or less gives no MPBR result ([#109](2026-11-11-67-109-110-fallback-near-zero-mit.md)).
+- Opening or reloading an inner page such as `/profiles` or `/fr/profiles` now loads the app ([#67](2026-11-11-67-109-110-fallback-near-zero-mit.md)).
+- The About page says ZRO is under the MIT licence ([#110](2026-11-11-67-109-110-fallback-near-zero-mit.md)).
 - Trajectory validation has a Below / Above choice ([#82](2026-11-05-82-83-validation-solver.md)).
 - The minimum browsers rise to Safari 16.4, Chrome 111 and Firefox 114 ([#72](2026-11-05-72-toolchain.md)).
 
@@ -106,12 +109,12 @@ There is no rollback step: build artifacts are kept for 1 day, and a deploy alwa
 
 ### Deep links on the web host
 
-**[#67](https://github.com/hawkins48b/cw-zro/issues/67), open.** The app is a single `index.html` with client-side routes, and `build/` holds no rewrite rule for the host. Opening or reloading an inner URL such as `/profiles` or `/fr/profiles` can give the host's 404, while moving around inside the app works. How the live host behaves today was not confirmed.
+**[#67](https://github.com/hawkins48b/cw-zro/issues/67).** The app is a single `index.html` with client-side routes. Without a rewrite rule, opening or reloading an inner URL such as `/profiles` or `/fr/profiles` can give the host's 404, while moving around inside the app works.
 
-- The fix is on the branch `task/67-spa-fallback`, in the owner's local workspace. **It is held off `develop` on purpose** and has not been pushed to GitHub.
-- It was tested on a local Apache, not on the real host.
-- It is held because a `.htaccess` can give a site-wide 500 or 403 on some server settings, and a deploy would overwrite any `.htaccess` already at the FTP root.
-- The owner needs to confirm the host's override settings and check for an existing file.
+- The fix, [`static/.htaccess`](../static/.htaccess), is on `develop` and is copied to `build/`. Its rules are in [the delivery document](2026-11-11-67-109-110-fallback-near-zero-mit.md#deep-links-on-apache-67).
+- It was tested on a local Apache 2.4.69, not on the real host. The owner said on 2026-11-11 that the host is fine.
+- A `.htaccess` can give a site-wide 500 or 403 when the server does not allow its directives, and a deploy overwrites any `.htaccess` already at the FTP root. Before the release that carries it, the owner checks that `AllowOverride` includes `FileInfo` and that no existing `.htaccess` at the FTP root would be overwritten.
+- Rollback: delete `.htaccess` from the FTP root.
 
 ### Repository settings
 

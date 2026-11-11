@@ -204,8 +204,12 @@ describe('NaN guards (#113)', () => {
 			expect(calculateFullTrajectory(profile, RANGE, null, null)).not.toBeNull();
 		});
 
-		it('calculateMPBR gives a result', () => {
-			expect(calculateMPBR(profile, 30, 'in')).not.toBeNull();
+		// No near crossing to save on a sight height of 0 (#109), so no result, but it gets past the
+		// guards: the search fires.
+		it('calculateMPBR reaches the engine and gives no result', () => {
+			const firing = vi.spyOn(Calculator.prototype, 'fire');
+			expect(calculateMPBR(profile, 30, 'in')).toBeNull();
+			expect(firing).toHaveBeenCalled();
 		});
 
 		it.each(CARDS)('the %s dope card prints', async (_, generate) => {

@@ -163,17 +163,31 @@ No row past the range counts. The second fire costs about as much as a step 1 ta
 `calculateMPBR` finds the longest range over which the bullet stays inside a target of the given size ([#86](https://github.com/hawkins48b/cw-zro/issues/86)). It uses the standard atmosphere, no wind and no powder sensitivity.
 
 1. It bisects barrel elevation until the apex touches the top of the zone, half the target size.
-2. It takes the far crossing of that arc, rounded down to a whole unit, as the zero.
+2. It takes the near crossing of that arc, where the bullet comes up through the line of sight, as the zero ([#109](https://github.com/hawkins48b/cw-zro/issues/109), owner decision of 2026-11-11). The zero is a whole unit: the one under the crossing if the shot zeroed there keeps its apex inside the zone, else the one above. A further near zero gives a lower arc, and the solver zeroes about 0.1 yd past the distance, which lowers it a little more.
 3. It zeroes the shot there and reads every returned value from that shot.
 
 | Property | Value |
 |----------|-------|
-| Zero | Always the far crossing, so `optimalZero` equals `farZero` |
-| Tolerance | `mpbrMax` is at most 1 unit under the best any zero can give, and at most 0.1 over it |
-| Largest gap measured | 0.69 yd against a brute force walk |
+| Zero | Always the near crossing, so `optimalZero` equals `nearZero`. A crossing under 1 unit gives a zero of 1 |
+| Against a walk over whole near zeros | Same `mpbrMax`, within 0.1 (tests on 8, 30 and 300 in) |
+| Against the best any zero can give | Never more than 0.1 over it. Under it by what one whole unit of near zero costs, see below |
 | Rounding | Distances to 0.1 |
 
-**"Set MPBR for current profile" saves the far crossing as the zero**: 249 yd rather than 21 yd for an 8 in target on the `.308` test profile. The page still shows the near zero. The delivery doc asks the owner to confirm this choice, and no confirmation is recorded.
+One unit of near zero moves the arc far more than one unit of far zero, so a whole unit near zero can leave the apex well under the top of the zone. `mpbrMax` against the arc that touches the top, measured in the dev container on 2026-11-11 for #109 on the four test profiles, in and cm, sizes 0.001 to 33000:
+
+| Targets | Largest loss |
+|---------|--------------|
+| The 8 baseline cases (8 in, 20 cm) | 5.9 m, 2.2 % (`.308`, 20 cm) |
+| Up to 30 in or 100 cm | 20 yd, 4.0 % (`.308`, 30 in) |
+| 100 in to 1000 in | 8.4 % (`.308`, 300 in) |
+| Near crossing under 1 unit (about 3000 in and up) | 10 to 27 % |
+| A 300 fps load on 8 in | 15 % (3 yd zero, 31.6 yd) |
+
+Before #109 the zero was the far crossing (from [#86](2026-11-05-86-mpbr-search.md)), which lost at most 1 unit. A near zero to 0.1 unit would lose at most about 1 % up to 30 in or 100 cm on the same profiles, measured but not implemented.
+
+There is no near crossing when the sight height is 0 or less: the bullet starts on or over the line of sight. MPBR then gives no result.
+
+**"Set MPBR for current profile" saves the near crossing as the zero**: 21 yd for an 8 in target on the `.308` test profile, which comes back down through the line of sight at 249 yd.
 
 ## Trajectory validation
 
@@ -244,7 +258,7 @@ All ends are included. The gram and foot ends are the owner's rounded values, no
 | Dope cards | Any of the four card trajectories gives no result, for any reason. `generateImperialDopeCard` and `generateMetricDopeCard` return null | The page shows "Cannot compute" and saves no PDF ([#91](https://github.com/hawkins48b/cw-zro/issues/91)) |
 | Dope cards | Building or saving the PDF throws, for example when the template cannot be fetched (`downloadDopeCard` returns `'failed'`) | The page shows that the PDF could not be created or saved, not "Cannot compute" ([#123](https://github.com/hawkins48b/cw-zro/issues/123)) |
 | `calculateMPBR` | Barrel elevation up to 0.5 rad, flight up to 20000 units, at most 54 fires and 2 zero solves | No result. A shot reaching the limit is never reported as a capped distance |
-| MPBR page | A suggested zero above 3000, from a huge target | Shown, but not offered for saving, with a message |
+| MPBR page | A suggested zero above 3000. Since #109 the zero is a near crossing, at most 111 units on the measured cases, so this no longer happens on them | Shown, but not offered for saving, with a message |
 | `calculateTrajectoryValidation` | Range at least 100 and at most 3000, beyond the zero, value not 0, velocity and BC above 0 | No result, or an error message for the range |
 | `calculateTrajectoryValidation` | Velocity between 0 and 10000 in the profile's unit, BC between 0.01 and 2. Each shot goes through `calculateShotPoint`, so its limits apply too | Shot skipped |
 | `calculateTrajectoryValidation` | At most 200 shots and 5 seconds, checked before each shot | No solution, or a timeout message when time ended a search that could still move |

@@ -107,11 +107,13 @@ function near(actual, expected, tolerance, label) {
  * - coldMetric: ATMO_COLD_METRIC, 4 m/s from 300 degrees.
  * - scope600yd: [elevation, windage] by display unit, 600 yd, WIND_10MPH.
  * - spinDriftIn: windage at 500 and 1000 yd, spin drift on, no wind.
- * - mpbr8in, mpbr20cm: re-recorded for #86, the only values here to change on purpose. The search
- *   used to walk zeros up to 200 on 5 unit rows, so optimalZero was a near crossing and mpbrMin,
- *   mpbrMax and the apex distance sat on the 5 unit grid. Now optimalZero is the far crossing and
- *   equals farZero, mpbrMax gains 2 to 8 units from the better arc, and the distances are read
- *   between step 1 rows. See the MPBR search block for the check against a brute force search.
+ * - mpbr8in, mpbr20cm: the only values here to change on purpose. Re-recorded for #86: the search
+ *   used to walk zeros up to 200 on 5 unit rows, so mpbrMin, mpbrMax and the apex distance sat on
+ *   the 5 unit grid; it now bisects to the best arc and reads between step 1 rows. Re-recorded for
+ *   #109 (owner decision of 2026-11-11): optimalZero went from the far crossing to the near
+ *   crossing, as a whole unit, so it equals nearZero. A whole unit of near zero moves the arc more
+ *   than one of far zero, so mpbrMax lost up to 5.1 units (1.9 %, the .308 on 20 cm), and the apex
+ *   can sit under the top of the zone. See the MPBR search block for the brute force checks.
  */
 const REFERENCE = {
 	P223_G1: {
@@ -144,8 +146,8 @@ const REFERENCE = {
 		],
 		scope600yd: { MOA: [-14.1, 8.9], MRAD: [-4.1, 2.6], IN: [-88.9, 55.9], FT: [-7.41, 4.66], CM: [-225.8, 142.1], M: [-2.26, 1.42] },
 		spinDriftIn: [2.105, 15.93],
-		mpbr8in: { optimalZero: 287, nearZero: 39, farZero: 287, mpbrMin: 0, mpbrMax: 332.3, maxOrdinate: { elevation: 4, distance: 170 }, halfTarget: 4, useMetric: false },
-		mpbr20cm: { optimalZero: 261, nearZero: 36, farZero: 261, mpbrMin: 0, mpbrMax: 302.2, maxOrdinate: { elevation: 9.9, distance: 155 }, halfTarget: 10, useMetric: true }
+		mpbr8in: { optimalZero: 39, nearZero: 39, farZero: 286, mpbrMin: 0, mpbrMax: 331.7, maxOrdinate: { elevation: 3.9, distance: 170 }, halfTarget: 4, useMetric: false },
+		mpbr20cm: { optimalZero: 36, nearZero: 36, farZero: 260, mpbrMin: 0, mpbrMax: 301.4, maxOrdinate: { elevation: 9.8, distance: 154 }, halfTarget: 10, useMetric: true }
 	},
 	P308_G1: {
 		profile: P308_G1,
@@ -177,8 +179,8 @@ const REFERENCE = {
 		],
 		scope600yd: { MOA: [-16.3, 5.4], MRAD: [-4.7, 1.6], IN: [-102.2, 33.9], FT: [-8.51, 2.83], CM: [-259.5, 86.2], M: [-2.6, 0.86] },
 		spinDriftIn: [2.346, 12.892],
-		mpbr8in: { optimalZero: 249, nearZero: 21, farZero: 249, mpbrMin: 0, mpbrMax: 293.4, maxOrdinate: { elevation: 4, distance: 139 }, halfTarget: 4, useMetric: false },
-		mpbr20cm: { optimalZero: 226, nearZero: 20, farZero: 226, mpbrMin: 0, mpbrMax: 266.4, maxOrdinate: { elevation: 9.9, distance: 126 }, halfTarget: 10, useMetric: true }
+		mpbr8in: { optimalZero: 21, nearZero: 21, farZero: 249, mpbrMin: 0, mpbrMax: 293.1, maxOrdinate: { elevation: 4, distance: 138 }, halfTarget: 4, useMetric: false },
+		mpbr20cm: { optimalZero: 20, nearZero: 20, farZero: 220, mpbrMin: 0, mpbrMax: 261.3, maxOrdinate: { elevation: 9.2, distance: 123 }, halfTarget: 10, useMetric: true }
 	},
 	P65_G7: {
 		profile: P65_G7,
@@ -210,8 +212,8 @@ const REFERENCE = {
 		],
 		scope600yd: { MOA: [-13.5, 4.1], MRAD: [-3.9, 1.2], IN: [-84.9, 26], FT: [-7.08, 2.16], CM: [-215.8, 65.9], M: [-2.16, 0.66] },
 		spinDriftIn: [1.657, 8.119],
-		mpbr8in: { optimalZero: 265, nearZero: 27, farZero: 265, mpbrMin: 0, mpbrMax: 312, maxOrdinate: { elevation: 4, distance: 149 }, halfTarget: 4, useMetric: false },
-		mpbr20cm: { optimalZero: 241, nearZero: 25, farZero: 241, mpbrMin: 0, mpbrMax: 283.6, maxOrdinate: { elevation: 9.9, distance: 135 }, halfTarget: 10, useMetric: true }
+		mpbr8in: { optimalZero: 27, nearZero: 27, farZero: 264, mpbrMin: 0, mpbrMax: 311, maxOrdinate: { elevation: 3.9, distance: 148 }, halfTarget: 4, useMetric: false },
+		mpbr20cm: { optimalZero: 25, nearZero: 25, farZero: 239, mpbrMin: 0, mpbrMax: 281.7, maxOrdinate: { elevation: 9.7, distance: 134 }, halfTarget: 10, useMetric: true }
 	},
 	P338_G7_METRIC: {
 		profile: P338_G7_METRIC,
@@ -243,8 +245,8 @@ const REFERENCE = {
 		],
 		scope600yd: { MOA: [-10.6, 3.4], MRAD: [-3.1, 1], IN: [-66.4, 21.4], FT: [-5.54, 1.79], CM: [-168.8, 54.5], M: [-1.69, 0.54] },
 		spinDriftIn: [1.564, 7.386],
-		mpbr8in: { optimalZero: 292, nearZero: 31, farZero: 292, mpbrMin: 0, mpbrMax: 343.4, maxOrdinate: { elevation: 4, distance: 164 }, halfTarget: 4, useMetric: false },
-		mpbr20cm: { optimalZero: 265, nearZero: 28, farZero: 265, mpbrMin: 0, mpbrMax: 311.7, maxOrdinate: { elevation: 9.9, distance: 149 }, halfTarget: 10, useMetric: true }
+		mpbr8in: { optimalZero: 31, nearZero: 31, farZero: 287, mpbrMin: 0, mpbrMax: 338.9, maxOrdinate: { elevation: 3.8, distance: 162 }, halfTarget: 4, useMetric: false },
+		mpbr20cm: { optimalZero: 28, nearZero: 28, farZero: 265, mpbrMin: 0, mpbrMax: 311.8, maxOrdinate: { elevation: 10, distance: 149 }, halfTarget: 10, useMetric: true }
 	}
 };
 
@@ -1212,24 +1214,20 @@ describe('max drop and subsonic distance (#94)', () => {
 });
 
 /**
- * The search solves for the arc whose apex touches the top of the zone (#86). The tests here
- * check it from the outside, against a walk over zero distances that shares no code with it.
+ * The search solves for the arc whose apex touches the top of the zone (#86), and saves its near
+ * crossing, rounded up to a whole unit (#109). The tests here check it from the outside, against
+ * walks over zero distances that share no code with it.
  *
- * Tolerance, as in calculateMPBR: mpbrMax is at most 1 distance unit under the best any zero can
- * give, the cost of a whole unit zero, and at most 0.1 over it, the rounding of the output.
- * Measured gap on 19 cases of 3 loads: 0.69 yd at most.
+ * Against a walk over whole near zeros, mpbrMax is the same, within the 0.1 rounding of the
+ * output. Against the best any zero can give, it is never over it by more than 0.1, and it loses
+ * what one whole unit of near zero costs: at most 4 % up to 30 in, more on huge targets.
  *
  * Every case has a velocity and BC the solver can work with, or stubs the solver, so none can
  * stall the run.
  */
 describe('MPBR search (#86)', () => {
-	/**
-	 * The longest range of any zero on a walk over zero distances, near and far crossings alike,
-	 * in yd. Rows are step 1, the exit is read between two rows, and a zero is skipped when any
-	 * row rises over the top of the zone.
-	 */
-	function bruteForceMpbr(profile, targetInches, zeros, range) {
-		const half = targetInches / 2;
+	/** Rows [yd, inches over the line of sight] of the shot zeroed at a distance, step 1 yd. */
+	function zeroedHeights(profile, zero, range) {
 		const weapon = new Weapon({ sightHeight: UNew.Inch(parseFloat(profile.opticHeight)) });
 		const dm = new DragModel({
 			bc: parseFloat(profile.bc),
@@ -1239,15 +1237,28 @@ describe('MPBR search (#86)', () => {
 			length: UNew.Inch(2)
 		});
 		const ammo = new Ammo({ dm, mv: UNew.FPS(parseFloat(profile.velocity)) });
+		const shot = new Shot({ weapon, ammo, atmo: new Atmo(), winds: [] });
+		const calc = new Calculator();
+		calc.setWeaponZero(shot, UNew.Yard(zero));
+		return calc
+			.fire({ shot, trajectoryRange: UNew.Yard(range), trajectoryStep: UNew.Yard(1) })
+			.trajectory.map((p) => [p.distance.In(Unit.Yard), p.targetDrop.In(Unit.Inch)]);
+	}
+
+	/** Highest point of the shot zeroed at a distance, in inches over the line of sight. */
+	const apexInches = (profile, zero, range) =>
+		Math.max(...zeroedHeights(profile, zero, range).map(([, height]) => height));
+
+	/**
+	 * The longest range of the zeros given, in yd. The exit is read between two rows, and a zero
+	 * is skipped when any row rises over the top of the zone. Zeros under the distance of the apex
+	 * of the lowest arc that reaches the line of sight, about 100 yd on the .308, are near zeros.
+	 */
+	function bruteForceMpbr(profile, targetInches, zeros, range) {
+		const half = targetInches / 2;
 		let best = 0;
 		for (const zero of zeros) {
-			const shot = new Shot({ weapon, ammo, atmo: new Atmo(), winds: [] });
-			const calc = new Calculator();
-			weapon.zeroElevation = UNew.Radian(0);
-			calc.setWeaponZero(shot, UNew.Yard(zero));
-			const rows = calc
-				.fire({ shot, trajectoryRange: UNew.Yard(range), trajectoryStep: UNew.Yard(1) })
-				.trajectory.map((p) => [p.distance.In(Unit.Yard), p.targetDrop.In(Unit.Inch)]);
+			const rows = zeroedHeights(profile, zero, range);
 			if (rows.some(([, height]) => height > half)) continue;
 			const exit = rows.findLastIndex(([, height]) => height >= -half);
 			if (exit === rows.length - 1) continue;
@@ -1259,69 +1270,82 @@ describe('MPBR search (#86)', () => {
 
 	const wholeUnits = (first, last) => Array.from({ length: last - first + 1 }, (_, i) => first + i);
 
-	function expectWithinTolerance(actual, reference) {
-		expect(actual, `${actual} against ${reference}`).toBeGreaterThanOrEqual(reference - 1);
-		expect(actual, `${actual} against ${reference}`).toBeLessThanOrEqual(reference + 0.1);
-	}
-
-	/** Longest range on a walk in 0.05 yd steps, measured once: too slow for every run. */
+	/**
+	 * Longest range of any zero, near or far, on a walk in 0.05 yd steps, measured once for #86:
+	 * too slow for every run. The near zero gives up the share of it in the last column (#109).
+	 */
 	it.each([
-		['8', 294.0],
-		['20', 424.39],
-		['30', 499.13],
-		['300', 1144.89]
-	])('matches the 0.05 yd search on a %s in target', (target, fine) => {
-		expectWithinTolerance(calculateMPBR(P308_G1, target, 'in').mpbrMax, fine);
+		['8', 294.0, 0.031],
+		['20', 424.39, 0.016],
+		['30', 499.13, 0.04],
+		['300', 1144.89, 0.084]
+	])('stays under the 0.05 yd search on a %s in target, by the cost of a whole near zero', (target, fine, loss) => {
+		const { mpbrMax } = calculateMPBR(P308_G1, target, 'in');
+		expect(mpbrMax).toBeLessThanOrEqual(fine + 0.1);
+		expect(mpbrMax).toBeGreaterThanOrEqual(fine * (1 - loss));
 	});
 
 	it.each([
-		['8', 300, 340],
-		['30', 440, 520]
-	])('matches a walk over every whole zero on a %s in target', (target, lastZero, range) => {
+		['8', 60, 340],
+		['30', 60, 520]
+	])('matches a walk over every whole near zero on a %s in target', (target, lastZero, range) => {
 		const reference = bruteForceMpbr(P308_G1, parseFloat(target), wholeUnits(1, lastZero), range);
-		expectWithinTolerance(calculateMPBR(P308_G1, target, 'in').mpbrMax, reference);
+		near(calculateMPBR(P308_G1, target, 'in').mpbrMax, reference, 0.1, 'mpbrMax');
 	});
 
-	it('fixes the values of the issue', () => {
-		// Before: 475 yd, 415 yd and 290 yd, with zeros of 12, 14 and 21.
+	it('gives these values on the targets of #86', () => {
+		// Before #86, near zeros on 5 unit rows: 475 yd, 415 yd and 290 yd, with zeros of 12, 14
+		// and 21. With #86, far zeros: 498.9, 424.3 and 293.4.
 		const max = (target) => calculateMPBR(P308_G1, target, 'in').mpbrMax;
-		expect(max('30')).toBe(498.9);
-		expect(max('20')).toBe(424.3);
-		expect(max('8')).toBe(293.4);
+		expect(max('30')).toBe(479.2);
+		expect(max('20')).toBe(417.7);
+		expect(max('8')).toBe(293.1);
 	});
 
-	it('is not limited by the old 200 unit zero or 900 unit range', () => {
-		// Before: zero 4, near crossing, and 900 yd exactly.
+	it('is not limited by the old 900 unit range', () => {
+		// Before #86: zero 4 and 900 yd exactly.
 		const result = calculateMPBR(P308_G1, '300', 'in');
-		expect(result.optimalZero).toBe(995);
-		expect(result.mpbrMax).toBe(1144.2);
-		const reference = bruteForceMpbr(P308_G1, 300, wholeUnits(990, 1000), 1200);
-		expectWithinTolerance(result.mpbrMax, reference);
+		expect(result.optimalZero).toBe(4);
+		expect(result.mpbrMax).toBe(1048.8);
+		const reference = bruteForceMpbr(P308_G1, 300, wholeUnits(1, 10), 1200);
+		near(result.mpbrMax, reference, 0.1, 'mpbrMax');
 	});
 
-	it('reports the far crossing for every target size', () => {
-		// Before: 193 for 4 in, the far crossing, and 24 for 6 in, the near one.
+	it('reports the near crossing for every target size', () => {
+		// Before #109: the far crossing, 193 for 4 in and 223 for 6 in.
 		const sizes = ['0.5', '1', '2', '3', '4', '5', '6', '8', '12', '20', '30', '100', '1000'];
 		const results = sizes.map((size) => calculateMPBR(P308_G1, size, 'in'));
 		for (const result of results) {
-			expect(result.optimalZero).toBe(result.farZero);
+			expect(result.optimalZero).toBe(result.nearZero);
 			expect(Number.isInteger(result.optimalZero)).toBe(true);
 			expect(result.nearZero).toBeLessThan(result.farZero);
 		}
+		// A bigger zone takes a higher arc, which comes up through the line of sight sooner.
 		const zeros = results.map((result) => result.optimalZero);
-		expect(zeros).toEqual([...zeros].sort((a, b) => a - b));
-		expect(zeros[4]).toBe(193);
-		expect(zeros[6]).toBe(223);
+		expect(zeros).toEqual([...zeros].sort((a, b) => b - a));
+		expect(zeros[4]).toBe(28);
+		expect(zeros[6]).toBe(24);
 	});
 
-	it('keeps the apex inside the zone, also when the far crossing is just over a whole unit', () => {
-		// The solver zeroes about 0.1 yd past the distance asked for. On 2 and 3 in that puts the
-		// unit under the far crossing over the top of the zone, so the zero is one lower.
-		for (const [size, zero] of [['2', 153], ['3', 174]]) {
+	it('takes the closest whole near zero that keeps the apex inside the zone', () => {
+		// The best arc comes up through the line of sight at 35.73 yd on 2 in, 31.16 yd on 3 in and
+		// 21.06 yd on 8 in. The solver zeroes about 0.1 yd past the distance, which lowers the arc,
+		// so 31 and 21 still fit; 35 does not. One unit closer gives a higher arc, over the top.
+		for (const [size, zero] of [['2', 36], ['3', 31], ['8', 21]]) {
 			const result = calculateMPBR(P308_G1, size, 'in');
 			expect(result.optimalZero).toBe(zero);
 			expect(result.maxOrdinate.elevation).toBeLessThanOrEqual(result.halfTarget);
+			expect(apexInches(P308_G1, zero, 250)).toBeLessThanOrEqual(parseFloat(size) / 2);
+			expect(apexInches(P308_G1, zero - 1, 250)).toBeGreaterThan(parseFloat(size) / 2);
 		}
+	});
+
+	it('takes a zero of 1 when the near crossing is under 1 unit', () => {
+		// The best arc for a 3000 in zone comes up through the line of sight at 0.8 yd.
+		const result = calculateMPBR(P308_G1, '3000', 'in');
+		expect(result.optimalZero).toBe(1);
+		expect(result.nearZero).toBe(1);
+		expect(result.maxOrdinate.elevation).toBeLessThanOrEqual(result.halfTarget);
 	});
 
 	it.each([
@@ -1343,17 +1367,20 @@ describe('MPBR search (#86)', () => {
 
 	describe('imperial and metric', () => {
 		it.each([
-			['8', '20.32'],
-			['20', '50.8'],
-			['30', '76.2'],
-			['100', '254']
-		])('gives the same range for %s in and %s cm', (inches, centimeters) => {
+			['8', '20.32', 0.03],
+			['20', '50.8', 0.01],
+			['30', '76.2', 0.04],
+			['100', '254', 0.04]
+		])('gives the same range for %s in and %s cm, within %s', (inches, centimeters, share) => {
 			const yd = calculateMPBR(P308_G1, inches, 'in');
 			const m = calculateMPBR(P308_G1, centimeters, 'cm');
-			// Each side has its own whole unit zero, which is the 1 unit of the tolerance.
-			near(m.mpbrMax / 0.9144, yd.mpbrMax, 1, 'mpbrMax');
+			// Each side has its own whole unit near zero, and gives up its own share of the best
+			// range for it (#109): the share in the title, measured 2.3 %, 0.6 % and 3.4 % on 8, 20
+			// and 100 in.
+			near(m.mpbrMax / 0.9144, yd.mpbrMax, yd.mpbrMax * share, 'mpbrMax');
 			near(m.optimalZero / 0.9144, yd.optimalZero, 2, 'optimal zero');
-			near(m.maxOrdinate.elevation / 2.54, yd.maxOrdinate.elevation, 0.1, 'apex');
+			expect(yd.maxOrdinate.elevation).toBeLessThanOrEqual(yd.halfTarget);
+			expect(m.maxOrdinate.elevation).toBeLessThanOrEqual(m.halfTarget);
 		});
 	});
 
@@ -1377,15 +1404,14 @@ describe('MPBR search (#86)', () => {
 
 		it('is not on the 5 unit grid', () => {
 			// Before: 25 and 10, the last row below the zone.
-			expect(calculateMPBR(P308_G1, '1', 'in').mpbrMin).toBe(25.7);
+			expect(calculateMPBR(P308_G1, '1', 'in').mpbrMin).toBe(25.9);
 			expect(calculateMPBR(P308_G1, '2', 'in').mpbrMin).toBe(10.4);
 		});
 
-		it('handles a sight height of 0', () => {
-			const result = calculateMPBR({ ...P308_G1, opticHeight: '0' }, '8', 'in');
-			expect(result.mpbrMin).toBe(0);
-			expect(result.nearZero).toBeNull();
-			expect(result.optimalZero).toBe(result.farZero);
+		it('returns null for a sight height of 0 or under, which has no near crossing (#109)', () => {
+			// The bullet starts on or over the line of sight, so it never comes up through it.
+			expect(calculateMPBR({ ...P308_G1, opticHeight: '0' }, '8', 'in')).toBeNull();
+			expect(calculateMPBR({ ...P308_G1, opticHeight: '-1' }, '8', 'in')).toBeNull();
 		});
 	});
 
@@ -1412,7 +1438,7 @@ describe('MPBR search (#86)', () => {
 
 		it('takes a thin zone', () => {
 			const result = calculateMPBR(P308_G1, '0.001', 'in');
-			expect(result.optimalZero).toBe(result.farZero);
+			expect(result.optimalZero).toBe(result.nearZero);
 			expect(result.mpbrMax - result.mpbrMin).toBeLessThan(5);
 		});
 
@@ -1423,8 +1449,8 @@ describe('MPBR search (#86)', () => {
 		it('follows a target far past any useful size', () => {
 			// 2750 ft across, just inside the depth the engine follows a bullet to.
 			const result = calculateMPBR(P308_G1, '33000', 'in');
-			expect(result.mpbrMax).toBeGreaterThan(4000);
-			expect(result.optimalZero).toBe(result.farZero);
+			expect(result.mpbrMax).toBeGreaterThan(3000);
+			expect(result.optimalZero).toBe(result.nearZero);
 		});
 
 		it.each([['34000'], ['100000'], ['1e308'], ['Infinity']])(
@@ -1440,9 +1466,11 @@ describe('MPBR search (#86)', () => {
 		});
 
 		it('gives a result for a slow load, which used to return null', () => {
+			// Before #109: the far zero, 30 yd and 36.2 yd. The near crossing is at 2.5 yd, and 2 yd
+			// puts the apex over the top, so 3 yd costs 15 % of the best range on this load.
 			const result = calculateMPBR({ ...P308_G1, velocity: '300' }, '8', 'in');
-			expect(result.optimalZero).toBe(30);
-			expect(result.mpbrMax).toBe(36.2);
+			expect(result.optimalZero).toBe(3);
+			expect(result.mpbrMax).toBe(31.6);
 		});
 
 		it.each([
