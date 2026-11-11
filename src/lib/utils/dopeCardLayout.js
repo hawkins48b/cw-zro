@@ -95,6 +95,34 @@ export function fitText(font, text, maxWidth, size, minSize = MIN_HEADER_SIZE) {
 	return { text: chars.length > 0 ? cut() : '', size: minSize };
 }
 
+/** The characters each font can encode, read once per font. */
+const characterSets = new WeakMap();
+
+/**
+ * The text without the characters the font cannot encode (#140, owner decision: drop them). The
+ * cards use the standard font Helvetica Bold, which encodes only WinAnsi (Western European): pdf-lib
+ * threw on any other character, emoji, CJK, Cyrillic or `ł`, and no card was made. A space
+ * character it cannot encode, such as the narrow no-break space U+202F, becomes a plain space, so
+ * that the words around it stay apart. A lone surrogate is dropped too.
+ * @param {{ getCharacterSet: () => number[] }} font
+ * @param {string} text
+ * @returns {string}
+ */
+export function encodableText(font, text) {
+	let set = characterSets.get(font);
+	if (!set) {
+		set = new Set(font.getCharacterSet());
+		characterSets.set(font, set);
+	}
+	let out = '';
+	for (const char of String(text ?? '')) {
+		const code = char.codePointAt(0) ?? 0;
+		if (set.has(code)) out += char;
+		else if (/\p{Zs}/u.test(char) && set.has(0x20)) out += ' ';
+	}
+	return out;
+}
+
 /**
  * Draw a header value fitted to its field.
  * @param {object} page - pdf-lib page
@@ -106,7 +134,7 @@ export function drawHeaderText(page, font, field, text) {
 	const { x, y, right } = HEADER_FIELDS[field];
 	// pdf-lib's drawText turned line breaks and tabs into lines or spaces, but measuring them throws,
 	// so control characters print as spaces, as they did.
-	const clean = String(text ?? '').replace(/[\u0000-\u001f\u007f\u2028\u2029]/g, ' ');
+	const clean = encodableText(font, String(text ?? '').replace(/[\u0000-\u001f\u007f\u2028\u2029]/g, ' '));
 	const fitted = fitText(font, clean, (right - x) * PT, 11);
 	page.drawText(fitted.text, {
 		x: x * PT,

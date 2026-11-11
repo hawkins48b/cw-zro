@@ -1,4 +1,4 @@
-import { shownProfile } from './storedProfiles.js';
+import { MAX_NAME_LENGTH, cutText, shownProfile } from './storedProfiles.js';
 
 /**
  * Pure helper functions for profile list operations.
@@ -53,6 +53,20 @@ export function getProfile(list, id) {
 	return list.find((p) => p.id === id) ?? null;
 }
 
+/** What a duplicated profile's name ends with. */
+const COPY_SUFFIX = ' - Copy';
+
+/**
+ * The name of a copy of a profile: the shown name, cut so that the name with " - Copy" fits in
+ * MAX_NAME_LENGTH (#141). Without the cut, a 60-character name lost its suffix on the next read,
+ * and the copy looked like the original.
+ * @param {object} profile
+ * @returns {string}
+ */
+export function copyName(profile) {
+	return cutText(shownProfile(profile).name, MAX_NAME_LENGTH - COPY_SUFFIX.length) + COPY_SUFFIX;
+}
+
 /**
  * Duplicates a profile, appending " - Copy" to its name as the page shows it, so that a stored name
  * that is not text cannot throw (#120).
@@ -64,7 +78,7 @@ export function duplicateProfile(list, id) {
 	const src = getProfile(list, id);
 	if (!src) return { list, id: null };
 	const { id: _srcId, ...rest } = src;
-	return addProfile(list, { ...rest, name: `${shownProfile(src).name} - Copy` });
+	return addProfile(list, { ...rest, name: copyName(src) });
 }
 
 /**

@@ -8,6 +8,7 @@
 	import { usePress } from 'svelte-gestures';
 	import { swipe } from '#lib/actions/swipe.js';
 	import { shownProfile } from '#lib/utils/storedProfiles.js';
+	import { copyName } from '#lib/utils/profileOps.js';
 
 	let sortBy = $state('recent');
 	let sortDesc = $state(true);
@@ -130,7 +131,7 @@
 		const src = profiles.get(id);
 		if (!src) return;
 		const { id: _id, ...rest } = src;
-		profiles.add({ ...rest, name: `${shownProfile(src).name} - Copy` });
+		profiles.add({ ...rest, name: copyName(src) });
 		closeContextMenu();
 	}
 

@@ -5,10 +5,13 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Calculator, Unit } from 'js-ballistics';
-import { readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import fs, { readdirSync } from 'node:fs';
+import path, { join } from 'node:path';
 import {
+	MAX_AMMO_LENGTH,
+	MAX_NAME_LENGTH,
 	UNUSABLE_IDS,
+	cutText,
 	findProfileIdRenames,
 	normalizeProfiles,
 	renameActiveProfileId,
@@ -536,5 +539,56 @@ describe('duplicateProfile with a damaged name', () => {
 	it.each(DAMAGED_VALUES)('copies a profile named %s as " - Copy"', (_, name) => {
 		const { list } = duplicateProfile([{ ...DEFAULT_PROFILE, name }], 'p1');
 		expect(list[1].name).toBe(' - Copy');
+	});
+});
+
+describe('profile text length (#141)', () => {
+	const long = 'x'.repeat(500);
+
+	it('cuts a longer stored name, optic name, ammo brand and ammo text when read', () => {
+		const stored = { ...DEFAULT_PROFILE, id: 'a', name: long, opticName: long, optic: long, bulletBrand: long, ammo: long };
+		const [read] = normalizeProfiles([stored]);
+		expect(read.name).toHaveLength(MAX_NAME_LENGTH);
+		expect(read.opticName).toHaveLength(MAX_NAME_LENGTH);
+		expect(read.optic).toHaveLength(MAX_NAME_LENGTH);
+		expect(read.bulletBrand).toHaveLength(MAX_NAME_LENGTH);
+		expect(read.ammo).toHaveLength(MAX_AMMO_LENGTH);
+		expect(read.velocity).toBe(stored.velocity);
+		expect(stored.name).toBe(long);
+	});
+
+	it('keeps texts within the limit, and the stored object itself', () => {
+		const stored = { ...DEFAULT_PROFILE, id: 'a', name: 'n'.repeat(MAX_NAME_LENGTH), ammo: 'a'.repeat(MAX_AMMO_LENGTH) };
+		expect(normalizeProfiles([stored])[0]).toBe(stored);
+	});
+
+	it('cuts the text of a renumbered profile too', () => {
+		const [read] = normalizeProfiles([{ ...DEFAULT_PROFILE, id: 7, name: long }]);
+		expect(read).toMatchObject({ id: '7', name: 'x'.repeat(MAX_NAME_LENGTH) });
+	});
+
+	it('leaves values that are not text for shownProfile', () => {
+		const stored = { ...DEFAULT_PROFILE, id: 'a', name: ['x'.repeat(100)], bulletBrand: 12345 };
+		expect(normalizeProfiles([stored])[0]).toBe(stored);
+		expect(shownProfile(stored).name).toBe('');
+	});
+
+	it('shows a long stored name cut on every page', () => {
+		expect(shownProfile(normalizeProfiles([{ ...DEFAULT_PROFILE, id: 'a', name: long }])[0]).name).toHaveLength(MAX_NAME_LENGTH);
+	});
+
+	it('does not leave half of an emoji at the cut', () => {
+		expect(cutText('x'.repeat(MAX_NAME_LENGTH - 1) + '🎯', MAX_NAME_LENGTH)).toBe('x'.repeat(MAX_NAME_LENGTH - 1));
+		expect(cutText('x'.repeat(MAX_NAME_LENGTH - 2) + '🎯', MAX_NAME_LENGTH)).toBe('x'.repeat(MAX_NAME_LENGTH - 2) + '🎯');
+		expect(cutText('short', MAX_NAME_LENGTH)).toBe('short');
+	});
+
+	it('limits the rifle designation, optic name and ammo brand inputs of the profile form', () => {
+		const source = fs.readFileSync(path.join(process.cwd(), 'src/lib/components/ProfileForm.svelte'), 'utf8');
+		for (const field of ['name', 'opticName', 'bulletBrand']) {
+			const input = source.match(new RegExp(`<input[^>]*bind:value=\\{form\\.${field}\\}[^>]*>`))?.[0];
+			expect(input, field).toContain('maxlength={MAX_NAME_LENGTH}');
+		}
+		expect(source).toContain("import { MAX_NAME_LENGTH } from '#lib/utils/storedProfiles.js'");
 	});
 });

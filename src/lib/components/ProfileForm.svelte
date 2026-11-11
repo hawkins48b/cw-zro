@@ -22,6 +22,7 @@
 		normalizedNumbers
 	} from '#lib/utils/profileValidation.js';
 	import { parseDecimal } from '#lib/utils/decimal.js';
+	import { MAX_NAME_LENGTH } from '#lib/utils/storedProfiles.js';
 	import { formatLimit } from '#lib/utils/format.js';
 	import { ammoSelection } from '#lib/stores/ammoSelection.svelte.js';
 	import { formDraft } from '#lib/stores/formDraft.svelte.js';
@@ -228,6 +229,7 @@
 			<input
 				class="input"
 				type="text"
+				maxlength={MAX_NAME_LENGTH}
 				bind:value={form.name}
 				placeholder={m.profile_rifle_designation_placeholder()}
 			/>
@@ -263,6 +265,7 @@
 			<input
 				class="input"
 				type="text"
+				maxlength={MAX_NAME_LENGTH}
 				bind:value={form.opticName}
 				placeholder={m.profile_optic_name_placeholder()}
 			/>
@@ -384,6 +387,7 @@
 			<input
 				class="input"
 				type="text"
+				maxlength={MAX_NAME_LENGTH}
 				bind:value={form.bulletBrand}
 				placeholder={m.profile_ammo_brand_placeholder()}
 			/>

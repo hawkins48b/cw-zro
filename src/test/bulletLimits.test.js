@@ -32,7 +32,10 @@ vi.mock('pdf-lib', () => ({
 	StandardFonts: {},
 	PDFDocument: {
 		load: async () => ({
-			embedFont: async () => ({ widthOfTextAtSize: (text, size) => String(text).length * size * 0.55 }),
+			embedFont: async () => ({
+				widthOfTextAtSize: (text, size) => String(text).length * size * 0.55,
+				getCharacterSet: () => Array.from({ length: 95 }, (_, i) => i + 0x20)
+			}),
 			getPages: () => [
 				{
 					getSize: () => ({ height: 612 }),

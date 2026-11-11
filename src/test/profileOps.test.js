@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { MAX_NAME_LENGTH, normalizeProfiles } from '#lib/utils/storedProfiles.js';
 import {
+	copyName,
 	addProfile,
 	updateProfile,
 	removeProfile,
@@ -146,6 +148,15 @@ describe('duplicateProfile', () => {
 		const { list } = duplicateProfile(seed, id);
 		expect(list).toHaveLength(2);
 		expect(list[1].name).toBe('Original - Copy');
+	});
+
+	it('keeps " - Copy" on a copy of a name at the length limit (#141)', () => {
+		const name = 'x'.repeat(MAX_NAME_LENGTH);
+		const { list: seed, id } = addProfile([], makeProfile({ name }));
+		const { list } = duplicateProfile(seed, id);
+		expect(list[1].name).toBe('x'.repeat(MAX_NAME_LENGTH - 7) + ' - Copy');
+		expect(normalizeProfiles(list)[1].name).toBe(list[1].name);
+		expect(copyName({ name: 'Short' })).toBe('Short - Copy');
 	});
 
 	it('gives the copy a new unique id', () => {

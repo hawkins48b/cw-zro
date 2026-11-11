@@ -23,6 +23,7 @@ import {
 	HEADER_FIELDS,
 	MIN_HEADER_SIZE,
 	clipSegmentY,
+	encodableText,
 	fitText
 } from '#lib/utils/dopeCardLayout.js';
 import { P223_G1, P223_SHORT_ZERO, P300BLK_SUBSONIC, P308_G1, P338_G7_METRIC } from './fixtures/ballisticProfiles.js';
@@ -273,6 +274,43 @@ describe('values past the printed scales (#136)', () => {
 		await generateImperialDopeCard(P308_G1);
 		expect(arrows(elements())).toEqual([]);
 	});
+});
+
+describe('characters the font cannot encode (#140)', () => {
+	it('drops them and keeps WinAnsi text as it is', () => {
+		expect(encodableText(font, 'Rifle 🎯')).toBe('Rifle ');
+		expect(encodableText(font, '日本 Tikka')).toBe(' Tikka');
+		expect(encodableText(font, 'Łódź ł Привет Ωμέγα')).toBe('ód   ');
+		expect(encodableText(font, 'Gewehr ÄÖÜ é € 3.5–10×50')).toBe('Gewehr ÄÖÜ é € 3.5–10×50');
+		expect(encodableText(font, 'bad\ud800end\u0085')).toBe('badend');
+	});
+
+	it('turns a space character it cannot encode into a space', () => {
+		expect(encodableText(font, 'M193 55\u202fgr')).toBe('M193 55 gr');
+	});
+
+	const NAMES = [
+		['emoji', 'Rifle 🎯'],
+		['CJK', '日本'],
+		['Cyrillic', 'Винтовка'],
+		['Polish ł', 'Strzał'],
+		['only emoji', '🎯🎯']
+	];
+
+	for (const [kind, generate] of CARDS) {
+		it.each(NAMES)(`gives a ${kind} card for a name, brand and optic with %s`, async (_, text) => {
+			const bytes = await generate({ ...P308_G1, name: text, bulletBrand: text, opticName: text });
+			expect(bytes).not.toBeNull();
+			for (const e of byArea().header.filter((e) => e.method === 'drawText')) {
+				expect(encodableText(font, e.text)).toBe(e.text);
+			}
+		});
+
+		it(`prints a WinAnsi name as typed on the ${kind} card`, async () => {
+			await generate({ ...P308_G1, name: 'Gewehr ÄÖÜ é' });
+			expect(byArea().header.some((e) => e.text === 'Gewehr ÄÖÜ é')).toBe(true);
+		});
+	}
 });
 
 describe('header text size (#137)', () => {

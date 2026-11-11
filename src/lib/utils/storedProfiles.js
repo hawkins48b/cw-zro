@@ -97,6 +97,60 @@ function linkableId(id) {
 }
 
 /**
+ * Longest rifle designation, optic name and ammo brand, in UTF-16 code units as an input's
+ * `maxlength` counts them (#141, owner decision of 2026-11-11). The profile form holds each of them
+ * to it, and a longer stored value is cut to it when read (cutStoredTexts).
+ */
+export const MAX_NAME_LENGTH = 60;
+
+/**
+ * Longest stored ammo text (`ammo`): the profile form builds it from the brand and the weight
+ * (buildAmmoString), so it may hold MAX_NAME_LENGTH characters of brand and a weight after it.
+ */
+export const MAX_AMMO_LENGTH = MAX_NAME_LENGTH + 20;
+
+/** The stored text fields cut on read, with their longest length (#141). `optic` copies `opticName`. */
+const TEXT_LIMITS = {
+	name: MAX_NAME_LENGTH,
+	opticName: MAX_NAME_LENGTH,
+	optic: MAX_NAME_LENGTH,
+	bulletBrand: MAX_NAME_LENGTH,
+	ammo: MAX_AMMO_LENGTH
+};
+
+/**
+ * A text cut to at most `max` UTF-16 code units, as `maxlength` counts them, without leaving half
+ * of a character that takes two (an emoji, for example) at the end.
+ * @param {string} text
+ * @param {number} max
+ * @returns {string}
+ */
+export function cutText(text, max) {
+	if (text.length <= max) return text;
+	const last = text.charCodeAt(max - 1);
+	return text.slice(0, last >= 0xd800 && last <= 0xdbff ? max - 1 : max);
+}
+
+/**
+ * The profile with each text field of TEXT_LIMITS that is longer than its limit cut to it (#141,
+ * owner decision: cut on read). Only text is cut: other values are left as stored, for shownProfile
+ * to read. The very object given when nothing is cut.
+ * @param {Record<string, any>} profile
+ * @returns {Record<string, any>}
+ */
+function cutStoredTexts(profile) {
+	let cut = null;
+	for (const [key, max] of Object.entries(TEXT_LIMITS)) {
+		const value = profile[key];
+		if (typeof value === 'string' && value.length > max) {
+			cut ??= { ...profile };
+			cut[key] = cutText(value, max);
+		}
+	}
+	return cut ?? profile;
+}
+
+/**
  * The usable profiles of the stored list. Anything that is not a list gives no profiles, and an
  * entry that is not a profile is left out. The pages then show that there is no profile, and
  * saving a profile writes a usable list again.
@@ -114,8 +168,12 @@ function linkableId(id) {
  * as for a duplicate. Like duplicates, the result depends only on the list, so it is the same at
  * every read, and the next save stores it.
  *
- * A profile whose id is already text, usable and not taken is the stored object itself. Its other
- * fields are left as stored.
+ * A rifle designation, optic name or ammo brand longer than MAX_NAME_LENGTH, and an ammo text longer
+ * than MAX_AMMO_LENGTH, is cut to it (#141, cutStoredTexts). Like a renumbered id, the next save
+ * stores the cut text.
+ *
+ * A profile whose id is already text, usable and not taken, and whose texts fit, is the stored
+ * object itself. Its other fields are left as stored.
  *
  * @param {unknown} value
  * @returns {object[]}
@@ -133,7 +191,9 @@ export function normalizeProfiles(value) {
 		const taken = used.has(wanted) || (wanted !== text && stored.has(wanted));
 		const id = taken ? freeId(wanted, stored, used, next) : wanted;
 		used.add(id);
-		return id === profile.id ? profile : { ...profile, id };
+		const fitted = cutStoredTexts(profile);
+		if (id === profile.id) return fitted;
+		return fitted === profile ? { ...profile, id } : Object.assign(fitted, { id });
 	});
 }
 
