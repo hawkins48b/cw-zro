@@ -1,4 +1,4 @@
-import { migrateClockWind, pageWind, patchWind } from '#lib/utils/storedWind.js';
+import { WIND_FROM_TARGET, migrateStoredWind, pageWind, patchWind } from '#lib/utils/storedWind.js';
 import {
 	storedAtmosphere,
 	storedElevation,
@@ -18,7 +18,8 @@ const ISA_DEFAULTS = {
 	humidity: '0'
 };
 
-const DEFAULT_WIND = { speed: '0', speedUnit: 'mph', direction: '90' };
+// Direction where the wind comes from, since #106: 90 is from the right.
+const DEFAULT_WIND = { speed: '0', speedUnit: 'mph', direction: '90', directionConvention: WIND_FROM_TARGET };
 
 const store = localStore('zro-scope-view', () => ({
 	range: { distance: '500', unit: 'yd' },
@@ -32,9 +33,11 @@ const store = localStore('zro-scope-view', () => ({
 // see storedState.js.
 const state = () => storedObject(store.value);
 
-// One-time migration: convert stored clock direction to degrees
-if (state().wind?.directionUnit !== undefined) {
-	store.value = { ...state(), wind: migrateClockWind(state().wind) };
+// One-time migrations: a stored clock direction to degrees, then the direction to where the wind
+// comes from (#106). A wind already converted comes back as the same object, so nothing is written.
+const migratedWind = migrateStoredWind(state().wind, { clock: true });
+if (migratedWind !== state().wind) {
+	store.value = { ...state(), wind: migratedWind };
 }
 
 export const scopeView = {

@@ -258,6 +258,30 @@ describe('zero crossings on the card', () => {
 		expect(header[6]).toMatch(/^\+/);
 	});
 
+	// #124: P308_G1 saves its zero in yd, so this is a 3000 yd zero, 2743.2 m. The metric card looks
+	// for crossings to 3000 m, so it finds the crossing the imperial card cannot reach. It lies 0.1
+	// past the zero because the solver checks height one integration step past the distance.
+	it('prints the far crossing of a 3000 yd zero on the metric card, in metres (#124)', async () => {
+		await generateMetricDopeCard({ ...P308_G1, zeroDist: 3000 });
+		const { header } = printed();
+		expect(header[6]).toBe('2743.3');
+		expect(Math.abs(parseFloat(header[6]) - UNew.Yard(3000).In(Unit.Meter))).toBeLessThanOrEqual(0.2);
+	});
+
+	// #124: a zero at the end of the search range has its crossing just past it, so far zero is blank
+	// on both cards, as for a 3000 yd zero on the imperial card.
+	it.each([
+		['metric, 3000 m zero', generateMetricDopeCard, 'm'],
+		['imperial, 3000 m zero', generateImperialDopeCard, 'm']
+	])('leaves far zero blank past the search range, %s (#124)', async (_, generate, zeroUnit) => {
+		await generate({ ...P308_G1, zeroDist: 3000, zeroUnit });
+		const { header } = printed();
+		expect(card.labels).toHaveLength(42);
+		expect(parseFloat(header[2])).toBeLessThan(1);
+		expect(header[5]).toBe('0.462 G1');
+		expect(header[6]).toMatch(/^\+/);
+	});
+
 	// Owner approval of 2026-11-10 (#93): a zero past 3000 gives no card instead of a blank far zero.
 	it('gives no card for a 3500 m zero, metric', async () => {
 		expect(await generateMetricDopeCard({ ...P308_G1, zeroDist: 3500, zeroUnit: 'm' })).toBeNull();

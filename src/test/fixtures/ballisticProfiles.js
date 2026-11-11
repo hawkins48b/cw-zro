@@ -181,6 +181,11 @@ export const ATMO_COLD_METRIC = {
 	humidity: '60'
 };
 
-/** Full-value crosswinds as the wind control produces them (90 = from the left). */
-export const WIND_10MPH = { speed: '10', speedUnit: 'mph', direction: '90' };
-export const WIND_4MPS = { speed: '4', speedUnit: 'mps', direction: '90' };
+/**
+ * Full-value crosswinds from the left, as the wind control produces them. The direction is where
+ * the wind comes from since #106, so 270 is from the left. Before #106 these held 90, which the
+ * engine read as from the left too: the input was converted (owner decision on #106), and the
+ * recorded results are unchanged.
+ */
+export const WIND_10MPH = { speed: '10', speedUnit: 'mph', direction: '270' };
+export const WIND_4MPS = { speed: '4', speedUnit: 'mps', direction: '270' };

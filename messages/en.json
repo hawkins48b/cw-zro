@@ -132,6 +132,7 @@
 	"scope_view_wind": "Wind",
 	"scope_view_wind_speed": "Wind Speed",
 	"scope_view_wind_dir": "Wind Direction",
+	"scope_view_wind_dir_from": "Where the wind comes from: 0° = from the target, 90° = from the right",
 	"scope_view_wind_no_wind": "No Wind",
 	"scope_view_wind_light_wind": "Light Wind",
 	"scope_view_wind_strong_wind": "Strong Wind",

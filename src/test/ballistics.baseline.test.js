@@ -314,13 +314,15 @@ describe.each(PROFILES)('trajectory baseline: %s', (_, ref) => {
 	});
 
 	it('records a hot, high atmosphere with a quartering wind, imperial inputs', () => {
-		const wind = { speed: '10', speedUnit: 'mph', direction: '45' };
+		// 225 since #106: the direction where the wind comes from, the engine's 45 before.
+		const wind = { speed: '10', speedUnit: 'mph', direction: '225' };
 		const result = calculateFullTrajectory(ref.profile, YD_1000, ATMO_HOT_ALTITUDE, wind);
 		expectImperialRows(result.trajectory, ref.hotAltitude);
 	});
 
 	it('records a cold, high atmosphere with a quartering wind, metric inputs', () => {
-		const wind = { speed: '4', speedUnit: 'mps', direction: '300' };
+		// 120 since #106: the direction where the wind comes from, the engine's 300 before.
+		const wind = { speed: '4', speedUnit: 'mps', direction: '120' };
 		const result = calculateFullTrajectory(ref.profile, M_1000, ATMO_COLD_METRIC, wind);
 		expectMetricRows(result.trajectory, ref.coldMetric);
 	});
@@ -361,8 +363,9 @@ describe('trajectory conventions', () => {
 	});
 
 	it('mirrors wind from the left and from the right', () => {
-		const left = at600(P308_G1, { speed: '10', speedUnit: 'mph', direction: '90' });
-		const right = at600(P308_G1, { speed: '10', speedUnit: 'mph', direction: '270' });
+		// Where the wind comes from since #106: 270 is from the left, 90 from the right.
+		const left = at600(P308_G1, { speed: '10', speedUnit: 'mph', direction: '270' });
+		const right = at600(P308_G1, { speed: '10', speedUnit: 'mph', direction: '90' });
 		expect(left.windage.In(Unit.Inch)).toBeGreaterThan(0);
 		near(left.windage.In(Unit.Inch), -right.windage.In(Unit.Inch), TOL.inch, 'mirrored wind');
 	});
@@ -1038,7 +1041,8 @@ describe('max apex (#85)', () => {
 	});
 
 	it('flies the same shot as the table, with its air and wind', () => {
-		const wind = { speed: '10', speedUnit: 'mph', direction: '45' };
+		// 225 since #106: the direction where the wind comes from, the engine's 45 before.
+		const wind = { speed: '10', speedUnit: 'mph', direction: '225' };
 		const top = step1Top(ZERO_200, 'yd', 1000, ATMO_HOT_ALTITUDE, wind);
 		// Thin air needs less elevation to reach the zero, by more than the tolerance.
 		expect(top.elevation).toBeLessThan(step1Top(ZERO_200, 'yd').elevation - 0.05);

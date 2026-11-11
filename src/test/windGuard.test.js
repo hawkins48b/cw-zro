@@ -247,7 +247,7 @@ describe('wind guard (#116)', () => {
 			});
 
 			it('reads a stored number as the same text', () => {
-				expect(figures(calculate({ speed: 10, speedUnit: 'mph', direction: 90 }))).toEqual(
+				expect(figures(calculate({ speed: 10, speedUnit: 'mph', direction: 270 }))).toEqual(
 					figures(calculate(WIND_10MPH))
 				);
 			});
@@ -260,9 +260,16 @@ describe('wind guard (#116)', () => {
 	});
 
 	describe('shotWinds', () => {
-		/** The wind both calculators built before the guard. */
+		/**
+		 * The wind both calculators built before the guard, with the engine angle half a turn from the
+		 * entered one since #106 (where the wind comes from). Written out, not read from
+		 * windDirection.js, so a change there fails here.
+		 */
 		const direct = (speed, toVelocity, direction) =>
-			new Wind({ velocity: toVelocity(parseFloat(speed)), directionFrom: UNew.Degree(parseFloat(direction)) });
+			new Wind({
+				velocity: toVelocity(parseFloat(speed)),
+				directionFrom: UNew.Degree((((parseFloat(direction) % 360) + 540) % 360))
+			});
 
 		it.each([
 			['10', 'mph', '90', UNew.MPH],
@@ -275,7 +282,7 @@ describe('wind guard (#116)', () => {
 			['20', 'mph', '90abc', UNew.MPH],
 			['20', 'mph', '-0', UNew.MPH],
 			['10abc', 'mph', '90', UNew.MPH]
-		])('builds %s %s at %s as it always did', (speed, speedUnit, direction, toVelocity) => {
+		])('builds %s %s at %s as it always did, half a turn away', (speed, speedUnit, direction, toVelocity) => {
 			const winds = shotWinds({ speed, speedUnit, direction });
 			expect(winds).toHaveLength(1);
 			expect(winds[0]).toEqual(direct(speed, toVelocity, direction));

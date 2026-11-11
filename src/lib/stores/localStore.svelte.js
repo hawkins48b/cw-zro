@@ -24,14 +24,27 @@ export function localStore(key, init, { seed = true } = {}) {
 			// fall through to default
 		}
 		const defaultValue = getDefault();
-		if (seed) localStorage.setItem(key, JSON.stringify(defaultValue));
+		if (seed) write(defaultValue);
 		return defaultValue;
+	}
+
+	/**
+	 * Saves a value, and keeps going when storage refuses it (full, or blocked). The value stays in
+	 * memory for this session. A store module writes while it loads (a seed, or a one-time conversion
+	 * such as the wind direction of #106), so a throw here would stop the page loading.
+	 */
+	function write(value) {
+		try {
+			localStorage.setItem(key, JSON.stringify(value));
+		} catch (e) {
+			console.warn(`Could not save ${key}:`, e);
+		}
 	}
 
 	let data = $state(load());
 
 	function persist() {
-		if (browser) localStorage.setItem(key, JSON.stringify(data));
+		if (browser) write(data);
 	}
 
 	return {

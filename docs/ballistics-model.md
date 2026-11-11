@@ -40,7 +40,7 @@ Everything comes from a profile or from the screen. Values are stored as entered
 | Air temperature | °F, °C | Custom atmosphere |
 | Humidity | % | Custom atmosphere |
 | Wind speed | mph, m/s | Wind |
-| Wind direction | degrees | Wind |
+| Wind direction | degrees, where the wind comes from | Wind |
 
 Weight and diameter do not change the drag. The BC alone carries that.
 
@@ -59,7 +59,7 @@ Weight and diameter do not change the drag. The BC alone carries that.
 | MPBR | `calculateMPBR` | Standard only | No | No | Vertical only is used |
 | Dope cards | `computeTrajectory` in each card file | Standard only | Preset | No | No |
 
-Dope cards go to 500 yd or 500 m. They use a crosswind from the left of 8 and 20 mph (imperial) or 3.5 and 9 m/s (metric).
+Dope cards go to 500 yd or 500 m. They use a crosswind from the left of 8 and 20 mph (imperial) or 3.5 and 9 m/s (metric), built in the card files with the engine's 90°. The cards print the windage as a size, light wind on the left of each point-of-aim chart and strong wind on the right, marked `LI` and `ST`. No label on them says left or right, so the convention of [#106](https://github.com/hawkins48b/cw-zro/issues/106) changed nothing on them.
 
 ## Drag
 
@@ -96,18 +96,20 @@ With the option on, the velocity changes by the entered value in **fps per degre
 
 ## Wind
 
-One wind applies for the whole flight, with no vertical part. Direction is in degrees, clockwise, from the view of the shooter.
+One wind applies for the whole flight, with no vertical part. The direction is where the wind comes from, in degrees clockwise from the target, as on a shooter's clock ([#106](https://github.com/hawkins48b/cw-zro/issues/106), owner decision of 2026-11-11). The library reads its angle the other way round: 0° is a tailwind and 90° a wind from the left (`Wind.directionFrom`, vector (cos, 0, sin)). So [`shotWinds`](../src/lib/utils/shotWind.js) gives the engine the entered angle plus 180°, in [0, 360) ([`halfTurn`](../src/lib/utils/windDirection.js)).
 
-| Direction | Library meaning | Effect, 10 mph, `.308` test profile at 1000 yd |
-|-----------|-----------------|-----------------------------------------|
-| 0° | Tailwind: blowing towards the target | Drop 5.0 in less than with no wind |
-| 90° | From the left | 110.8 in to the right |
-| 180° | Headwind: blowing towards the shooter | Drop 5.1 in more than with no wind |
-| 270° | From the right | 110.8 in to the left |
+| Direction entered | Clock | Wind | Effect, 10 mph, `.308` test profile at 1000 yd |
+|-------------------|-------|------|-------------------------------------------------|
+| 0° | 12 | Headwind, from the target | Drop 5.1 in more than with no wind |
+| 90° | 3 | From the right | 110.8 in to the left |
+| 180° | 6 | Tailwind, from behind | Drop 5.0 in less than with no wind |
+| 270° | 9 | From the left | 110.8 in to the right |
 
-On the wind dial, 0° is at the top, towards the target, and the arrowhead sits at the entered angle. So the arrowhead shows where the wind is going, not where it comes from. Entering the clock position the wind comes from gives the opposite of the table above.
+On the wind dial, 0° is at the top, towards the target. The Wind icon sits at the entered angle, where the wind comes from, and the arrowhead points where it blows. Dragging the dial moves the Wind icon. A line under the direction box says what the angle means.
 
-An empty direction box counts as 0°, a tailwind, as its placeholder and the dial show ([#116](https://github.com/hawkins48b/cw-zro/issues/116)). So clearing the box with a wind speed above 0 gives a result for a wind the user did not enter.
+An empty direction box counts as 0°, as its placeholder and the dial show ([#116](https://github.com/hawkins48b/cw-zro/issues/116)). Since #106 that is a headwind. So clearing the box with a wind speed above 0 gives a result for a wind the user did not enter.
+
+**Directions saved before #106** were in the library's convention. Both stores convert their wind once, when they load, to the direction half a turn away, so the wind and the result stay the same: a saved 90 (from the left) becomes 270, and an empty box (a tailwind then) becomes 180. A marker in the saved wind stops a second conversion. See [Stored values](architecture.md#stored-values).
 
 A comma in the speed or direction box reads as a decimal point: `1,5` is 1.5, in the result, on the dial and in the badge ([#117](https://github.com/hawkins48b/cw-zro/issues/117)).
 
@@ -193,7 +195,7 @@ Limits:
 
 The library runs synchronously. **Far outside normal values it can stay in its loop for good, and neither `try/catch` nor a timeout can stop that.** So guards have to run before the engine is called. These are the guards in place.
 
-The limits were set by the owner on 2026-11-10 ([#89](https://github.com/hawkins48b/cw-zro/issues/89), [#90](https://github.com/hawkins48b/cw-zro/issues/90), [#91](https://github.com/hawkins48b/cw-zro/issues/91), [#92](https://github.com/hawkins48b/cw-zro/issues/92), [#93](https://github.com/hawkins48b/cw-zro/issues/93), [#114](https://github.com/hawkins48b/cw-zro/issues/114), [#119](https://github.com/hawkins48b/cw-zro/issues/119), [#125](https://github.com/hawkins48b/cw-zro/issues/125)). They live in [`inputLimits.js`](../src/lib/utils/inputLimits.js) and [`zeroDistance.js`](../src/lib/utils/zeroDistance.js), and the form and every path read them from there. Measured on f40933f before the change, 3888 worst-case combinations inside them (G1 and G7, BC 0.01 to 2, 60 to 9999 fps, sight height -10 to 10 in, zero 1 to 3000, both ends of temperature and pressure, no wind and 223 mph at 0° and 90°) gave no hang through `calculateShotPoint` and `calculateFullTrajectory`. The slowest took 2.2 s, on a 3000 zero. The dope cards, MPBR and validation were not part of that run.
+The limits were set by the owner on 2026-11-10 ([#89](https://github.com/hawkins48b/cw-zro/issues/89), [#90](https://github.com/hawkins48b/cw-zro/issues/90), [#91](https://github.com/hawkins48b/cw-zro/issues/91), [#92](https://github.com/hawkins48b/cw-zro/issues/92), [#93](https://github.com/hawkins48b/cw-zro/issues/93), [#114](https://github.com/hawkins48b/cw-zro/issues/114), [#119](https://github.com/hawkins48b/cw-zro/issues/119), [#125](https://github.com/hawkins48b/cw-zro/issues/125)). They live in [`inputLimits.js`](../src/lib/utils/inputLimits.js) and [`zeroDistance.js`](../src/lib/utils/zeroDistance.js), and the form and every path read them from there. Measured on f40933f before the change, 3888 worst-case combinations inside them (G1 and G7, BC 0.01 to 2, 60 to 9999 fps, sight height -10 to 10 in, zero 1 to 3000, both ends of temperature and pressure, no wind and 223 mph at 0° and 90°, the engine's angles) gave no hang through `calculateShotPoint` and `calculateFullTrajectory`. The slowest took 2.2 s, on a 3000 zero. The dope cards, MPBR and validation were not part of that run.
 
 | Limit | Value, in the unit entered |
 |-------|----------------------------|
@@ -234,7 +236,7 @@ All ends are included. The gram and foot ends are the owner's rounded values, no
 | Ballistic page | Range above 0 and at most 3000 (`isUsableBallisticRange`). A negative range gives no result here, as on the compare page ([#122](https://github.com/hawkins48b/cw-zro/issues/122)) | No result, and a message under the box |
 | Scope view, angle in cos | Cosine finite, above 0 and at most 1 (`isUsableScopeAngle`). Empty is flat ([#121](https://github.com/hawkins48b/cw-zro/issues/121)) | No result, and a message under the box |
 | Scope view, angle in degrees | Angle finite and strictly between -90° and 90° (`isUsableScopeAngle`). Text that is not a number is rejected. Empty is flat ([#129](https://github.com/hawkins48b/cw-zro/issues/129)) | No result, and a message under the box |
-| Shot point, full trajectory, wind speed above 0 (`shotWinds`) | Speed at most 100 m/s, about 224 mph, in either unit. Direction a number or text that reads as a number, at most 1e6 degrees either way, so a negative angle is valid. An empty or whitespace text counts as 0°. Null, a missing value, an object or a boolean is not empty | No result |
+| Shot point, full trajectory, wind speed above 0 (`shotWinds`) | Speed at most 100 m/s, about 224 mph, in either unit. Direction a number or text that reads as a number, at most 1e6 degrees either way, so a negative angle is valid; the limit applies to the angle entered, before the half turn of #106, and the engine then gets an angle in [0, 360). An empty or whitespace text counts as 0°, a headwind. Null, a missing value, an object or a boolean is not empty | No result |
 | Shot point, full trajectory, stored wind speed that is an array, object or boolean (`shotWinds`) | Rejected, because the page can still show it as a speed | No result |
 | Shot point, full trajectory, wind speed empty, text, 0, negative, null or missing (`shotWinds`) | No wind is used, so the direction is not checked | Normal result without wind |
 | Compare trajectories | Same zero rule on each entry's field. Range within the limit | Message under the field, and the entry leaves the chart |
@@ -253,7 +255,7 @@ Saved profiles are read through the same guards on every path, so a stored `Infi
 **Remaining gaps.** These are known and not fixed:
 
 - The powder sensitivity temperature and modifier only have to be finite in the form. The velocity they give is checked.
-- The pressure correction for altitude ([#107](https://github.com/hawkins48b/cw-zro/issues/107)) gives the engine pressures down to 78 hPa. Probed on this branch with the engine in a worker and a 30 s limit: 2048 corners (G1 and G7, BC 0.01 and 2, 60 and 9999 fps, sight height ±10 in, zero 1 and 3000, altitude -1000 and 10000 m with 300 and 1200 hPa, -90 and 70 °C, 0 and 100 % humidity, no wind and 100 m/s at 90°, shot point and full trajectory, range 3000 yd), and 480 cases at 10000 m from 300 to 1200 hPa. Without the density guard, 4 corners ran past 30 s, all at 10000 m, 300 hPa, 70 °C, 100 %. With it, none did. The slowest took 0.9 s alone. A density just above 0 is not proven safe for every combination. Readings that are physically impossible (water vapour pressure above the air pressure, as at 70 °C below about 312 hPa) still give a result when the density stays above 0.
+- The pressure correction for altitude ([#107](https://github.com/hawkins48b/cw-zro/issues/107)) gives the engine pressures down to 78 hPa. Probed on this branch with the engine in a worker and a 30 s limit: 2048 corners (G1 and G7, BC 0.01 and 2, 60 and 9999 fps, sight height ±10 in, zero 1 and 3000, altitude -1000 and 10000 m with 300 and 1200 hPa, -90 and 70 °C, 0 and 100 % humidity, no wind and 100 m/s at 90° in the engine's angle, shot point and full trajectory, range 3000 yd), and 480 cases at 10000 m from 300 to 1200 hPa. Without the density guard, 4 corners ran past 30 s, all at 10000 m, 300 hPa, 70 °C, 100 %. With it, none did. The slowest took 0.9 s alone. A density just above 0 is not proven safe for every combination. Readings that are physically impossible (water vapour pressure above the air pressure, as at 70 °C below about 312 hPa) still give a result when the density stays above 0.
 - The low end of the altitude limits gives no result, because the engine ends every flight below -1410.748 ft. The pages with a custom atmosphere say so. With the standard atmosphere (compare, MPBR, dope cards, and the other pages with "use ISA" on) a flight that drops 1410 ft below the muzzle ends the same way, and shows only the general no-result text.
 - In trajectory validation, only the profile's own first shot is checked for that stop. A later shot of the search that ends there counts as a failed shot, and can end in "no solution".
 - The hangs measured near the limits needed a sight height about as large as the zero distance or larger (20 in with a 0.5 zero, 10 in with a 0.2 zero), which the limits rule out. No proof covers every combination inside them, and the dope cards, MPBR and validation were not part of the 3888-combination run.

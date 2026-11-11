@@ -138,7 +138,8 @@ function customAtmo(atmosphere) {
  * @param {object} profile - flat v2 profile from the profiles store
  * @param {object} range   - { distance: string|number, unit: 'yd'|'m' }
  * @param {object|null} atmosphere - custom atmo or null for ISA
- * @param {object} wind    - { speed, speedUnit: 'mph'|'mps', direction, directionUnit: 'clock'|'deg' }
+ * @param {object} wind    - { speed, speedUnit: 'mph'|'mps', direction }, direction in degrees where the
+ *   wind comes from (#106), read by shotWinds
  * @param {object} [options] - optional settings
  * @param {number} [options.cantAngle=0] - rifle cant angle in degrees
  * @param {{ minimumAltitude?: boolean }} [options.report] - when given, minimumAltitude is set to
@@ -326,7 +327,8 @@ const RANGE_EPSILON = 1e-6;
  * @param {object} profile    - flat v2 profile
  * @param {object} range      - { distance, unit: 'yd'|'m', step }
  * @param {object|null} atmosphere - custom atmo or null for ISA
- * @param {object} wind       - { speed, speedUnit: 'mph'|'mps', direction }
+ * @param {object} wind       - { speed, speedUnit: 'mph'|'mps', direction }, direction where the wind
+ *   comes from (#106), read by shotWinds
  * @param {object} [options]
  * @param {{ minimumAltitude?: boolean }} [options.report] - when given, minimumAltitude is set to
  *   whether a null result came from the engine's minimum altitude (flightStop.js, #125)

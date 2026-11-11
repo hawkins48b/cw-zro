@@ -5,9 +5,15 @@
 
 	let { speed, speedUnit, direction, onchange } = $props();
 
-	// Direction is always in degrees (0–360, 0 = 12 o'clock / downrange, clockwise). Boxes are read
-	// as shotWinds reads them, with a comma as a decimal point, so the dial matches the result.
+	// Direction is where the wind comes FROM, in degrees clockwise from the target, as on a shooter's
+	// clock (#106): 0 = from the target (12 o'clock), 90 = from the right (3 o'clock), 180 = from
+	// behind, 270 = from the left. Boxes are read as shotWinds reads them, with a comma as a decimal
+	// point, so the dial matches the result.
 	let dirDeg = $derived(((readDecimal(direction) || 0) % 360 + 360) % 360);
+	// The arrow is drawn pointing up, head at the top and Wind icon at the bottom. Turned by the
+	// direction plus half a turn, the icon sits on the side the wind comes from and the head points
+	// where it blows.
+	let arrowDeg = $derived((dirDeg + 180) % 360);
 
 	let dialEl = $state(null);
 	let dragging = $state(false);
@@ -144,8 +150,8 @@
 				<text x="50" y="77" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="600" class="fill-surface-500 dark:fill-surface-400">180°</text>
 				<text x="24" y="50" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="600" class="fill-surface-500 dark:fill-surface-400">270°</text>
 
-				<!-- Rotating group: arrow shaft + arrowhead at source end (top) -->
-				<g transform="rotate({dirDeg} 50 50)">
+				<!-- Rotating group: arrow shaft + arrowhead at the downwind end (top before rotating) -->
+				<g transform="rotate({arrowDeg} 50 50)">
 					<line
 						x1="50" y1="21" x2="50" y2="72"
 						class="stroke-blue-400" stroke-width="1.5" stroke-linecap="round"
@@ -167,8 +173,9 @@
 				<line x1="55" y1="50" x2="60" y2="50" class="stroke-surface-500 dark:stroke-surface-400" stroke-width="0.8" />
 				<circle cx="50" cy="50" r="4" fill="none" class="stroke-blue-400" stroke-width="1.5" />
 
-				<!-- Wind icon at tail end of arrow (vertically mirrored from original) -->
-				<g transform="rotate({dirDeg} 50 50)">
+				<!-- Wind icon at the tail of the arrow, on the side the wind comes from (vertically mirrored
+					from original) -->
+				<g transform="rotate({arrowDeg} 50 50)">
 					<g transform="scale(1,-1) translate(0,-100)">
 						<g transform="rotate(90, 50, 18)">
 							<Wind x={43} y={11} size={14} class="stroke-blue-400" />
@@ -222,6 +229,7 @@
 					/>
 					<span class="text-xs text-surface-600-400 ml-auto shrink-0">{m.unit_deg()}</span>
 				</div>
+				<p class="text-xs text-surface-600-400">{m.scope_view_wind_dir_from()}</p>
 			</div>
 		</div>
 	</div>

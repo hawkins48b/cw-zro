@@ -1,6 +1,7 @@
 import { UNew, Unit, Wind } from 'js-ballistics';
 import { isNumberOrText } from './storedWind.js';
 import { readDecimal } from './decimal.js';
+import { MAX_WIND_DIRECTION_DEGREES, halfTurn } from './windDirection.js';
 
 /**
  * Fastest wind the engine is given, in m/s: about 224 mph (owner decision on #116).
@@ -14,13 +15,6 @@ import { readDecimal } from './decimal.js';
 const MAX_WIND_SPEED_MPS = 100;
 
 /**
- * Largest wind direction accepted, in degrees either way. It cannot hang the engine, which only
- * takes its sin and cos. But the angle loses precision, and from 1e100 it has no meaning while the
- * result still looks normal. No one enters this many turns, so it gives no result instead.
- */
-const MAX_WIND_DIRECTION_DEGREES = 1e6;
-
-/**
  * The winds array of a Shot, from the wind of a screen or of storage. Call this before the engine.
  *
  * A NaN or infinite direction, or an infinite speed, gives a NaN wind vector. The zero solve still
@@ -32,13 +26,18 @@ const MAX_WIND_DIRECTION_DEGREES = 1e6;
  * | Empty, text, 0, negative, null, missing   | Anything                    | [], no wind            |
  * | Array, object, boolean                    | Anything                    | null                   |
  * | Above MAX_WIND_SPEED_MPS, or infinite     | Anything                    | null                   |
- * | Above 0                                   | Empty or whitespace string  | One wind at 0°         |
+ * | Above 0                                   | Empty or whitespace string  | One wind from 0°       |
  * | Above 0                                   | Text or not finite          | null                   |
  * | Above 0                                   | Not a number or string      | null                   |
  * | Above 0                                   | Over 1e6 degrees either way | null                   |
- * | Above 0                                   | Finite number or string     | One wind at that angle |
+ * | Above 0                                   | Finite number or string     | One wind from there    |
+ *
+ * The direction is where the wind comes from, clockwise from the target, and the engine is given
+ * that angle plus half a turn (owner decision on #106, see windDirection.js). So 0° is a headwind,
+ * 90° a wind from the right, which drifts the bullet left.
  *
  * Only an empty box counts as 0°, to match its placeholder and the dial (owner decision on #116).
+ * Since #106 that is a headwind.
  * A missing direction does not: the box always sends a string, so null or undefined is a damaged
  * value. Only a number or a string is read at all: parseFloat alone would read the array [90] as 90,
  * and throw on an object that cannot become text. A stored speed of any other shape gives no result
@@ -65,5 +64,5 @@ export function shotWinds(wind) {
 	const degrees = isEmpty ? 0 : readDecimal(direction);
 	if (!(Math.abs(degrees) <= MAX_WIND_DIRECTION_DEGREES)) return null;
 
-	return [new Wind({ velocity, directionFrom: UNew.Degree(degrees) })];
+	return [new Wind({ velocity, directionFrom: UNew.Degree(halfTurn(degrees)) })];
 }

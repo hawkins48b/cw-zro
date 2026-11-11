@@ -1,4 +1,4 @@
-import { pageWind, patchWind } from '#lib/utils/storedWind.js';
+import { WIND_FROM_TARGET, migrateStoredWind, pageWind, patchWind } from '#lib/utils/storedWind.js';
 import {
 	storedAtmosphere,
 	storedBallisticOptions,
@@ -19,7 +19,8 @@ const ISA_DEFAULTS = {
 
 const DEFAULT_COLUMNS = ['rangeYd', 'elevIn', 'elevMOA', 'velFps', 'energyFtlb', 'time'];
 
-const DEFAULT_WIND = { speed: '0', speedUnit: 'mph', direction: '90' };
+// Direction where the wind comes from, since #106: 90 is from the right.
+const DEFAULT_WIND = { speed: '0', speedUnit: 'mph', direction: '90', directionConvention: WIND_FROM_TARGET };
 
 const DEFAULT_OPTIONS = {
 	showAtmosphere: false,
@@ -40,6 +41,13 @@ const store = localStore('zro-ballistic', () => ({
 // The stored state, or an empty one when it is not an object (#120). Each getter checks its field:
 // see storedState.js.
 const state = () => storedObject(store.value);
+
+// One-time migration of the direction to where the wind comes from (#106). A wind already converted
+// comes back as the same object, so nothing is written.
+const migratedWind = migrateStoredWind(state().wind);
+if (migratedWind !== state().wind) {
+	store.value = { ...state(), wind: migratedWind };
+}
 
 export const ballistic = {
 	get range() {

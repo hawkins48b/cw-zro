@@ -103,8 +103,9 @@ describe('zro-scope-view', () => {
 	});
 
 	it('still migrates a stored clock wind', async () => {
+		// 3 o'clock was the engine's 90, a wind from the left. Since #106 that is shown as 270.
 		const { scopeView } = await load_({ ...scope, wind: { speed: '5', speedUnit: 'mph', direction: '3', directionUnit: 'clock' } });
-		expect(scopeView.wind).toEqual({ speed: '5', speedUnit: 'mph', direction: '90' });
+		expect(scopeView.wind).toEqual({ speed: '5', speedUnit: 'mph', direction: '270' });
 	});
 });
 
@@ -162,6 +163,78 @@ describe('zro-ballistic', () => {
 		const { ballistic } = await load_({ ...ball, options: { ...options, visibleColumns: 5 } });
 		ballistic.toggleColumn('time');
 		expect(ballistic.options.visibleColumns).toEqual(options.visibleColumns.filter((c) => c !== 'time'));
+	});
+});
+
+/**
+ * Wind direction (#106): a stored direction in the engine's convention is converted once, when the
+ * store is imported, to where the wind comes from. A reload must not turn it back.
+ */
+describe.each([
+	['zro-scope-view', '#lib/stores/scopeView.svelte.js', 'scopeView'],
+	['zro-ballistic', '#lib/stores/ballistic.svelte.js', 'ballistic']
+])('%s wind direction (#106)', (key, path, name) => {
+	const MARK = { directionConvention: 'from-target' };
+	const loadWith = async (wind) => (await load(path, { [key]: { range: { distance: '500', unit: 'yd' }, wind } }))[name];
+	/** Import the store again on what is now in storage, as a reload does. */
+	const reload = async () => (await load(path, storage.values))[name];
+
+	it('converts an old direction once, and a reload keeps it', async () => {
+		const store = await loadWith({ speed: '10', speedUnit: 'mph', direction: '90' });
+		expect(store.wind).toEqual({ speed: '10', speedUnit: 'mph', direction: '270' });
+		expect(storage.values[key].wind).toEqual({ speed: '10', speedUnit: 'mph', direction: '270', ...MARK });
+		expect(storage.values[key].range).toEqual({ distance: '500', unit: 'yd' });
+		for (let i = 0; i < 2; i++) expect((await reload()).wind.direction).toBe('270');
+	});
+
+	it('turns an empty old direction, a tailwind, into 180', async () => {
+		const store = await loadWith({ speed: '10', speedUnit: 'mph', direction: '' });
+		expect(store.wind.direction).toBe('180');
+		expect((await reload()).wind.direction).toBe('180');
+	});
+
+	it('keeps the marker when the user changes the wind, so a reload does not convert it', async () => {
+		const store = await loadWith({ speed: '10', speedUnit: 'mph', direction: '90' });
+		store.setWind({ direction: '45' });
+		expect(storage.values[key].wind).toEqual({ speed: '10', speedUnit: 'mph', direction: '45', ...MARK });
+		expect((await reload()).wind.direction).toBe('45');
+	});
+
+	it('does not convert the default wind of a first start', async () => {
+		vi.resetModules();
+		storage.values = {};
+		const store = (await import(path))[name];
+		expect(store.wind.direction).toBe('90');
+		expect(storage.values[key].wind).toMatchObject(MARK);
+		expect((await reload()).wind.direction).toBe('90');
+	});
+
+	it.each([
+		['null', null],
+		['text', 'x'],
+		['an array', [{ speed: '10', direction: '90' }]]
+	])('leaves a wind that is %s, and writes a marked one on the next change', async (_, wind) => {
+		const store = await loadWith(wind);
+		expect(storage.values[key].wind).toEqual(wind);
+		store.setWind({ speed: '5' });
+		expect(storage.values[key].wind).toEqual({ speed: '5', speedUnit: 'mph', direction: '90', ...MARK });
+		expect((await reload()).wind.direction).toBe('90');
+	});
+
+	it('marks a damaged direction and keeps it, with no result', async () => {
+		const store = await loadWith({ speed: '10', speedUnit: 'mph', direction: throwsAsText });
+		expect(store.wind.direction).toBe('');
+		expect(storage.values[key].wind.direction).toBe(throwsAsText);
+		expect(storage.values[key].wind).toMatchObject(MARK);
+	});
+
+	it('writes nothing when the wind is already converted', async () => {
+		const wind = { speed: '10', speedUnit: 'mph', direction: '90', ...MARK };
+		const state = { range: { distance: '500', unit: 'yd' }, wind };
+		vi.resetModules();
+		storage.values = { [key]: state };
+		await import(path);
+		expect(storage.values[key]).toBe(state);
 	});
 });
 
