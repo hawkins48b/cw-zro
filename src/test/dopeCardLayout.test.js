@@ -22,6 +22,7 @@ import {
 	CARD_LAYOUTS,
 	HEADER_FIELDS,
 	MIN_HEADER_SIZE,
+	bcHeaderText,
 	clipSegmentY,
 	encodableText,
 	fitText
@@ -337,5 +338,31 @@ describe('header text size (#137)', () => {
 		const far = byArea().header.find((e) => /^\d{4}$/.test(e.text));
 		expect(far).toBeDefined();
 		expect(far.x + far.w).toBeLessThanOrEqual(HEADER_FIELDS.farZero.right * PT + EPS);
+	});
+});
+
+describe('BC header (#142)', () => {
+	const bcText = () => {
+		const f = HEADER_FIELDS.bc;
+		return elements().find((e) => e.method === 'drawText' && Math.abs(f.x * PT - e.x) < EPS && Math.abs(e.height - f.y * PT - e.y) < EPS)?.text;
+	};
+
+	it('reads the BC as the trajectory does', () => {
+		expect(bcHeaderText({ bc: '0,243', bcType: 'G7' })).toBe('0.243 G7');
+		expect(bcHeaderText({ bc: '0.4620', bcType: 'G1' })).toBe('0.462 G1');
+		expect(bcHeaderText({ bc: 0.5, bcType: 'G7x' })).toBe('0.5 G1');
+		expect(bcHeaderText({ bc: '0.3', bcType: undefined })).toBe('0.3 G1');
+	});
+
+	it.each(CARDS)('prints a short header for very long stored text, %s', async (kind, generate) => {
+		const profile = { ...P308_G1, bc: P308_G1.bc + '9'.repeat(5) + 'x'.repeat(100000), bcType: 'G7'.repeat(500000) };
+		expect(await generate(profile)).not.toBeNull();
+		const text = bcText();
+		expect(text).toBe(`${parseFloat(P308_G1.bc + '99999')} G1`);
+	});
+
+	it.each(CARDS)('prints the stored BC and table of a normal profile, %s', async (kind, generate) => {
+		expect(await generate(structuredClone(P338_G7_METRIC))).not.toBeNull();
+		expect(bcText()).toBe(`${parseFloat(String(P338_G7_METRIC.bc).replace(',', '.'))} G7`);
 	});
 });

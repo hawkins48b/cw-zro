@@ -16,6 +16,7 @@
  * converted here to PDF points (origin bottom left).
  */
 import { rgb } from 'pdf-lib';
+import { readDecimal } from './decimal.js';
 
 export const PDF_PRIMARY_COLOR = rgb(0.03529411764705882, 0.47843137254901963, 0.20392156862745098);
 const WHITE = rgb(1, 1, 1);
@@ -143,6 +144,17 @@ export function drawHeaderText(page, font, field, text) {
 		font,
 		color: PDF_PRIMARY_COLOR
 	});
+}
+
+/**
+ * The BC header text: the number and drag table the card computed with (#142), not the stored text.
+ * The trajectory reads the BC with readDecimal and uses G1 for anything but `G7`, so a stored `0,243`
+ * prints `0.243` and an unknown table prints `G1`. Stored text of any length gives a short header.
+ * @param {{ bc?: unknown, bcType?: unknown }} profile
+ * @returns {string}
+ */
+export function bcHeaderText(profile) {
+	return `${readDecimal(profile.bc)} ${profile.bcType === 'G7' ? 'G7' : 'G1'}`;
 }
 
 /** Signed label: '+1.2', '0', '-3.4'. */

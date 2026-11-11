@@ -3,7 +3,7 @@ import { Calculator, Weapon, DragModel, Ammo, Atmo, Wind, Shot, UNew, Unit, Tabl
 import { findZeroCrossings, ZERO_SEARCH_RANGE, isFlyableZeroElevation } from './dopeCardZeros.js';
 import { hasFiniteElevation, isUsableZeroDistance, zeroDistanceValue } from './zeroDistance.js';
 import { readDecimal } from './decimal.js';
-import { CARD_LAYOUTS, drawDropGraph, drawHeaderText, drawPointsOfAim, fmtSigned, tenth } from './dopeCardLayout.js';
+import { CARD_LAYOUTS, bcHeaderText, drawDropGraph, drawHeaderText, drawPointsOfAim, fmtSigned, tenth } from './dopeCardLayout.js';
 import { hasFlyableVelocity, hasUsableBullet, isUsableBc, isUsableSightHeight } from './inputLimits.js';
 
 /**
@@ -56,7 +56,7 @@ export async function generateMetricDopeCard(profile) {
 		// Optic name
 		drawHeaderText(firstPage, helveticaFont, 'optic', String(profile.opticName ?? ''));
 		// BC
-		drawHeaderText(firstPage, helveticaFont, 'bc', `${profile.bc ?? ''} ${profile.bcType ?? ''}`);
+		drawHeaderText(firstPage, helveticaFont, 'bc', bcHeaderText(profile));
 		// Far zero from trajectory
 		if (zeros.far !== null) drawHeaderText(firstPage, helveticaFont, 'farZero', String(Math.round(zeros.far)));
 		// 100 m impact
