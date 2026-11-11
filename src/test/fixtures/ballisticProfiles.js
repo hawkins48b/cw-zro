@@ -86,6 +86,25 @@ export const P65_G7 = {
 	spinDrift: true
 };
 
+/**
+ * 300 BLK subsonic, 220 gr, G1, imperial inputs (#136). Its drop leaves the -80 in scale of the
+ * imperial card at about 280 yd and its elevation passes 20 MOA from 300 yd, so the cards must pin
+ * these values to the edge of the printed scales.
+ */
+export const P300BLK_SUBSONIC = {
+	...imperialProfile,
+	name: '300 BLK 220 gr subsonic',
+	barrelTwist: '8',
+	opticHeight: '2.6',
+	zeroDist: 100,
+	bulletDiameter: '0.308',
+	bulletWeight: '220',
+	bcType: 'G1',
+	bc: '0.608',
+	bulletLength: '1.4',
+	velocity: '1020'
+};
+
 /** .338 Lapua Magnum, 16.2 g, G7, every input metric, spin drift on. */
 export const P338_G7_METRIC = {
 	name: '.338 LM 16.2 g G7',

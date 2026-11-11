@@ -22,14 +22,15 @@ vi.mock('pdf-lib', () => ({
 	StandardFonts: {},
 	PDFDocument: {
 		load: async () => ({
-			embedFont: async () => ({}),
+			embedFont: async () => ({ widthOfTextAtSize: (text, size) => String(text).length * size * 0.55 }),
 			getPages: () => [
 				{
 					getSize: () => ({ height: 612 }),
 					drawText: (text) => card.labels.push(text),
 					drawLine: () => {},
 					drawCircle: () => {},
-					drawRectangle: () => {}
+					drawRectangle: () => {},
+					drawSvgPath: () => {}
 				}
 			]
 		})

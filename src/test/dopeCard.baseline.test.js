@@ -17,7 +17,7 @@ import { generateMetricDopeCard } from '#lib/utils/dopeCardMetric.js';
 import { calculateFullTrajectory, calculateMPBR } from '#lib/utils/ballisticCalculator.js';
 import { findZeroCrossings, isFlyableZeroElevation } from '#lib/utils/dopeCardZeros.js';
 import { Calculator, UNew, Unit } from 'js-ballistics';
-import { P223_G1, P223_SHORT_ZERO, P308_G1, P338_G7_METRIC } from './fixtures/ballisticProfiles.js';
+import { P223_G1, P223_SHORT_ZERO, P300BLK_SUBSONIC, P308_G1, P338_G7_METRIC } from './fixtures/ballisticProfiles.js';
 
 const card = vi.hoisted(() => ({ labels: [] }));
 
@@ -26,14 +26,15 @@ vi.mock('pdf-lib', () => ({
 	StandardFonts: {},
 	PDFDocument: {
 		load: async () => ({
-			embedFont: async () => ({}),
+			embedFont: async () => ({ widthOfTextAtSize: (text, size) => String(text).length * size * 0.55 }),
 			getPages: () => [
 				{
 					getSize: () => ({ height: 612 }),
 					drawText: (text) => card.labels.push(text),
 					drawLine: () => {},
 					drawCircle: () => {},
-					drawRectangle: () => {}
+					drawRectangle: () => {},
+					drawSvgPath: () => {}
 				}
 			]
 		})
@@ -57,6 +58,8 @@ const printed = () => ({
  * header: name, brand, near zero, 25 impact, optic, BC, far zero, 100 impact, sight height,
  * velocity. Near and far zero were re-recorded for #86: near used to be the saved zero whichever
  * crossing it was, and far the first step 1 row past the crossing, so about 1 unit long.
+ * Owner decision of 2026-11-11 (#138): the metric card prints whole metres for near and far zero, like
+ * the imperial card, so every metric zero was re-recorded rounded (100.1 -> 100, 91.6 -> 92, ...).
  * graph: drop at 0, 25, ... 500.
  * pointsOfAim: at 200, 300, 400, 500: elevation, light wind, strong wind.
  * Imperial card: yd, in, MOA, fps, 8 and 20 mph. Metric card: m, cm, mrad, m/s, 3.5 and 9 m/s.
@@ -96,7 +99,7 @@ describe('metric dope card', () => {
 	it('records a card from metric inputs', async () => {
 		await generateMetricDopeCard(P338_G7_METRIC);
 		expect(printed()).toEqual({
-			header: ['.338 LM 16.2 g G7', '', '78', '-2.6', '', '0.322 G7', '100.1', '0', '5', '905'],
+			header: ['.338 LM 16.2 g G7', '', '78', '-2.6', '', '0.322 G7', '100', '0', '5', '905'],
 			graph: [
 				'-5', '-2.6', '-0.9', '0', '0', '-0.8', '-2.4', '-5', '-8.4', '-12.8', '-18.2',
 				'-24.5', '-31.9', '-40.4', '-49.9', '-60.6', '-72.4', '-85.4', '-99.7', '-115.2', '-132'
@@ -108,7 +111,7 @@ describe('metric dope card', () => {
 	it('converts imperial inputs', async () => {
 		await generateMetricDopeCard(P308_G1);
 		expect(printed()).toEqual({
-			header: ['.308 168 gr G1', '', '51.2', '-1.4', '', '0.462 G1', '91.6', '-0.4', '3.8', '807.7'],
+			header: ['.308 168 gr G1', '', '51', '-1.4', '', '0.462 G1', '92', '-0.4', '3.8', '807.7'],
 			graph: [
 				'-3.8', '-1.4', '0', '+0.3', '-0.4', '-2.2', '-5.1', '-9.3', '-14.7', '-21.4', '-29.6',
 				'-39.1', '-50.2', '-62.8', '-77.1', '-93.1', '-111', '-130.7', '-152.4', '-176.2', '-202.2'
@@ -120,6 +123,37 @@ describe('metric dope card', () => {
 	it('prints no figures for a profile that cannot be computed', async () => {
 		await generateMetricDopeCard({ ...P338_G7_METRIC, bc: '0' });
 		expect(card.labels).toEqual([]);
+	});
+});
+
+/**
+ * A subsonic load leaves the printed scales of both cards (#136). The card still prints the true
+ * figure of every point, pinned to the edge of the graph or target box, so they are recorded here
+ * like any other card. Where they are drawn is checked in dopeCardLayout.test.js.
+ */
+describe('subsonic dope cards (#136)', () => {
+	it('records the imperial card', async () => {
+		await generateImperialDopeCard(P300BLK_SUBSONIC);
+		expect(printed()).toEqual({
+			header: ['300 BLK 220 gr subsonic', '', '15', '+1.3', '', '0.608 G1', '100', '0', '2.6', '1020'],
+			graph: [
+				'-2.6', '+1.3', '+3', '+2.6', '0', '-4.8', '-11.9', '-21.4', '-33.2', '-47.3', '-63.9',
+				'-83', '-104.5', '-128.6', '-155.2', '-184.4', '-216.3', '-250.8', '-288', '-328', '-370.8'
+			],
+			pointsOfAim: ['+15.8', '1.4', '3.5', '+33.3', '2', '5.1', '+51.6', '2.7', '6.7', '+70.8', '3.3', '8.3']
+		});
+	});
+
+	it('records the metric card', async () => {
+		await generateMetricDopeCard(P300BLK_SUBSONIC);
+		expect(printed()).toEqual({
+			header: ['300 BLK 220 gr subsonic', '', '14', '+3.9', '', '0.608 G1', '92', '-3.9', '6.6', '310.9'],
+			graph: [
+				'-6.6', '+3.9', '+7.9', '+5.4', '-3.9', '-20', '-43.1', '-73.2', '-110.6', '-155.3', '-207.4',
+				'-267.1', '-334.5', '-409.7', '-492.8', '-584', '-683.3', '-790.8', '-906.8', '-1031.3', '-1164.4'
+			],
+			pointsOfAim: ['+5.5', '0.4', '1.1', '+11.2', '0.6', '1.6', '+17.1', '0.8', '2.1', '+23.3', '1', '2.6']
+		});
 	});
 });
 
@@ -188,7 +222,7 @@ describe('zero crossings on the card', () => {
 
 	it.each([
 		['imperial', generateImperialDopeCard, ['56', '100']],
-		['metric', generateMetricDopeCard, ['51.2', '91.6']]
+		['metric', generateMetricDopeCard, ['51', '92']]
 	])('prints both crossings of a .308 zeroed at 100 yd, %s', async (_, generate, expected) => {
 		await generate(P308_G1);
 		expect(zeros()).toEqual(expected);
@@ -204,9 +238,9 @@ describe('zero crossings on the card', () => {
 
 	it.each([
 		['imperial', generateImperialDopeCard, '8', 'in', ['21', '249']],
-		['metric', generateMetricDopeCard, '8', 'in', ['19.4', '227.5']],
+		['metric', generateMetricDopeCard, '8', 'in', ['19', '228']],
 		['imperial', generateImperialDopeCard, '20', 'cm', ['22', '240']],
-		['metric', generateMetricDopeCard, '20', 'cm', ['20.1', '219.8']]
+		['metric', generateMetricDopeCard, '20', 'cm', ['20', '220']]
 	])('prints the real crossings of a saved MPBR zero, %s card, %s %s target', async (_, generate, size, unit, expected) => {
 		await generate(saved(P308_G1, calculateMPBR(P308_G1, size, unit)));
 		expect(zeros()).toEqual(expected);
@@ -220,7 +254,7 @@ describe('zero crossings on the card', () => {
 
 	it.each([
 		['imperial', generateImperialDopeCard, ['6', '667']],
-		['metric', generateMetricDopeCard, ['5.6', '609.6']]
+		['metric', generateMetricDopeCard, ['6', '610']]
 	])('prints a saved zero past the 500 units of the card, %s', async (_, generate, expected) => {
 		await generate(saved(P308_G1, calculateMPBR(P308_G1, '100', 'in')));
 		expect(zeros()).toEqual(expected);
@@ -228,7 +262,7 @@ describe('zero crossings on the card', () => {
 
 	it.each([
 		['imperial', generateImperialDopeCard, ['25', '465']],
-		['metric', generateMetricDopeCard, ['23', '425.1']]
+		['metric', generateMetricDopeCard, ['23', '425']]
 	])('prints the far crossing of a short zero, %s', async (_, generate, expected) => {
 		await generate(P223_SHORT_ZERO);
 		expect(zeros()).toEqual(expected);
@@ -236,12 +270,13 @@ describe('zero crossings on the card', () => {
 
 	it('reads a near crossing closer than the first row', async () => {
 		await generateMetricDopeCard({ ...P308_G1, zeroDist: 2800 });
-		expect(zeros()).toEqual(['0.4', '2560.4']);
+		expect(zeros()).toEqual(['0', '2560']);
 	});
 
+	// Since #138 the metric card rounds both crossings (101.7 and 102.3 m) to the same whole metre.
 	it.each([
 		['imperial', generateImperialDopeCard, ['111', '112']],
-		['metric', generateMetricDopeCard, ['101.7', '102.3']]
+		['metric', generateMetricDopeCard, ['102', '102']]
 	])('keeps an arc narrower than a row, %s', async (_, generate, expected) => {
 		await generate({ ...P223_G1, zeroDist: 111 });
 		expect(zeros()).toEqual(expected);
@@ -261,11 +296,12 @@ describe('zero crossings on the card', () => {
 
 	// #124: P308_G1 saves its zero in yd, so this is a 3000 yd zero, 2743.2 m. The metric card looks
 	// for crossings to 3000 m, so it finds the crossing the imperial card cannot reach. It lies 0.1
-	// past the zero because the solver checks height one integration step past the distance.
+	// past the zero because the solver checks height one integration step past the distance: 2743.3 m,
+	// printed 2743 since #138.
 	it('prints the far crossing of a 3000 yd zero on the metric card, in metres (#124)', async () => {
 		await generateMetricDopeCard({ ...P308_G1, zeroDist: 3000 });
 		const { header } = printed();
-		expect(header[6]).toBe('2743.3');
+		expect(header[6]).toBe('2743');
 		expect(Math.abs(parseFloat(header[6]) - UNew.Yard(3000).In(Unit.Meter))).toBeLessThanOrEqual(0.2);
 	});
 
@@ -291,7 +327,7 @@ describe('zero crossings on the card', () => {
 
 	it.each([
 		['imperial', generateImperialDopeCard, '100'],
-		['metric', generateMetricDopeCard, '91.6']
+		['metric', generateMetricDopeCard, '92']
 	])('leaves near zero blank when the muzzle is on the line of sight, %s', async (_, generate, far) => {
 		await generate({ ...P308_G1, opticHeight: '0' });
 		const { header } = printed();
