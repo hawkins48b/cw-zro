@@ -18,7 +18,7 @@ Data stays in the browser's `localStorage`, or the same store in the Electron an
 | `zro-dark-mode` | Dark mode choice, stored only after a change | [`settings`](../src/lib/stores/settings.svelte.js) |
 | `zro-locale` | Language picked in the language switcher, `en`, `fr` or `de` as plain text, stored only after a click ([#96](https://github.com/hawkins48b/cw-zro/issues/96)) | [`storedLocale.js`](../src/lib/utils/storedLocale.js), read by [`hooks.client.js`](../src/hooks.client.js) |
 
-These are the only uses of `localStorage` in `src/`, apart from the read in [`app.html`](../src/app.html) that sets dark mode before the first paint. Each stays until the user clears the site data or uninstalls the app. There is no `sessionStorage`, no IndexedDB and no service worker.
+These are the only uses of `localStorage` in `src/`, apart from the read in [`theme-init.js`](../static/theme-init.js), loaded by [`app.html`](../src/app.html), that sets dark mode before the first paint. Each stays until the user clears the site data or uninstalls the app. There is no `sessionStorage`, no IndexedDB and no service worker.
 
 **In memory only**, gone on reload: the ammo selection in progress and the profile form draft ([`ammoSelection`](../src/lib/stores/ammoSelection.svelte.js), [`formDraft`](../src/lib/stores/formDraft.svelte.js)).
 
@@ -49,7 +49,7 @@ The host sees what any web server sees, such as IP address, requested path and u
 - No analytics, tracking, advertising or crash reporting
 - No remote fonts, images or scripts
 - No account, login or server-side storage
-- No geolocation, camera or contacts access in the code
+- No geolocation, camera or contacts access in the code, and the desktop app refuses those permissions
 - No auto-update in the desktop app (`publish: null`)
 
 ## How this was checked
@@ -75,7 +75,8 @@ Calculations run on the device. But the web app has no service worker, so it nee
 
 ## Security notes
 
-- The app sets no Content-Security-Policy, in any target. What headers the web host adds was not checked.
+- The web and desktop builds set a Content-Security-Policy that allows scripts, connections and images only from the app itself ([#104](https://github.com/hawkins48b/cw-zro/issues/104)). See [Architecture](architecture.md#content-security-policy). The mobile build sets none. What headers the web host adds was not checked.
+- The desktop app refuses every permission request (camera, location, notifications, devices).
 - The desktop window cannot leave the app, and opens `https:` links only in the system browser. See [Architecture](architecture.md#desktop).
 - Saved values are not validated when read, apart from the chart unit of compare trajectories. See [Input guards](ballistics-model.md#input-guards).
 - The app's [privacy page](../src/routes/settings/privacy/+page.svelte) lists what is stored, that it stays until the site data is cleared or the app is uninstalled, the web host's view of requests, and the offline limits of the web version ([#102](https://github.com/hawkins48b/cw-zro/issues/102)). It follows this guide: change both together.

@@ -3,14 +3,9 @@
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-		<script>
-			(function () {
-				var stored = localStorage.getItem('zro-dark-mode');
-				var dark = stored !== null ? stored === 'true' : window.matchMedia('(prefers-color-scheme: dark)').matches;
-				if (dark) document.documentElement.classList.add('dark');
-			})();
-		</script>
 		%sveltekit.head%
+		<!-- After the head, so the Content-Security-Policy <meta> covers it too (#104) -->
+		<script src="%sveltekit.assets%/theme-init.js"></script>
 	</head>
 	<body data-sveltekit-preload-data="hover">
 		<div style="display: contents">%sveltekit.body%</div>

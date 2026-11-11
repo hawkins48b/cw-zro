@@ -42,7 +42,7 @@ Do not upgrade these, not even within a major, without an owner decision on the 
 - **`js-ballistics`** stays on 2.2.0-beta.2, Euler engine ([#77](https://github.com/hawkins48b/cw-zro/issues/77)). 3.1.0 embeds LGPL-3.0 code and shifts results.
 - **`apexcharts`** stays on 5.16.0 ([#75](https://github.com/hawkins48b/cw-zro/issues/75)). Its licence terms are the open question.
 
-`package.json` has caret ranges, so `npm update` can move them. Use `npm ci`, and check the lockfile diff.
+`js-ballistics` is pinned to an exact version. `apexcharts` has a caret range, so `npm update` can move it. Use `npm ci`, and check the lockfile diff.
 
 ## Code rules
 
@@ -53,6 +53,8 @@ Do not upgrade these, not even within a major, without an owner decision on the 
 - Calculations go in `src/lib/utils/`, as plain tested functions. Stores stay thin.
 - External links need `target="_blank"`, or Electron blocks them.
 - `electron-serve` stays in `dependencies`.
+- No inline `<script>` in `app.html`: the Content-Security-Policy blocks it. Put it in `static/`. See [Content-Security-Policy](docs/architecture.md#content-security-policy).
+- A new external host for scripts, styles, images or fonts needs a change to `csp` in `vite.config.js` (and an owner decision, see below).
 - Code comments and script output point at the `Dependency Updates` and `Accepting an exception` headings in README.md. Keep those headings there.
 
 ## Messages

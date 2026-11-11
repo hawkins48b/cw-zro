@@ -29,6 +29,7 @@
 		"@inlang/plugin-message-format": "4.6.0",
 		"@skeletonlabs/skeleton": "^5.0.1",
 		"@skeletonlabs/skeleton-svelte": "^5.0.1",
+		"@sveltejs/adapter-static": "^4.0.1",
 		"@sveltejs/kit": "^3.1.1",
 		"@sveltejs/vite-plugin-svelte": "^7.3.1",
 		"@tailwindcss/vite": "^4.3.4",
@@ -50,10 +51,9 @@
 		"@capacitor/status-bar": "^8.0.4",
 		"@inlang/paraglide-js": "^3.1.0",
 		"@lucide/svelte": "^1.69.0",
-		"@sveltejs/adapter-static": "^4.0.1",
 		"apexcharts": "^5.16.0",
 		"electron-serve": "^3.0.1",
-		"js-ballistics": "^2.2.0-beta.2",
+		"js-ballistics": "2.2.0-beta.2",
 		"pdf-lib": "^1.17.1",
 		"svelte-gestures": "^5.2.2"
 	}

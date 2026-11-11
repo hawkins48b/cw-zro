@@ -8,6 +8,26 @@ import { defineConfig } from 'vite';
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
 const isCapacitor = process.env.BUILD_TARGET === 'capacitor';
 
+// Content-Security-Policy for the web and Electron builds (#104), written as a <meta> tag
+// with the hashes of SvelteKit's inline scripts. The mobile build has none until it is
+// tested on a device. 'unsafe-inline' styles: ApexCharts, Svelte transitions and style:
+// directives set inline styles. data: and blob: images: ApexCharts and the chart exports.
+// The app loads and sends nothing outside its own origin (docs/data-and-privacy.md).
+const csp = {
+	mode: 'hash',
+	directives: {
+		'default-src': ['self'],
+		'script-src': ['self'],
+		'style-src': ['self', 'unsafe-inline'],
+		'img-src': ['self', 'data:', 'blob:'],
+		'font-src': ['self', 'data:'],
+		'connect-src': ['self'],
+		'object-src': ['none'],
+		'base-uri': ['self'],
+		'form-action': ['none']
+	}
+};
+
 export default defineConfig({
 	define: {
 		__APP_VERSION__: JSON.stringify(pkg.version)
@@ -25,11 +45,13 @@ export default defineConfig({
 			adapter: adapter({
 				fallback: 'index.html'
 			}),
-			...(isCapacitor && {
-				output: {
-					bundleStrategy: 'single'
-				}
-			})
+			...(isCapacitor
+				? {
+						output: {
+							bundleStrategy: 'single'
+						}
+					}
+				: { csp })
 		})
 	],
 	ssr: {

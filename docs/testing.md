@@ -29,6 +29,7 @@ On 2026-11-10, after #121 to #125: **2689 passed, 1 todo**, in 23 files. After #
 | [`dopeCardUnits.test.js`](../src/test/dopeCardUnits.test.js) | 30 | Sight height and velocity printed on both dope cards (#132): a damaged unit prints the card of the unit its trajectory used |
 | [`auditCheck.test.js`](../src/test/auditCheck.test.js) | 84 | The audit check |
 | [`electronNavigation.test.js`](../src/test/electronNavigation.test.js) | 34 | Electron URL rules |
+| [`electronHardening.test.js`](../src/test/electronHardening.test.js) | 17 | Electron menu without developer tools when packaged, permissions refused, fuses and AppImage arguments in `electron-builder.json`, the exact `js-ballistics` version, the build-only adapter out of `dependencies` (#104, #105, #126) |
 | [`messages.test.js`](../src/test/messages.test.js) | 6 | Message catalogs |
 | [`format.test.js`](../src/test/format.test.js) | 7 | Escaping of text for chart labels, limits in messages |
 | [`decimal.test.js`](../src/test/decimal.test.js) | 85 | Reading typed numbers: plain decimals, decimal comma |
@@ -102,7 +103,7 @@ So a test for a hang must not run the hang:
 ## What the tests do not cover
 
 - **The user interface.** Nothing in the repository runs a browser. Screens, forms and charts are not tested. Browser checks in the delivery documents were run from scripts that are not kept.
-- **Electron and Capacitor at runtime.** Only the URL rules are tested.
+- **Electron and Capacitor at runtime.** Only the URL rules, the menu template, the permission handlers and the packaging settings are tested.
 - **Rendered PDFs.** Field values and coordinates are checked. No one has reviewed a rendered card.
 - **The stores**, mostly. `profileOps.js` is tested in place of the profile list operations. `compareEntries.test.js` and `storedStores.test.js` run the compare, Ballistic, Scope View, profiles, MPBR and Trajectory Validation stores with `localStore` replaced by plain values, so the runes in `localStore.svelte.js` are not run there. `localStore.test.js` covers only a write that storage refuses.
 

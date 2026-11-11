@@ -1,8 +1,10 @@
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, Menu, session, shell } from 'electron';
 import serve from 'electron-serve';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { buildMenuTemplate } from './menu.js';
 import { APP_HOST, APP_SCHEME, isAppUrl, isExternalUrl } from './navigation.js';
+import { denyAllPermissions } from './permissions.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -47,7 +49,15 @@ app.on('web-contents-created', (_event, contents) => {
 	});
 });
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+	denyAllPermissions(session.defaultSession);
+	Menu.setApplicationMenu(
+		Menu.buildFromTemplate(
+			buildMenuTemplate({ isMac: process.platform === 'darwin', isPackaged: app.isPackaged })
+		)
+	);
+	createWindow();
+});
 
 app.on('window-all-closed', () => {
 	if (process.platform !== 'darwin') app.quit();

@@ -38,11 +38,11 @@ src/
 │   └── utils/               # Calculations and other pure logic
 ├── test/                    # Vitest tests and fixtures
 ├── app.css                  # Tailwind and Skeleton, and restored Skeleton defaults
-├── app.html                 # HTML shell, sets dark mode before the first paint
+├── app.html                 # HTML shell; static/theme-init.js sets dark mode before the first paint
 ├── hooks.client.js          # At start, goes to the stored language when the URL has none
 ├── hooks.js                 # Removes the locale from the URL before routing
 └── hooks.server.js          # Paraglide middleware, server side only
-electron/                    # Desktop main process, navigation rules, preload
+electron/                    # Desktop main process, navigation rules, menu, permissions, preload
 messages/                    # en.json, fr.json, de.json
 project.inlang/              # Paraglide settings
 resources/                   # Desktop icons
@@ -160,6 +160,34 @@ The width decides this, not the platform.
 | Main window navigates anywhere else | Blocked |
 
 An external link needs `target="_blank"`. Without it, the link is blocked instead of opening in the browser. The rules are in [`navigation.js`](../electron/navigation.js) and have tests.
+
+Hardening ([#104](https://github.com/hawkins48b/cw-zro/issues/104)):
+
+| Piece | Where | What it does |
+|-------|-------|--------------|
+| Permissions | [`permissions.js`](../electron/permissions.js) | Every permission request, check and device request of the default session is refused. The app uses none |
+| Menu | [`menu.js`](../electron/menu.js) | File (Quit) or the macOS app menu, Edit, View (zoom, full screen), Window. Reload and the developer tools only when the app is not packaged (`electron:dev`) |
+| Fuses | `electronFuses` in [`electron-builder.json`](../electron-builder.json) | `ELECTRON_RUN_AS_NODE`, `NODE_OPTIONS` and `--inspect` are ignored; cookies are encrypted; the app loads only from `app.asar`, checked for integrity on Windows and macOS (Linux has no such check); `file://` gets no extra rights. `resetAdHocDarwinSignature` re-signs an unsigned macOS build after the fuses change it |
+| Linux sandbox | `linux.executableArgs: []` | The AppImage desktop entry no longer passes `--no-sandbox`. The AppImage launcher still adds it on hosts where `unshare -Ur true` fails (no user namespaces, as on Ubuntu 24.04 by default), so the app starts there without the OS sandbox |
+| Content-Security-Policy | `csp` in [`vite.config.js`](../vite.config.js) | See [Content-Security-Policy](#content-security-policy) |
+
+## Content-Security-Policy
+
+The web and desktop builds carry a `<meta>` Content-Security-Policy, written by SvelteKit (`kit.csp`, hash mode). The mobile build has none until it is tested on a device.
+
+| Directive | Value | Why |
+|-----------|-------|-----|
+| `default-src` | `'self'` | Anything not listed comes from the app only |
+| `script-src` | `'self'` and the hash of SvelteKit's start script | No other inline script, no `eval` |
+| `style-src` | `'self' 'unsafe-inline'` | ApexCharts, Svelte transitions and `style:` set inline styles |
+| `img-src` | `'self' data: blob:` | ApexCharts |
+| `font-src` | `'self' data:` | |
+| `connect-src` | `'self'` | The app fetches only its two PDF templates |
+| `object-src` | `'none'` | |
+| `base-uri` | `'self'` | |
+| `form-action` | `'none'` | No form is submitted anywhere |
+
+SvelteKit hashes only the scripts it writes. An inline script in [`app.html`](../src/app.html) would be blocked, so the dark mode script is the file [`static/theme-init.js`](../static/theme-init.js). A `<meta>` policy cannot set `frame-ancestors`; that needs a header from the web host. Downloads of `blob:` links (PDF and CSV) are navigations, which the policy does not cover.
 
 ## Mobile
 

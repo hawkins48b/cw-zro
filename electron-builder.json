@@ -28,6 +28,17 @@
 	"linux": {
 		"target": "AppImage",
 		"icon": "icon.icns",
-		"syncDesktopName": true
+		"syncDesktopName": true,
+		"executableArgs": []
+	},
+	"electronFuses": {
+		"runAsNode": false,
+		"enableCookieEncryption": true,
+		"enableNodeOptionsEnvironmentVariable": false,
+		"enableNodeCliInspectArguments": false,
+		"enableEmbeddedAsarIntegrityValidation": true,
+		"onlyLoadAppFromAsar": true,
+		"grantFileProtocolExtraPrivileges": false,
+		"resetAdHocDarwinSignature": true
 	}
 }

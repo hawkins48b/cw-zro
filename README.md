@@ -93,6 +93,13 @@ The `audit` job in CI runs `npm run audit:check`. It audits all dependencies, de
 
 `npm audit` is retried three times when the registry gives no report. A check that could not run counts as failed, never as passed.
 
+Known moderate and low findings, which do not ship in the app ([#105](https://github.com/hawkins48b/cw-zro/issues/105)), checked on 2026-11-11:
+
+| Package | Advisory | Comes from | Why it does not affect ZRO |
+|---------|----------|------------|-----------------------------|
+| `deepmerge` 4.3.1 (4 low) | [GHSA-gcqx-w48m-w2h4](https://github.com/advisories/GHSA-gcqx-w48m-w2h4), prototype poisoning in `mergeObject()` | `@sveltejs/vite-plugin-svelte` | It merges the build configuration on the build machine and is not in the bundle. All versions from 4.2.0 are affected, so there is no fixed version. `@sveltejs/adapter-static` is a devDependency since #105, so `npm audit --omit=dev` reports nothing |
+| `minimatch` 7.0.0 to 11.0.0 (6 moderate) | [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249), denial of service through glob patterns | `electron-builder` 26 (`app-builder-lib`, `@electron/universal`) | It runs only while packaging the desktop app, on patterns from our own `electron-builder.json`, never on user input. npm's only fix is a downgrade to electron-builder 24. Recheck when electron-builder updates |
+
 **CI runs inside the production deploy** (`deploy-prod.yml`), so either failure also blocks a deploy, even with no change to the dependencies. An exception is the way out of a finding. It does not help with a registry outage: rerun the job.
 
 ### Accepting an exception

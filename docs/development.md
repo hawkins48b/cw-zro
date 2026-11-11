@@ -104,7 +104,9 @@ The first `electron .` after a fresh install downloads the Electron binary.
 | Windows | NSIS installer | Not built. On Linux the build stops at wine |
 | macOS | dmg | Not built |
 
-electron-builder targets the platform it runs on. Packages are not signed, and there is no auto-update. Electron 45 needs macOS 13 or later and drops 32-bit Windows and armv7l. [The Electron delivery](2026-11-05-76-electron.md) has the details and the open hardening items.
+electron-builder targets the platform it runs on. Packages are not signed, and there is no auto-update. Electron 45 needs macOS 13 or later and drops 32-bit Windows and armv7l. [The Electron delivery](2026-11-05-76-electron.md) has the details. Fuses, permissions, the menu and the sandbox are in [Architecture](architecture.md#desktop) ([#104](https://github.com/hawkins48b/cw-zro/issues/104)).
+
+The fuses make a packaged app ignore `--inspect` and `ELECTRON_RUN_AS_NODE`, and it has no developer tools. Debug with `npm run electron:dev`, which keeps them.
 
 `electron-serve` must stay in `dependencies`. As a devDependency, the packaged app crashes on start although the build reports success.
 
@@ -121,4 +123,4 @@ electron-builder targets the platform it runs on. Packages are not signed, and t
 
 ## Dependency updates
 
-See [Dependency Updates](../README.md#dependency-updates) in the README. `package.json` uses caret ranges, so `npm update` could move the held packages. Only the lockfile and the Dependabot rules keep them in place.
+See [Dependency Updates](../README.md#dependency-updates) in the README. `js-ballistics` is pinned to an exact version in `package.json` ([#126](https://github.com/hawkins48b/cw-zro/issues/126)). `apexcharts` still has a caret range, so `npm update` could move it. Only the lockfile and the Dependabot rules keep it in place.
