@@ -68,13 +68,15 @@ export async function generateMetricDopeCard(profile) {
 			const drop100 = fmtSigned(Math.round(p100.targetDrop.In(Unit.Centimeter) * 10) / 10);
 			drawText(drop100, 9.32, 0.97, 11);
 		}
-		// Height over bore (cm)
+		// Height over bore (cm). The units are read as computeTrajectory reads them: anything but
+		// 'cm' and 'mps' is inches and fps, so the printed figures are those of the trajectory, also
+		// for a damaged unit (#132).
 		let hob = readDecimal(profile.opticHeight);
-		if (profile.opticHeightUnit === 'in') hob = Math.round(UNew.Inch(hob).In(Unit.Centimeter) * 10) / 10;
+		if (profile.opticHeightUnit !== 'cm') hob = Math.round(UNew.Inch(hob).In(Unit.Centimeter) * 10) / 10;
 		drawText(String(hob), 2.81, 1.36, 11);
 		// Muzzle velocity (m/s)
 		let mv = readDecimal(profile.velocity);
-		if (profile.velocityUnit === 'fps') mv = Math.round(UNew.FPS(mv).In(Unit.MPS) * 10) / 10;
+		if (profile.velocityUnit !== 'mps') mv = Math.round(UNew.FPS(mv).In(Unit.MPS) * 10) / 10;
 		drawText(String(mv), 4.6, 1.36, 11);
 	}
 

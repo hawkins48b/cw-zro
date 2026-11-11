@@ -227,6 +227,7 @@
 	"ballistic_max_dist": "Max Distance",
 	"ballistic_step": "Step",
 	"ballistic_step_hint": "Calculation interval",
+	"ballistic_step_min": "Enter a step of at least {min} {unit}",
 	"ballistic_atmosphere": "Atmosphere",
 	"ballistic_use_isa": "Standard Atmosphere (ISA)",
 	"ballistic_altitude": "Altitude",

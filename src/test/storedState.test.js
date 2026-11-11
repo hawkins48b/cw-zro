@@ -14,15 +14,20 @@ import {
 	storedElevation,
 	storedObject,
 	storedRange,
+	storedMpbrTarget,
 	storedRotation,
-	storedText
+	storedSolveFor,
+	storedText,
+	storedValidationAtmosphere,
+	storedValidationMeasure
 } from '#lib/utils/storedState.js';
-import { calculateFullTrajectory, calculateShotPoint, hasNoAirDensity } from '#lib/utils/ballisticCalculator.js';
+import { calculateFullTrajectory, calculateMPBR, calculateShotPoint, hasNoAirDensity } from '#lib/utils/ballisticCalculator.js';
+import { calculateTrajectoryValidation } from '#lib/utils/trajectoryValidation.js';
 import { ballisticPageTrajectory, isUsableBallisticRange } from '#lib/utils/ballisticPage.js';
 import { isUsableScopeAngle, isUsableScopeRange, scopeEffectiveRange } from '#lib/utils/scopeRange.js';
 import { isUsableRange } from '#lib/utils/inputLimits.js';
 import { readDecimal } from '#lib/utils/decimal.js';
-import { P223_G1, WIND_10MPH } from './fixtures/ballisticProfiles.js';
+import { P223_G1, P308_G1, WIND_10MPH } from './fixtures/ballisticProfiles.js';
 
 const throwsAsText = JSON.parse('{"toString":1}');
 
@@ -430,5 +435,269 @@ describe('storedBallisticOptions', () => {
 		expect(read.showAnnotations).toBe(true);
 		expect(read.showVelocityChart).toBe(false);
 		expect(read.velChartUnit).toBe('fps');
+	});
+});
+
+/*
+ * #127: the MPBR and Trajectory Validation stores. The page reads the target, the observation, the
+ * choice to solve for and the atmosphere through these readers, and passes the same values to the
+ * calculators, so what the page shows and the result agree.
+ */
+
+const ISA_VALIDATION = { useISA: true, altitude: '0', altitudeUnit: 'ft', pressure: '29.92', pressureUnit: 'inhg', temperature: '59', temperatureUnit: 'f', humidity: '0' };
+const MEASURE = { type: 'angle', direction: 'below', distanceValue: '0', distanceUnit: 'in', angleValue: '2', angleUnit: 'moa' };
+const EMPTY_MEASURE = { type: 'angle', direction: 'below', distanceValue: '', distanceUnit: 'in', angleValue: '', angleUnit: 'moa' };
+
+/** The validation as the page runs it, from what the store reads. */
+function pageValidation(profile, range, measure, solveFor, atmosphere) {
+	const atmo = atmosphere.useISA ? null : atmosphere;
+	const value = measure.type === 'distance' ? measure.distanceValue : measure.angleValue;
+	const unit = measure.type === 'distance' ? measure.distanceUnit : measure.angleUnit;
+	return calculateTrajectoryValidation(profile, range, measure.type, value, unit, solveFor, atmo, measure.direction);
+}
+
+describe('storedMpbrTarget', () => {
+	it('keeps a good target', () => {
+		expect(storedMpbrTarget({ size: '8', unit: 'in' })).toEqual({ size: '8', unit: 'in' });
+		expect(storedMpbrTarget({ size: 40, unit: 'cm' })).toEqual({ size: 40, unit: 'cm' });
+	});
+
+	it.each(DAMAGED_SECTIONS)('reads a target of %s as an empty box in inches', (_, value) => {
+		expect(storedMpbrTarget(value)).toEqual({ size: '', unit: 'in' });
+	});
+
+	it.each(DAMAGED_VALUES)('reads a size of %s as an empty box', (_, size) => {
+		const read = storedMpbrTarget({ size, unit: 'cm' });
+		expect(read).toEqual({ size: '', unit: 'cm' });
+		expect(() => readLikeThePage(read.size)).not.toThrow();
+	});
+
+	it.each([['mm'], ['CM'], [{}], [['cm']], [null], [true]])('reads the unit %j as in, as calculateMPBR does', (unit) => {
+		expect(storedMpbrTarget({ size: '8', unit }).unit).toBe('in');
+	});
+});
+
+describe('a damaged MPBR target gives no result, before the engine', () => {
+	let solver;
+	let fire;
+	const reached = () => solver.mock.calls.length + fire.mock.calls.length > 0;
+
+	beforeEach(() => {
+		solver = vi.spyOn(Calculator.prototype, 'setWeaponZero').mockImplementation(() => {
+			throw new Error('setWeaponZero reached');
+		});
+		fire = vi.spyOn(Calculator.prototype, 'fire').mockImplementation(() => {
+			throw new Error('fire reached');
+		});
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it('reaches the stub with a good size, so the stub is live', () => {
+		calculateMPBR(P223_G1, storedMpbrTarget({ size: '8', unit: 'in' }).size, 'in');
+		expect(reached()).toBe(true);
+	});
+
+	it('reached the engine with an array before #127: it read as 8', () => {
+		calculateMPBR(P223_G1, ['8'], 'in');
+		expect(reached()).toBe(true);
+	});
+
+	it.each([...DAMAGED_VALUES.map(([n, v]) => [`a size of ${n}`, { size: v, unit: 'in' }]),
+		...DAMAGED_SECTIONS.map(([n, v]) => [`a target of ${n}`, v])])('for %s', (_, target) => {
+		const read = storedMpbrTarget(target);
+		// The page keeps its Calculate button off for an empty size, and calculateMPBR gives no result.
+		expect(read.size).toBe('');
+		expect(calculateMPBR(P223_G1, read.size, read.unit)).toBeNull();
+		expect(reached()).toBe(false);
+	});
+});
+
+describe('a damaged MPBR unit changes no result', () => {
+	it('gives the inch result, as before, and the page labels it in inches', () => {
+		const silence = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const inch = calculateMPBR(P308_G1, '8', 'in');
+		const damaged = storedMpbrTarget({ size: '8', unit: 'mm' });
+		expect(damaged.unit).toBe('in');
+		const read = calculateMPBR(P308_G1, damaged.size, damaged.unit);
+		const raw = calculateMPBR(P308_G1, '8', 'mm');
+		silence.mockRestore();
+		expect(inch).not.toBeNull();
+		expect(read.useMetric).toBe(false);
+		expect([read.optimalZero, read.mpbrMax, read.maxOrdinate]).toEqual([inch.optimalZero, inch.mpbrMax, inch.maxOrdinate]);
+		expect([raw.optimalZero, raw.mpbrMax, raw.maxOrdinate]).toEqual([inch.optimalZero, inch.mpbrMax, inch.maxOrdinate]);
+	});
+});
+
+describe('storedValidationMeasure', () => {
+	it('keeps a good observation', () => {
+		expect(storedValidationMeasure(MEASURE)).toEqual(MEASURE);
+		const other = { type: 'distance', direction: 'above', distanceValue: 4, distanceUnit: 'cm', angleValue: '1', angleUnit: 'mrad' };
+		expect(storedValidationMeasure(other)).toEqual(other);
+	});
+
+	it.each(DAMAGED_SECTIONS)('reads an observation of %s as empty boxes', (_, value) => {
+		expect(storedValidationMeasure(value)).toEqual(EMPTY_MEASURE);
+	});
+
+	it.each(DAMAGED_VALUES)('reads a value of %s as an empty box', (_, value) => {
+		const read = storedValidationMeasure({ ...MEASURE, angleValue: value, distanceValue: value });
+		expect(read.angleValue).toBe('');
+		expect(read.distanceValue).toBe('');
+	});
+
+	it.each([['foo'], [{}], [null], [['distance']], ['Distance']])('reads the type %j as angle, as the calculation does', (type) => {
+		expect(storedValidationMeasure({ ...MEASURE, type }).type).toBe('angle');
+	});
+
+	it.each([[{}], ['mm'], [null]])('reads the units %j as in and MOA, and the direction as below', (value) => {
+		const read = storedValidationMeasure({ ...MEASURE, distanceUnit: value, angleUnit: value, direction: value });
+		expect([read.distanceUnit, read.angleUnit, read.direction]).toEqual(['in', 'moa', 'below']);
+	});
+});
+
+describe('storedSolveFor', () => {
+	it.each([
+		['bc', 'bc'],
+		['velocity', 'velocity'],
+		[undefined, 'velocity'],
+		[null, 'velocity'],
+		[{}, 'velocity'],
+		['x', 'velocity'],
+		['BC', 'velocity'],
+		[['bc'], 'velocity'],
+		[throwsAsText, 'velocity']
+	])('reads %j as %j', (value, expected) => {
+		expect(storedSolveFor(value)).toBe(expected);
+	});
+});
+
+describe('storedValidationAtmosphere', () => {
+	it('keeps a good atmosphere', () => {
+		expect(storedValidationAtmosphere(ISA_VALIDATION, ISA_VALIDATION)).toEqual(ISA_VALIDATION);
+		const custom = { ...ISA_VALIDATION, useISA: false, altitude: '1000', altitudeUnit: 'm' };
+		expect(storedValidationAtmosphere(custom, ISA_VALIDATION)).toEqual(custom);
+	});
+
+	it.each([[undefined], [null]])('reads %j as the standard atmosphere, as the page did', (value) => {
+		const read = storedValidationAtmosphere(value, ISA_VALIDATION);
+		expect(read).toEqual(ISA_VALIDATION);
+		expect(read).not.toBe(ISA_VALIDATION);
+	});
+
+	it.each(DAMAGED_SECTIONS.filter(([, v]) => v !== null && v !== undefined))('reads %s as a custom atmosphere with empty boxes', (_, value) => {
+		expect(storedValidationAtmosphere(value, ISA_VALIDATION)).toEqual(storedAtmosphere(value));
+		expect(storedValidationAtmosphere(value, ISA_VALIDATION).useISA).toBe(false);
+	});
+});
+
+describe('a damaged validation value gives no result, before the engine', () => {
+	let solver;
+	let fire;
+	const reached = () => solver.mock.calls.length + fire.mock.calls.length > 0;
+	const range = { distance: '300', unit: 'yd' };
+
+	beforeEach(() => {
+		solver = vi.spyOn(Calculator.prototype, 'setWeaponZero').mockImplementation(() => {
+			throw new Error('setWeaponZero reached');
+		});
+		fire = vi.spyOn(Calculator.prototype, 'fire').mockImplementation(() => {
+			throw new Error('fire reached');
+		});
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it('reaches the stub with good values, so the stub is live', () => {
+		pageValidation(P308_G1, storedRange(range), storedValidationMeasure(MEASURE), 'velocity', ISA_VALIDATION);
+		expect(reached()).toBe(true);
+	});
+
+	it.each([
+		['an angle array', { ...MEASURE, angleValue: ['2'] }],
+		['a distance array', { ...MEASURE, type: 'distance', distanceValue: ['4'] }],
+		['a custom pressure array', null, { ...ISA_VALIDATION, useISA: false, pressure: ['29.92'] }],
+		['a range array', null, null, { distance: ['300'], unit: 'yd' }]
+	])('reached the engine with %s before #127', (_, measure, atmosphere, rawRange) => {
+		const m = measure ?? MEASURE;
+		const value = m.type === 'distance' ? m.distanceValue : m.angleValue;
+		const unit = m.type === 'distance' ? m.distanceUnit : m.angleUnit;
+		const atmo = atmosphere ?? null;
+		calculateTrajectoryValidation(P308_G1, rawRange ?? range, m.type, value, unit, 'velocity', atmo, 'below');
+		expect(reached()).toBe(true);
+	});
+
+	it.each([
+		...DAMAGED_VALUES.map(([n, v]) => [`an angle of ${n}`, { measure: { ...MEASURE, angleValue: v } }]),
+		...DAMAGED_VALUES.map(([n, v]) => [`a distance of ${n}`, { measure: { ...MEASURE, type: 'distance', distanceValue: v } }]),
+		...DAMAGED_SECTIONS.map(([n, v]) => [`an observation of ${n}`, { measure: v }]),
+		...DAMAGED_VALUES.map(([n, v]) => [`a range distance of ${n}`, { range: { distance: v, unit: 'yd' } }]),
+		...DAMAGED_SECTIONS.map(([n, v]) => [`a range of ${n}`, { range: v }]),
+		...DAMAGED_VALUES.map(([n, v]) => [`a custom pressure of ${n}`, { atmosphere: { ...ISA_VALIDATION, useISA: false, pressure: v } }]),
+		...DAMAGED_SECTIONS.filter(([, v]) => v !== null && v !== undefined).map(([n, v]) => [`an atmosphere of ${n}`, { atmosphere: v }])
+	])('for %s', (_, stored) => {
+		const result = pageValidation(
+			P308_G1,
+			storedRange('range' in stored ? stored.range : range),
+			storedValidationMeasure('measure' in stored ? stored.measure : MEASURE),
+			storedSolveFor('velocity'),
+			storedValidationAtmosphere('atmosphere' in stored ? stored.atmosphere : ISA_VALIDATION, ISA_VALIDATION)
+		);
+		// A custom atmosphere out of its limits stops calculateShotPoint before the engine, so the
+		// search reports no solution under the box's message, as for a typed value out of its limits.
+		if ('atmosphere' in stored) expect(result).toEqual({ error: 'no_solution' });
+		else expect(result).toBeNull();
+		expect(reached()).toBe(false);
+	});
+});
+
+describe('a damaged validation choice changes no result', () => {
+	const range = { distance: '300', unit: 'yd' };
+	let warn;
+	beforeEach(() => {
+		warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+	});
+	afterEach(() => {
+		warn.mockRestore();
+	});
+
+	it.each([
+		['type', { type: 'foo' }, { type: 'angle' }],
+		['angle unit', { angleUnit: {} }, { angleUnit: 'moa' }],
+		['distance unit', { type: 'distance', distanceValue: '4', distanceUnit: 'mm' }, { type: 'distance', distanceValue: '4', distanceUnit: 'in' }],
+		['direction', { direction: {} }, { direction: 'below' }]
+	])('a damaged %s gives the result of what the page shows, as before', (_, damaged, shown) => {
+		const raw = { ...MEASURE, ...damaged };
+		const read = storedValidationMeasure(raw);
+		expect(read).toEqual({ ...MEASURE, ...shown });
+		const fromRead = pageValidation(P308_G1, range, read, 'velocity', ISA_VALIDATION);
+		const before = calculateTrajectoryValidation(
+			P308_G1,
+			range,
+			raw.type,
+			raw.type === 'distance' ? raw.distanceValue : raw.angleValue,
+			raw.type === 'distance' ? raw.distanceUnit : raw.angleUnit,
+			'velocity',
+			null,
+			raw.direction === 'above' ? 'above' : 'below'
+		);
+		expect(fromRead).not.toBeNull();
+		expect(fromRead.error).toBeUndefined();
+		expect(fromRead.validatedVelocity).toBe(before.validatedVelocity);
+	});
+
+	it('a missing or null atmosphere stays the standard atmosphere', () => {
+		const standard = pageValidation(P308_G1, range, MEASURE, 'velocity', ISA_VALIDATION);
+		const missing = pageValidation(P308_G1, range, MEASURE, 'velocity', storedValidationAtmosphere(undefined, ISA_VALIDATION));
+		const nulled = pageValidation(P308_G1, range, MEASURE, 'velocity', storedValidationAtmosphere(null, ISA_VALIDATION));
+		expect(standard.validatedVelocity).toBeGreaterThan(0);
+		expect(missing.validatedVelocity).toBe(standard.validatedVelocity);
+		expect(nulled.validatedVelocity).toBe(standard.validatedVelocity);
 	});
 });

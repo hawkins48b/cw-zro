@@ -62,6 +62,12 @@
 		return color || fallback;
 	}
 
+	/**
+	 * Room above the plot for the Max. Ordinate label, in px (#128). With the apex at the top of the
+	 * plot (20 in or 40 cm targets on the default profile), the label reached 5 px above it.
+	 */
+	const MAX_ORD_LABEL_ROOM = 12;
+
 	function buildChartOptions(result, dark, annotations) {
 		const distUnitEnum = result.useMetric ? Unit.Meter : Unit.Yard;
 		const elevUnitEnum = result.useMetric ? Unit.Centimeter : Unit.Inch;
@@ -194,7 +200,10 @@
 			grid: {
 				borderColor: dark ? '#374151' : '#e5e7eb',
 				strokeDashArray: 3,
-				padding: { left: 10, right: 20, top: 0, bottom: 0 }
+				// The apex is the highest point of the curve, so it is often at the top of the plot,
+				// and its label is drawn above it. Room above the plot keeps that label inside the
+				// chart (#128). The plot is 12 px shorter; no value changes.
+				padding: { left: 10, right: 20, top: annotations && result.maxOrdinate ? MAX_ORD_LABEL_ROOM : 0, bottom: 0 }
 			},
 			xaxis: {
 				type: 'numeric',

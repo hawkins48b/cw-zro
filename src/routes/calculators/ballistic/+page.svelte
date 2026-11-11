@@ -7,7 +7,13 @@
 	import { ballisticPageTrajectory, isUsableBallisticRange } from '#lib/utils/ballisticPage.js';
 	import { readDecimal } from '#lib/utils/decimal.js';
 	import { formatLimit } from '#lib/utils/format.js';
-	import { MAX_DISTANCE } from '#lib/utils/inputLimits.js';
+	import {
+		chartTickAmount,
+		isUsableTableStep,
+		MAX_DISTANCE,
+		MIN_TABLE_STEP,
+		tableStep
+	} from '#lib/utils/inputLimits.js';
 	import WindInput from '#lib/components/WindInput.svelte';
 	import AtmosphereCard from '#lib/components/AtmosphereCard.svelte';
 	import {
@@ -33,6 +39,8 @@
 	// ── Trajectory computation ───────────────────────────────────────
 	// The range box shows the range message when the page does not calculate (#122).
 	let rangeUsable = $derived(isUsableBallisticRange(ballistic.range.distance));
+	// The step box shows the minimum under a step below it (#130). The table keeps tableStep.
+	let stepUsable = $derived(isUsableTableStep(ballistic.range.step));
 	let trajectory = $derived.by(() => {
 		const atmo = ballistic.atmosphere.useISA ? null : ballistic.atmosphere;
 		return ballisticPageTrajectory(activeProfile.profile, ballistic.range, atmo, ballistic.storedWind);
@@ -81,7 +89,9 @@
 		}));
 
 		const maxX = data.length > 0 ? data[data.length - 1].x : 0;
-		const tickAmount = step > 0 && maxX > 0 ? Math.round(maxX / step) : undefined;
+		// One tick per table step, capped: a small step on a long range asked ApexCharts for
+		// millions of ticks (#130).
+		const tickAmount = chartTickAmount(maxX, step);
 
 		const annotationPoints = [];
 
@@ -208,7 +218,9 @@
 		}));
 
 		const maxX = velData.length > 0 ? velData[velData.length - 1].x : 0;
-		const tickAmount = step > 0 && maxX > 0 ? Math.round(maxX / step) : undefined;
+		// One tick per table step, capped: a small step on a long range asked ApexCharts for
+		// millions of ticks (#130).
+		const tickAmount = chartTickAmount(maxX, step);
 
 		const series = [{ name: m.ballistic_vel_chart(), data: velData }];
 
@@ -280,7 +292,7 @@
 			farZero,
 			maxApex,
 			maxDrop,
-			readDecimal(ballistic.range.step) || 25
+			tableStep(ballistic.range.step)
 		);
 		const chart = new ac(el, opts);
 		chart.render();
@@ -293,7 +305,7 @@
 		if (!ac || !el || !ballistic.options.showVelocityChart) return;
 
 		const velUnit = ballistic.options.velChartUnit ?? 'fps';
-		const opts = buildVelChartOptions(chartPoints, settings.darkMode, isMetric, velUnit, soundSpeedFPS, readDecimal(ballistic.range.step) || 25);
+		const opts = buildVelChartOptions(chartPoints, settings.darkMode, isMetric, velUnit, soundSpeedFPS, tableStep(ballistic.range.step));
 		const chart = new ac(el, opts);
 		chart.render();
 		return () => chart.destroy();
@@ -470,11 +482,16 @@
 							inputmode="decimal"
 							placeholder="25"
 							value={ballistic.range.step}
+							aria-invalid={!stepUsable}
 							oninput={(e) => ballistic.setRange({ step: e.target.value })}
 						/>
 						<span class="text-sm text-surface-600-400 shrink-0">{distLabel}</span>
 					</div>
-					<p class="text-xs text-surface-600-400">{m.ballistic_step_hint()}</p>
+					{#if stepUsable}
+						<p class="text-xs text-surface-600-400">{m.ballistic_step_hint()}</p>
+					{:else}
+						<p class="text-xs text-error-500">{m.ballistic_step_min({ min: formatLimit(MIN_TABLE_STEP), unit: distLabel })}</p>
+					{/if}
 				</div>
 			</div>
 

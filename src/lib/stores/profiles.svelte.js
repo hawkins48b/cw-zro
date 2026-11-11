@@ -42,21 +42,22 @@ const store = localStore('zro-profiles', () => [{ ...DEFAULT_PROFILE, id: crypto
 /** The usable stored profiles (#120): storage can hold any JSON value. */
 const readList = () => normalizeProfiles(store.value);
 
-// One-time migration: add optic click adjustment fields to profiles that lack them
+// One-time migration: add optic click adjustment fields to profiles that lack them. It writes the
+// usable list, as a save does: readList can give a copy of a profile (an id read as text, #131), so
+// a change made in place would not reach storage.
 {
-	let migrated = false;
-	for (const p of readList()) {
-		if (p.reticleType === undefined) {
-			p.reticleType = 'red-dot';
-			p.elevationClickValue = '0.5';
-			p.elevationClickUnit = 'MOA';
-			p.windageClickValue = '0.5';
-			p.windageClickUnit = 'MOA';
-			p.clickLink = true;
-			migrated = true;
-		}
+	const CLICK_DEFAULTS = {
+		reticleType: 'red-dot',
+		elevationClickValue: '0.5',
+		elevationClickUnit: 'MOA',
+		windageClickValue: '0.5',
+		windageClickUnit: 'MOA',
+		clickLink: true
+	};
+	const list = readList();
+	if (list.some((p) => p.reticleType === undefined)) {
+		store.value = list.map((p) => (p.reticleType === undefined ? { ...p, ...CLICK_DEFAULTS } : p));
 	}
-	if (migrated) store.persist();
 }
 
 // The list operations are those of profileOps.js, which is tested. A write keeps only the usable

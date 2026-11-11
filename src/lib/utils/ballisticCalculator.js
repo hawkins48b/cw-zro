@@ -29,7 +29,8 @@ import {
 	isUsableAtmosphere,
 	isUsableBc,
 	isUsableRange,
-	isUsableSightHeight
+	isUsableSightHeight,
+	tableStep
 } from './inputLimits.js';
 
 /**
@@ -333,7 +334,7 @@ export function calculateFullTrajectory(profile, range, atmosphere, wind, option
 	if (options.report) options.report.minimumAltitude = false;
 	try {
 		const maxDist = Math.abs(readDecimal(range.distance));
-		const stepVal = Math.max(1, Math.abs(readDecimal(range.step)) || 25);
+		const stepVal = tableStep(range.step);
 		if (!isUsableRange(maxDist)) return null;
 		if (!isUsableZeroDistance(profile.zeroDist)) return null;
 

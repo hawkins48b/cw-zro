@@ -22,16 +22,65 @@ import { isNumberOrText } from './storedWind.js';
 const isStoredProfile = (profile) => isRecord(profile) && isNumberOrText(/** @type {any} */ (profile).id);
 
 /**
- * The usable profiles of the stored list, as stored. Anything that is not a list gives no profiles,
- * and an entry that is not a profile is left out. The pages then show that there is no profile, and
+ * A new id for a later profile whose id is already taken: the id with `-2`, `-3` and so on, the
+ * first that no stored profile has and that was not given out yet. It depends only on the stored
+ * list, so it is the same at every read, and a save stores it. `next` remembers where the count of
+ * each id stopped, so that a list with many copies of one id stays quick to read.
+ *
+ * @param {string} id
+ * @param {Set<string>} stored - every stored id, as text
+ * @param {Set<string>} used - ids already given out
+ * @param {Map<string, number>} next - for each id, the number to try first
+ * @returns {string}
+ */
+function freeId(id, stored, used, next) {
+	for (let n = next.get(id) ?? 2; ; n++) {
+		const candidate = `${id}-${n}`;
+		if (!stored.has(candidate) && !used.has(candidate)) {
+			next.set(id, n + 1);
+			return candidate;
+		}
+	}
+}
+
+/**
+ * The usable profiles of the stored list. Anything that is not a list gives no profiles, and an
+ * entry that is not a profile is left out. The pages then show that there is no profile, and
  * saving a profile writes a usable list again.
+ *
+ * Ids are read as text (#131, owner decision): pages look a profile up with `===` by the id in
+ * `/profiles/<id>`, which is text, so a profile stored with the number id 1 could not be opened, or
+ * made active unless it was first. Its id is now `"1"`. Two profiles cannot share an id: the first
+ * keeps it, and a later one with the same id (`1` and `"1"`, or `"1"` twice) gets a new one from
+ * freeId, so that each profile can still be opened, edited and deleted on its own. A profile whose
+ * id is already text and not taken is the stored object itself. Its other fields are left as stored.
  *
  * @param {unknown} value
  * @returns {object[]}
  */
 export function normalizeProfiles(value) {
-	return Array.isArray(value) ? value.filter(isStoredProfile) : [];
+	if (!Array.isArray(value)) return [];
+	const profiles = value.filter(isStoredProfile);
+	const stored = new Set(profiles.map((profile) => String(profile.id)));
+	const used = new Set();
+	const next = new Map();
+	return profiles.map((profile) => {
+		const text = String(profile.id);
+		const id = used.has(text) ? freeId(text, stored, used, next) : text;
+		used.add(id);
+		return id === profile.id ? profile : { ...profile, id };
+	});
 }
+
+/**
+ * The stored id of the active profile, read as normalizeProfiles reads profile ids (#131): a number
+ * or text as text, anything else as none, so the first profile is active. A stored `1` therefore
+ * finds the profile stored with the id `1`, or `"1"`.
+ *
+ * @param {unknown} value
+ * @returns {string|null}
+ */
+export const storedProfileId = (value) => (isNumberOrText(value) ? String(value) : null);
 
 /** Names and labels: shown as text, so that pages can sort and search them. */
 const NAME_FIELDS = ['name', 'ammo', 'optic', 'opticName', 'bulletBrand'];

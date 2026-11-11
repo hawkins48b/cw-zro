@@ -226,3 +226,186 @@ describe('zro-profiles', () => {
 		expect(activeProfile.profile).toEqual(damaged);
 	});
 });
+
+describe('zro-profiles ids read as text (#131)', () => {
+	const load_ = async (value, active) => {
+		const { profiles } = await load('#lib/stores/profiles.svelte.js', { 'zro-profiles': value, 'zro-active-profile': active });
+		const { activeProfile } = await import('#lib/stores/activeProfile.svelte.js');
+		return { profiles, activeProfile };
+	};
+	const second = { ...GOOD_PROFILE, id: 7, name: 'Seven' };
+
+	it('opens a profile stored with a number id by the id in its URL', async () => {
+		const { profiles } = await load_([GOOD_PROFILE, second], 'p1');
+		expect(profiles.get('7')).toEqual({ ...second, id: '7' });
+		expect(profiles.get(7)).toBeUndefined();
+	});
+
+	it('makes a profile stored with a number id active, also when it is not first', async () => {
+		const { activeProfile } = await load_([GOOD_PROFILE, second], 'p1');
+		expect(activeProfile.profile.id).toBe('p1');
+		activeProfile.setActive('7');
+		expect(activeProfile.id).toBe('7');
+		expect(activeProfile.profile.name).toBe('Seven');
+	});
+
+	it.each([[7], ['7']])('reads the stored active id %j as the profile stored with the id 7', async (active) => {
+		const { activeProfile } = await load_([GOOD_PROFILE, second], active);
+		expect(activeProfile.id).toBe('7');
+		expect(activeProfile.profile.name).toBe('Seven');
+	});
+
+	it.each([[{}], [['7']], [true]])('reads a damaged stored active id %j as the first profile', async (active) => {
+		const { activeProfile } = await load_([GOOD_PROFILE, second], active);
+		expect(activeProfile.id).toBe('p1');
+		expect(activeProfile.profile.id).toBe('p1');
+	});
+
+	it('edits and deletes each of two profiles stored with the ids 1 and "1" on its own', async () => {
+		const a = { ...GOOD_PROFILE, id: 1, name: 'A' };
+		const b = { ...GOOD_PROFILE, id: '1', name: 'B' };
+		const { profiles } = await load_([a, b], 1);
+		expect(profiles.list.map((p) => [p.id, p.name])).toEqual([['1', 'A'], ['1-2', 'B']]);
+		expect(profiles.update('1-2', { name: 'B2' })).toBe(true);
+		expect(profiles.get('1').name).toBe('A');
+		expect(storage.values['zro-profiles'].map((p) => p.id)).toEqual(['1', '1-2']);
+		expect(profiles.remove('1')).toBe(true);
+		expect(profiles.list.map((p) => [p.id, p.name])).toEqual([['1-2', 'B2']]);
+	});
+
+	it('migrates the click fields of a profile stored with a number id', async () => {
+		const old = { ...GOOD_PROFILE, id: 3 };
+		delete old.reticleType;
+		const { profiles } = await load_([old], 3);
+		expect(profiles.get('3')).toMatchObject({ reticleType: 'red-dot', elevationClickValue: '0.5', clickLink: true });
+		expect(storage.values['zro-profiles'][0]).toMatchObject({ id: '3', reticleType: 'red-dot' });
+	});
+});
+
+describe('zro-mpbr (#127)', () => {
+	const good = { target: { size: '8', unit: 'in' } };
+	const load_ = (value) => load('#lib/stores/mpbr.svelte.js', { 'zro-mpbr': value });
+
+	it('reads good data as it is', async () => {
+		const { mpbr } = await load_(good);
+		expect(mpbr.target).toEqual(good.target);
+		const { mpbr: metric } = await load_({ target: { size: 20, unit: 'cm' } });
+		expect(metric.target).toEqual({ size: 20, unit: 'cm' });
+	});
+
+	it.each([
+		['wholly null', null],
+		['text', 'x'],
+		['a number', 5],
+		['an array', [good]],
+		['target missing', {}],
+		['target null', { target: null }],
+		['target text', { target: 'x' }],
+		['target an array', { target: ['8'] }],
+		['size an object', { target: { size: throwsAsText, unit: 'in' } }],
+		['size an array', { target: { size: ['8'], unit: 'in' } }],
+		['size a boolean', { target: { size: true, unit: 'in' } }],
+		['size null', { target: { size: null, unit: 'in' } }]
+	])('shows an empty size with %s, and recovers when the user enters one', async (_, value) => {
+		const { mpbr } = await load_(value);
+		expect(mpbr.target).toEqual({ size: '', unit: 'in' });
+		expect(() => readLikeThePage(mpbr.target.size)).not.toThrow();
+		mpbr.setTarget({ size: '10' });
+		expect(mpbr.target).toEqual({ size: '10', unit: 'in' });
+		expect(storage.values['zro-mpbr'].target).toEqual({ size: '10', unit: 'in' });
+	});
+
+	it.each([[throwsAsText], [{}], ['mm'], [null], [['cm']]])('reads the unit %j as in', async (unit) => {
+		const { mpbr } = await load_({ target: { size: '8', unit } });
+		expect(mpbr.target).toEqual({ size: '8', unit: 'in' });
+		mpbr.setTarget({ unit: 'cm' });
+		expect(storage.values['zro-mpbr'].target).toEqual({ size: '8', unit: 'cm' });
+	});
+});
+
+describe('zro-traj-validation (#127)', () => {
+	const ISA = { useISA: true, altitude: '0', altitudeUnit: 'ft', pressure: '29.92', pressureUnit: 'inhg', temperature: '59', temperatureUnit: 'f', humidity: '0' };
+	const measure = { type: 'angle', direction: 'below', distanceValue: '0', distanceUnit: 'in', angleValue: '2', angleUnit: 'moa' };
+	const good = { range: { distance: '300', unit: 'yd' }, measure, solveFor: 'velocity', atmosphere: ISA };
+	const EMPTY_MEASURE = { type: 'angle', direction: 'below', distanceValue: '', distanceUnit: 'in', angleValue: '', angleUnit: 'moa' };
+	const load_ = (value) => load('#lib/stores/trajectoryValidation.svelte.js', { 'zro-traj-validation': value });
+
+	it('reads good data as it is', async () => {
+		const { trajectoryValidation: tv } = await load_(good);
+		expect(tv.range).toEqual(good.range);
+		expect(tv.measure).toEqual(measure);
+		expect(tv.direction).toBe('below');
+		expect(tv.solveFor).toBe('velocity');
+		expect(tv.atmosphere).toEqual(ISA);
+	});
+
+	it.each([
+		['wholly null', null],
+		['text', 'x'],
+		['a number', 5],
+		['an array', [good]]
+	])('reads a store of %s as empty sections, and the standard atmosphere, as a missing one was', async (_, value) => {
+		const { trajectoryValidation: tv } = await load_(value);
+		expect(tv.range).toEqual({ distance: '', unit: 'yd' });
+		expect(tv.measure).toEqual(EMPTY_MEASURE);
+		expect(tv.solveFor).toBe('velocity');
+		expect(tv.atmosphere).toEqual(ISA);
+	});
+
+	it.each([
+		['range null', { ...good, range: null }, 'range', { distance: '', unit: 'yd' }],
+		['range text', { ...good, range: 'x' }, 'range', { distance: '', unit: 'yd' }],
+		['range.distance an object', { ...good, range: { distance: throwsAsText, unit: 'm' } }, 'range', { distance: '', unit: 'm' }],
+		['range.distance an array', { ...good, range: { distance: ['300'], unit: 'yd' } }, 'range', { distance: '', unit: 'yd' }],
+		['measure null', { ...good, measure: null }, 'measure', EMPTY_MEASURE],
+		['measure text', { ...good, measure: 'x' }, 'measure', EMPTY_MEASURE],
+		['measure missing', { ...good, measure: undefined }, 'measure', EMPTY_MEASURE],
+		['measure.angleValue an object', { ...good, measure: { ...measure, angleValue: throwsAsText } }, 'measure', { ...measure, angleValue: '' }],
+		['measure.angleValue an array', { ...good, measure: { ...measure, angleValue: ['2'] } }, 'measure', { ...measure, angleValue: '' }],
+		['measure.type an object', { ...good, measure: { ...measure, type: {} } }, 'measure', measure],
+		['measure.type unknown', { ...good, measure: { ...measure, type: 'foo' } }, 'measure', measure],
+		['measure.angleUnit an object', { ...good, measure: { ...measure, angleUnit: {} } }, 'measure', measure],
+		['measure.direction an object', { ...good, measure: { ...measure, direction: {} } }, 'measure', measure],
+		['atmosphere text', { ...good, atmosphere: 'x' }, 'atmosphere', { useISA: false, altitude: '', altitudeUnit: 'ft', pressure: '', pressureUnit: 'inhg', temperature: '', temperatureUnit: 'f', humidity: '' }],
+		['atmosphere.pressure an array', { ...good, atmosphere: { ...ISA, useISA: false, pressure: ['29.92'] } }, 'atmosphere', { ...ISA, useISA: false, pressure: '' }],
+		['atmosphere null, read as the standard one as before', { ...good, atmosphere: null }, 'atmosphere', ISA],
+		['solveFor an object', { ...good, solveFor: {} }, 'solveFor', 'velocity'],
+		['solveFor unknown', { ...good, solveFor: 'x' }, 'solveFor', 'velocity'],
+		['solveFor null', { ...good, solveFor: null }, 'solveFor', 'velocity']
+	])('reads %s as a usable value', async (_, value, field, expected) => {
+		const { trajectoryValidation: tv } = await load_(value);
+		expect(tv[field]).toEqual(expected);
+		expect(() => readLikeThePage(tv.range.distance)).not.toThrow();
+		expect(() => readLikeThePage(tv.measure.angleValue)).not.toThrow();
+		expect(() => readLikeThePage(tv.atmosphere.altitude)).not.toThrow();
+	});
+
+	it('recovers when the user enters values, also on a store of text', async () => {
+		const { trajectoryValidation: tv } = await load_('x');
+		tv.setRange({ distance: '300' });
+		tv.setMeasure({ angleValue: '2' });
+		tv.setSolveFor('bc');
+		expect(storage.values['zro-traj-validation']).toEqual({
+			range: { distance: '300', unit: 'yd' },
+			measure: { ...EMPTY_MEASURE, angleValue: '2' },
+			solveFor: 'bc'
+		});
+		expect(tv.atmosphere).toEqual(ISA);
+	});
+
+	it('keeps the other sections when one damaged section is set', async () => {
+		const { trajectoryValidation: tv } = await load_({ ...good, measure: null });
+		tv.setMeasure({ type: 'distance', distanceValue: '4' });
+		expect(tv.measure).toEqual({ ...EMPTY_MEASURE, type: 'distance', distanceValue: '4' });
+		expect(tv.range).toEqual(good.range);
+		expect(storage.values['zro-traj-validation'].atmosphere).toEqual(ISA);
+	});
+
+	it('restores the standard atmosphere over a damaged one, and turns it off with its values', async () => {
+		const { trajectoryValidation: tv } = await load_({ ...good, atmosphere: 'x' });
+		tv.setAtmosphere({ useISA: true });
+		expect(tv.atmosphere).toEqual(ISA);
+		tv.setAtmosphere({ useISA: false });
+		expect(tv.atmosphere).toEqual({ ...ISA, useISA: false });
+	});
+});

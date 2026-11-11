@@ -133,3 +133,65 @@ export function storedBallisticOptions(stored, defaults) {
 		velChartUnit: options.velChartUnit === 'mps' ? 'mps' : 'fps'
 	};
 }
+
+/**
+ * The stored target of the MPBR page (#127). A size that is not a number or text is an empty box:
+ * the Calculate button stays off, so there is no result, as there was none or the page threw. An
+ * array is not read as a number, as in storedRange. The unit is `cm` or else `in`, as calculateMPBR
+ * reads it.
+ *
+ * @param {unknown} stored
+ * @returns {{ size: string|number, unit: 'in'|'cm' }}
+ */
+export function storedMpbrTarget(stored) {
+	const target = storedObject(stored);
+	return { size: storedText(target.size), unit: target.unit === 'cm' ? 'cm' : 'in' };
+}
+
+/**
+ * The stored observation of the Trajectory Validation page (#127). Each choice is read as
+ * calculateTrajectoryValidation reads it: the type is `distance` or else `angle`, the distance unit
+ * `cm` or else `in`, the angle unit `mrad` or else `moa`, and the direction `above` or else `below`
+ * (state saved before the direction existed has none). A value that is not a number or text is an
+ * empty box, which gives no result. A damaged section is a section of empty boxes.
+ *
+ * @param {unknown} stored
+ * @returns {{ type: 'angle'|'distance', direction: 'below'|'above', distanceValue: string|number,
+ *   distanceUnit: 'in'|'cm', angleValue: string|number, angleUnit: 'moa'|'mrad' }}
+ */
+export function storedValidationMeasure(stored) {
+	const measure = storedObject(stored);
+	return {
+		type: measure.type === 'distance' ? 'distance' : 'angle',
+		direction: measure.direction === 'above' ? 'above' : 'below',
+		distanceValue: storedText(measure.distanceValue),
+		distanceUnit: measure.distanceUnit === 'cm' ? 'cm' : 'in',
+		angleValue: storedText(measure.angleValue),
+		angleUnit: measure.angleUnit === 'mrad' ? 'mrad' : 'moa'
+	};
+}
+
+/**
+ * What the Trajectory Validation page solves for (#127): `bc`, or else the muzzle velocity, the
+ * default. Before, the calculation solved for the BC on any value but `velocity`, while the chart
+ * and the Apply button took any value but `bc` as velocity, so a damaged value could save an
+ * `undefined` velocity to the profile. Now all of them read the same choice.
+ *
+ * @param {unknown} stored
+ * @returns {'velocity'|'bc'}
+ */
+export const storedSolveFor = (stored) => (stored === 'bc' ? 'bc' : 'velocity');
+
+/**
+ * The stored atmosphere of the Trajectory Validation page (#127). State saved before the field
+ * existed has none, and the page read a missing or `null` atmosphere as the standard one: that is
+ * kept, so no result changes. Anything else is read by storedAtmosphere: a section that is not an
+ * object is a custom atmosphere with empty boxes, which gives no result.
+ *
+ * @param {unknown} stored
+ * @param {ReturnType<typeof storedAtmosphere>} standard - the standard atmosphere of the page
+ * @returns {ReturnType<typeof storedAtmosphere>}
+ */
+export function storedValidationAtmosphere(stored, standard) {
+	return stored === undefined || stored === null ? { ...standard } : storedAtmosphere(stored);
+}

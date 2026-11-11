@@ -1,3 +1,10 @@
+import {
+	storedObject,
+	storedRange,
+	storedSolveFor,
+	storedValidationAtmosphere,
+	storedValidationMeasure
+} from '#lib/utils/storedState.js';
 import { localStore } from './localStore.svelte.js';
 
 const ISA_DEFAULTS = {
@@ -30,26 +37,29 @@ const defaults = {
 
 const _store = localStore('zro-traj-validation', defaults);
 
+// The stored state, or an empty one when it is not an object (#127). Each getter checks its field:
+// see storedState.js.
+const state = () => storedObject(_store.value);
+
 export const trajectoryValidation = {
-	get range() { return _store.value.range; },
-	get measure() { return _store.value.measure; },
+	get range() { return storedRange(state().range); },
+	get measure() { return storedValidationMeasure(state().measure); },
 	// State saved before this field existed has no direction: read it as below.
-	get direction() { return _store.value.measure.direction === 'above' ? 'above' : 'below'; },
-	get solveFor() { return _store.value.solveFor ?? 'velocity'; },
-	get atmosphere() { return _store.value.atmosphere ?? { ...ISA_DEFAULTS }; },
+	get direction() { return this.measure.direction; },
+	get solveFor() { return storedSolveFor(state().solveFor); },
+	get atmosphere() { return storedValidationAtmosphere(state().atmosphere, ISA_DEFAULTS); },
 	setRange(patch) {
-		_store.value = { ..._store.value, range: { ..._store.value.range, ...patch } };
+		_store.value = { ...state(), range: { ...this.range, ...patch } };
 	},
 	setMeasure(patch) {
-		_store.value = { ..._store.value, measure: { ..._store.value.measure, ...patch } };
+		_store.value = { ...state(), measure: { ...this.measure, ...patch } };
 	},
 	setSolveFor(val) {
-		_store.value = { ..._store.value, solveFor: val };
+		_store.value = { ...state(), solveFor: val };
 	},
 	setAtmosphere(patch) {
-		const current = _store.value.atmosphere ?? { ...ISA_DEFAULTS };
-		const updated = { ...current, ...patch };
+		const updated = { ...this.atmosphere, ...patch };
 		if (updated.useISA) Object.assign(updated, ISA_DEFAULTS, { useISA: true });
-		_store.value = { ..._store.value, atmosphere: updated };
+		_store.value = { ...state(), atmosphere: updated };
 	}
 };

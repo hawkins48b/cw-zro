@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Calculator, Unit } from 'js-ballistics';
-import { normalizeProfiles, shownProfile } from '#lib/utils/storedProfiles.js';
+import { normalizeProfiles, shownProfile, storedProfileId } from '#lib/utils/storedProfiles.js';
 import { duplicateProfile } from '#lib/utils/profileOps.js';
 import { calculateShotPoint } from '#lib/utils/ballisticCalculator.js';
 import { isUsableZeroDistance } from '#lib/utils/zeroDistance.js';
@@ -88,12 +88,86 @@ describe('normalizeProfiles', () => {
 	it('leaves out entries that are not profiles', () => {
 		const numberId = { ...DEFAULT_PROFILE, id: 7 };
 		const list = [null, 5, 'x', [], [DEFAULT_PROFILE], { ...DEFAULT_PROFILE, id: throwsAsText }, { name: 'no id' }, DEFAULT_PROFILE, numberId];
-		expect(normalizeProfiles(list)).toEqual([DEFAULT_PROFILE, numberId]);
+		expect(normalizeProfiles(list)).toEqual([DEFAULT_PROFILE, { ...numberId, id: '7' }]);
 	});
 
 	it('lets the store migration read every entry', () => {
 		const list = [null, 5, { ...DEFAULT_PROFILE, reticleType: undefined }];
 		expect(() => normalizeProfiles(list).forEach((p) => p.reticleType === undefined)).not.toThrow();
+	});
+});
+
+describe('profile ids are read as text (#131)', () => {
+	const ids = (list) => normalizeProfiles(list).map((p) => p.id);
+	const named = (id, name = `p${id}`) => ({ ...DEFAULT_PROFILE, id, name });
+
+	it.each([
+		[1, '1'],
+		[0, '0'],
+		[-3, '-3'],
+		[1.5, '1.5'],
+		[1e21, '1e+21']
+	])('reads the number id %j as %j, and keeps the other fields', (id, text) => {
+		const stored = named(id, 'Number');
+		const [read] = normalizeProfiles([stored]);
+		expect(read).toEqual({ ...stored, id: text });
+		expect(stored.id).toBe(id);
+	});
+
+	it('keeps a profile with a text id as the stored object', () => {
+		const list = [named('a'), named('1')];
+		const read = normalizeProfiles(list);
+		expect(read[0]).toBe(list[0]);
+		expect(read[1]).toBe(list[1]);
+	});
+
+	it.each([
+		['a number and its text', [named(1, 'first'), named('1', 'second')], ['1', '1-2']],
+		['its text and the number', [named('1', 'first'), named(1, 'second')], ['1', '1-2']],
+		['the same text twice', [named('a'), named('a')], ['a', 'a-2']],
+		['three times', [named(1), named('1'), named(1)], ['1', '1-2', '1-3']],
+		['a later profile already holding the new id', [named(1), named('1'), named('1-2')], ['1', '1-3', '1-2']],
+		['an earlier profile already holding the new id', [named('1-2'), named(1), named('1')], ['1-2', '1', '1-3']],
+		['a uuid twice', [named('2b6c'), named('x'), named('2b6c')], ['2b6c', 'x', '2b6c-2']]
+	])('gives a later duplicate a new id: %s', (_, list, expected) => {
+		const read = ids(list);
+		expect(read).toEqual(expected);
+		expect(new Set(read).size).toBe(read.length);
+	});
+
+	it('gives the same ids at every read, and keeps the duplicate itself', () => {
+		const list = [named(1, 'first'), named('1', 'second')];
+		expect(ids(list)).toEqual(ids(list));
+		expect(normalizeProfiles(list)[1]).toEqual({ ...list[1], id: '1-2' });
+	});
+
+	it('reads a list with many copies of one id quickly, each with its own id', () => {
+		const list = Array.from({ length: 20000 }, (_, i) => named(i % 2 ? 1 : '1'));
+		const start = performance.now();
+		const read = ids(list);
+		expect(performance.now() - start).toBeLessThan(1000);
+		expect(new Set(read).size).toBe(list.length);
+		expect(read.slice(0, 3)).toEqual(['1', '1-2', '1-3']);
+	});
+
+	it('keeps the ids a save writes back', () => {
+		const once = normalizeProfiles([named(1), named('1'), named(1)]);
+		expect(normalizeProfiles(once).map((p) => p.id)).toEqual(['1', '1-2', '1-3']);
+	});
+
+	it.each([
+		[1, '1'],
+		['1', '1'],
+		['p1', 'p1'],
+		[0, '0'],
+		[null, null],
+		[undefined, null],
+		[{}, null],
+		[['1'], null],
+		[true, null],
+		[throwsAsText, null]
+	])('reads the stored active id %j as %j', (value, expected) => {
+		expect(storedProfileId(value)).toBe(expected);
 	});
 });
 

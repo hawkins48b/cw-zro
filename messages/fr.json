@@ -227,6 +227,7 @@
 	"ballistic_max_dist": "Distance max.",
 	"ballistic_step": "Pas",
 	"ballistic_step_hint": "Intervalle de calcul",
+	"ballistic_step_min": "Saisissez un pas d'au moins {min} {unit}",
 	"ballistic_atmosphere": "Atmosphère",
 	"ballistic_use_isa": "Atmosphère standard (ISA)",
 	"ballistic_altitude": "Altitude",

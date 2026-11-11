@@ -146,6 +146,57 @@ export function isUsableRange(distance) {
 	return distance > 0 && distance <= MAX_DISTANCE;
 }
 
+/** Smallest Ballistic table step, in the range unit (yd or m) (#130, owner decision of 2026-11-10). */
+export const MIN_TABLE_STEP = 1;
+
+/**
+ * Most x-axis ticks a Ballistic chart asks ApexCharts for (#130): what the default step of 25 gives
+ * on the longest range, 3000, so no chart with a step of 25 or more changed. In Chromium on a 3000 yd
+ * range, 3001 ticks (a step of 1) took 5 s to draw, 6001 took 11 s, and a step of 0.1 or less froze
+ * the page or overflowed the call stack in ApexCharts.
+ */
+export const MAX_CHART_TICKS = 120;
+
+/**
+ * The step of the Ballistic table, as calculateFullTrajectory uses it: the size of the value typed,
+ * at least MIN_TABLE_STEP; 25, the box's placeholder, for an empty box, 0 or anything that is not a
+ * number. A typed step under 1 has always given rows 1 apart, so no table changed with #130.
+ *
+ * @param {unknown} step - the step box value
+ * @returns {number}
+ */
+export function tableStep(step) {
+	return Math.max(MIN_TABLE_STEP, Math.abs(readDecimal(step)) || 25);
+}
+
+/**
+ * Whether the step box shows no message (#130): empty (read as 25), or a finite number of at least
+ * MIN_TABLE_STEP, read as the table reads it. Anything else shows the minimum, and the table keeps
+ * the step tableStep gives.
+ *
+ * @param {unknown} step - the step box value
+ * @returns {boolean}
+ */
+export function isUsableTableStep(step) {
+	if (typeof step === 'string' && step.trim() === '') return true;
+	const number = readDecimal(step);
+	return Number.isFinite(number) && number >= MIN_TABLE_STEP;
+}
+
+/**
+ * The x-axis tick count of a Ballistic chart: one tick per table step, at most MAX_CHART_TICKS, so
+ * that a small step on a long range cannot ask ApexCharts for thousands of ticks (#130). Undefined,
+ * the ApexCharts default, without a range.
+ *
+ * @param {number} maxX - the last x value of the chart
+ * @param {number} step - the table step, from tableStep
+ * @returns {number|undefined}
+ */
+export function chartTickAmount(maxX, step) {
+	if (!(maxX > 0) || !(step > 0)) return undefined;
+	return Math.min(MAX_CHART_TICKS, Math.round(maxX / step));
+}
+
 /**
  * Air temperature limits in a unit: 'c', or °F for anything else, as the calculators read it.
  * @param {string} unit
