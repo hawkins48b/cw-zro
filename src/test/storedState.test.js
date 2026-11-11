@@ -335,10 +335,12 @@ describe('storedElevation', () => {
 			'still gives no result for 30 with a unit of %j, as before',
 			(unit) => {
 				// Before: read as a cosine of 30, 15000 yd, which every calculator rejects.
-				const before = scopeEffectiveRange(range, { angle: '30', unit: /** @type {any} */ (unit) });
-				expect(before.distance).toBe(15000);
+				const before = { distance: 500 * 30, unit: 'yd' };
 				expect(isUsableRange(before.distance)).toBe(false);
 				expect(calculateShotPoint(P223_G1, before, null, null)).toBeNull();
+				// Since #129, isUsableScopeAngle checks any unit other than deg as a cosine, as
+				// scopeEffectiveRange reads it, so the unread value gives no range either.
+				expect(scopeEffectiveRange(range, { angle: '30', unit: /** @type {any} */ (unit) })).toBeNull();
 				// Now: the same cosine, rejected one step earlier, so the cosine message shows. Not 433 yd.
 				const read = storedElevation({ angle: '30', unit });
 				expect(read.unit).toBe('cos');

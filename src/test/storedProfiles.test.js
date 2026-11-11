@@ -5,7 +5,18 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Calculator, Unit } from 'js-ballistics';
-import { normalizeProfiles, shownProfile, storedProfileId } from '#lib/utils/storedProfiles.js';
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import {
+	UNUSABLE_IDS,
+	findProfileIdRenames,
+	normalizeProfiles,
+	renameActiveProfileId,
+	renameCompareEntries,
+	profileForStoredId,
+	shownProfile,
+	storedProfileId
+} from '#lib/utils/storedProfiles.js';
 import { duplicateProfile } from '#lib/utils/profileOps.js';
 import { calculateShotPoint } from '#lib/utils/ballisticCalculator.js';
 import { isUsableZeroDistance } from '#lib/utils/zeroDistance.js';
@@ -168,6 +179,214 @@ describe('profile ids are read as text (#131)', () => {
 		[throwsAsText, null]
 	])('reads the stored active id %j as %j', (value, expected) => {
 		expect(storedProfileId(value)).toBe(expected);
+	});
+});
+
+/**
+ * Ids that cannot be used in a link are renumbered on read (#134, owner decision). Pages link to
+ * `/profiles/<id>` without encoding the id and look it up by the decoded route parameter.
+ */
+describe('profile ids that cannot be used in a link (#134)', () => {
+	const ids = (list) => normalizeProfiles(list).map((p) => p.id);
+	const named = (id, name = `p${id}`) => ({ ...DEFAULT_PROFILE, id, name });
+
+	/** The id a page reads back from a link to the profile, as the router decodes it, or null. */
+	function idFromLink(id) {
+		const url = new URL(`/profiles/${id}`, 'http://localhost');
+		const match = /^\/profiles\/([^/]+)$/.exec(url.pathname);
+		if (!match || url.search || url.hash) return null;
+		const decoded = decodeURIComponent(match[1]);
+		return decoded === 'new' ? null : decoded;
+	}
+
+	it.each([
+		['empty', '', 'profile'],
+		['"new"', 'new', 'profile'],
+		['"."', '.', 'profile'],
+		['".."', '..', 'profile'],
+		['a slash', 'a/b', 'a-b'],
+		['a question mark', 'a?b', 'a-b'],
+		['a hash', 'a#b', 'a-b'],
+		['a percent sign', 'a%41', 'a-41'],
+		['a backslash', 'a\\b', 'a-b'],
+		['spaces at its ends', ' a ', '-a-'],
+		['a tab and a line break', 'a\tb\n', 'a-b-'],
+		['a carriage return', 'a\rb', 'a-b'],
+		['a control character at its end', 'a\u0001', 'a-'],
+		['only a slash', '/', '-'],
+		['several', '/a?b#c/', '-a-b-c-']
+	])('renumbers an id with %s', (_, id, expected) => {
+		const stored = named(id, 'Kept');
+		const [read] = normalizeProfiles([stored]);
+		expect(read).toEqual({ ...stored, id: expected });
+		expect(stored.id).toBe(id);
+		expect(idFromLink(read.id)).toBe(read.id);
+		expect(idFromLink(id)).not.toBe(id);
+	});
+
+	it.each([['p1'], ['2b6c1f0e-8a1d-4c47-9a0a-1d9c3f6f8e11'], ['1'], ['new-2'], ['profile'], ['news'], ['a.b'], ['...'], ['é'], ['a-b'], ['a b'], ['a\u00a0b']])(
+		'keeps the usable id %j as the stored object',
+		(id) => {
+			const list = [named(id)];
+			expect(normalizeProfiles(list)[0]).toBe(list[0]);
+			expect(idFromLink(id)).toBe(id);
+		}
+	);
+
+	it.each([
+		['an id stored later', [named('a/b'), named('a-b')], ['a-b-2', 'a-b']],
+		['an id stored earlier', [named('a-b'), named('a/b')], ['a-b', 'a-b-2']],
+		['two ids that become the same', [named('a/b'), named('a?b'), named('a#b')], ['a-b', 'a-b-2', 'a-b-3']],
+		['an empty id next to "profile"', [named(''), named('profile')], ['profile-2', 'profile']],
+		['"new" and an empty id', [named('new'), named(''), named('profile-2')], ['profile', 'profile-3', 'profile-2']],
+		['a duplicate of the new id', [named('a/b'), named('a-b'), named('a-b')], ['a-b-2', 'a-b', 'a-b-3']],
+		['the number id of a duplicate', [named(1), named('1'), named('1-2'), named('1/2')], ['1', '1-3', '1-2', '1-2-2']]
+	])('gives no two profiles the same id: %s', (_, list, expected) => {
+		const read = ids(list);
+		expect(read).toEqual(expected);
+		expect(new Set(read).size).toBe(read.length);
+		for (const id of read) expect(idFromLink(id)).toBe(id);
+	});
+
+	it('gives the same ids at every read, and keeps them after a save', () => {
+		const list = [named(''), named('new'), named('a/b'), named('a-b'), named('x'), named('x')];
+		const once = normalizeProfiles(list);
+		expect(ids(list)).toEqual(once.map((p) => p.id));
+		expect(normalizeProfiles(once)).toEqual(once);
+		for (const [i, profile] of normalizeProfiles(once).entries()) expect(profile).toBe(once[i]);
+	});
+
+	it('gives every profile of a mixed list an id a link reads back, with no two the same', () => {
+		const odd = ['', 'new', '.', '..', '/', '?', '#', '%', '\\', ' ', '\t', 'a b', ' a', 'profile', 'profile-2', '-', 1, '1', 'new-2'];
+		const read = ids([...odd, ...odd].map((id) => named(id)));
+		expect(new Set(read).size).toBe(read.length);
+		for (const id of read) expect(idFromLink(id)).toBe(id);
+	});
+
+	it('renumbers an id that is a static route under /profiles/', () => {
+		expect(ids([named('ammo-selector')])).toEqual(['profile']);
+		expect(ids([named('ammo-selector-2')])).toEqual(['ammo-selector-2']);
+	});
+
+	it('lists every static route under /profiles/ as unusable', () => {
+		// Vitest runs from the project root (vite.config.js).
+		const routes = readdirSync(join(process.cwd(), 'src/routes/profiles'), { withFileTypes: true })
+			.filter((entry) => entry.isDirectory() && !entry.name.startsWith('[') && !entry.name.startsWith('('))
+			.map((entry) => entry.name);
+		expect(routes).toEqual(expect.arrayContaining(['new', 'ammo-selector']));
+		for (const route of routes) expect(UNUSABLE_IDS.has(route), `route /profiles/${route}`).toBe(true);
+	});
+
+	it.each([
+		['a long run of spaces inside', 'a' + ' '.repeat(100000) + 'a'],
+		['a long run of spaces at the start', ' '.repeat(100000) + 'a'],
+		['a long run of spaces at the end', 'a' + ' '.repeat(100000)],
+		['only spaces', ' '.repeat(100000)],
+		['spaces and tabs inside', 'a' + ' \t'.repeat(50000) + 'a'],
+		['a million spaces inside', 'a' + ' '.repeat(1000000) + 'a']
+	])('reads an id with %s in linear time (security review of #134)', (_, id) => {
+		const start = performance.now();
+		const [read] = normalizeProfiles([named(id)]);
+		expect(performance.now() - start).toBeLessThan(200);
+		expect(read.id).toHaveLength(id.length);
+		expect(idFromLink(read.id)).toBe(read.id);
+	});
+
+	describe('findProfileIdRenames', () => {
+		it('maps each renumbered stored id to the id it reads as', () => {
+			const list = [named('p1'), named('a/b'), named(''), named('new'), named('a-b'), named('a/b')];
+			expect([...findProfileIdRenames(list)]).toEqual([
+				['a/b', 'a-b-2'],
+				['', 'profile'],
+				['new', 'profile-2']
+			]);
+		});
+
+		it('leaves out ids a profile still reads as: number ids and duplicates (#131)', () => {
+			expect(findProfileIdRenames([named(1), named('1'), named(7)]).size).toBe(0);
+		});
+
+		it.each([[null], ['x'], [{}], [[]], [[null, 5]]])('is empty for %j', (value) => {
+			expect(findProfileIdRenames(value).size).toBe(0);
+		});
+
+		it('never maps from an id a profile reads as', () => {
+			const odd = ['', 'new', 'ammo-selector', '.', '..', '/', '?', '#', '%', '\\', ' ', '\t', 'a b', ' a', 'profile', 'profile-2', '-', 1, '1'];
+			const list = [...odd, ...odd].map((id) => named(id));
+			const readIds = new Set(ids(list));
+			for (const [from, to] of findProfileIdRenames(list)) {
+				expect(readIds.has(from)).toBe(false);
+				expect(readIds.has(to)).toBe(true);
+			}
+		});
+	});
+
+	describe('renaming stored references (security review of #134)', () => {
+		const renames = new Map([['a/b', 'a-b'], ['', 'profile']]);
+		const entry = { id: 'e1', profileId: 'a/b', zeroDist: '100', zeroUnit: 'yd' };
+
+		it.each([
+			['a/b', 'a-b'],
+			['', 'profile'],
+			['x', 'x'],
+			[7, 7],
+			[null, null],
+			[undefined, undefined]
+		])('reads the active id %j as %j', (value, expected) => {
+			expect(renameActiveProfileId(value, renames)).toBe(expected);
+		});
+
+		it.each([[{}], [['a/b']], [true]])('leaves the damaged active id %j as stored', (value) => {
+			expect(renameActiveProfileId(value, renames)).toBe(value);
+		});
+
+		it('points each matching compare entry at the new id, and leaves the rest', () => {
+			const other = { id: 'e2', profileId: 'x' };
+			const state = { entries: [null, entry, 5, other, { id: 'e3', profileId: 3 }], range: { distance: '500', unit: 'yd' }, yAxis: 'in' };
+			const read = renameCompareEntries(state, renames);
+			expect(read).toEqual({ ...state, entries: [null, { ...entry, profileId: 'a-b' }, 5, other, { id: 'e3', profileId: 3 }] });
+			expect(read.entries[3]).toBe(other);
+			expect(state.entries[1].profileId).toBe('a/b');
+		});
+
+		it.each([[null], ['x'], [[entry]], [{ entries: 'a/b' }], [{ entries: [{ ...entry, profileId: 'x' }] }], [{}]])(
+			'gives back %j itself when no entry changes',
+			(value) => {
+				expect(renameCompareEntries(value, renames)).toBe(value);
+			}
+		);
+	});
+
+	describe('profileForStoredId: a stored reference to a renumbered profile', () => {
+		const list = [named('p1', 'First'), named('a/b', 'Slash'), named('', 'Empty'), named('new', 'New'), named('a-b', 'Dash')];
+
+		it.each([
+			['p1', 'p1', 'First'],
+			['a/b', 'a-b-2', 'Slash'],
+			['', 'profile', 'Empty'],
+			['new', 'profile-2', 'New'],
+			['a-b', 'a-b', 'Dash'],
+			['a-b-2', 'a-b-2', 'Slash'],
+			['profile-2', 'profile-2', 'New']
+		])('finds the profile stored or read with the id %j', (stored, id, name) => {
+			const found = profileForStoredId(list, stored);
+			expect(found.id).toBe(id);
+			expect(found.name).toBe(name);
+		});
+
+		it('finds the first of several profiles stored with the same id, as before', () => {
+			const found = profileForStoredId([named('a/b', 'A'), named('a/b', 'B')], 'a/b');
+			expect(found).toMatchObject({ id: 'a-b', name: 'A' });
+			expect(profileForStoredId([named(1, 'A'), named('1', 'B')], '1')).toMatchObject({ id: '1', name: 'A' });
+		});
+
+		it.each([[null], [undefined], [1], ['none']])('finds nothing for %j', (stored) => {
+			expect(profileForStoredId(list, stored)).toBeUndefined();
+		});
+
+		it.each([[null], ['x'], [{}], [5]])('finds nothing in a stored list of %j', (value) => {
+			expect(profileForStoredId(value, 'p1')).toBeUndefined();
+		});
 	});
 });
 

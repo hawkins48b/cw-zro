@@ -37,7 +37,10 @@
  * Key points are rounded to 0.1 by the app, so: 0.2 on near/far zero, max drop distance and
  * subsonic distance, 0.1 on apex and max drop elevation, and 5 units on the apex distance,
  * because these apex values were recorded from step 5 rows. The apex no longer depends on the
- * step (#85), and the max apex block below holds it to 1 unit.
+ * step (#85), and the max apex block below holds it to 1 unit. Max drop and subsonic distance no
+ * longer depend on the step either (#94). One value changed for that, on purpose: P308_G1
+ * subsonicDist in m was recorded as 960 from step 5 rows, and is 957, the value step 1 rows gave
+ * before #94 too. See the max drop and subsonic distance block.
  *
  * Known problems in the code are deliberately NOT pinned here.
  */
@@ -163,7 +166,7 @@ const REFERENCE = {
 		zeroMoa: 3.922,
 		zeroMrad: 1.14087,
 		keyPointsYd: { nearZero: 56, farZero: 100.2, maxApex: { distance: 80, elevation: 0.1 }, maxDrop: { distance: 1000, drop: -422.4 }, subsonicDist: null },
-		keyPointsM: { nearZero: 51.2, farZero: 91.6, maxApex: { distance: 70, elevation: 0.3 }, maxDrop: { distance: 1000, drop: -1395.8 }, subsonicDist: 960 },
+		keyPointsM: { nearZero: 51.2, farZero: 91.6, maxApex: { distance: 70, elevation: 0.3 }, maxDrop: { distance: 1000, drop: -1395.8 }, subsonicDist: 957 },
 		hotAltitude: [
 			[300, 2204.8, 0.3724, -14.47, 4.1, 1813.2],
 			[1000, 1371.14, 1.589, -356.16, 57.08, 701.3]
@@ -1082,14 +1085,125 @@ describe('max apex (#85)', () => {
 		expect(result.maxApex.elevation).toBe(0);
 	});
 
-	it('fires once more, and only as far as the far zero', () => {
+	it('fires once more, as far as the range', () => {
+		// Max drop and subsonic distance need the whole range (#94). Before, this fire stopped at
+		// the far zero; the rows past it are below the line of sight, so the apex is the same.
 		const firing = vi.spyOn(Calculator.prototype, 'fire');
 		apex(ZERO_200, 'yd', 25);
 		const ranges = firing.mock.calls.map(([options]) => options.trajectoryRange.In(Unit.Yard));
 		firing.mockRestore();
-		expect(ranges).toHaveLength(2);
-		expect(ranges[0]).toBe(1000);
-		near(ranges[1], 200.2, 0.2, 'fine fire range');
+		expect(ranges).toEqual([1000, 1000]);
+	});
+});
+
+/**
+ * Max drop and subsonic distance come from the same fine fire as the apex, over the whole range
+ * (#94), not from the table rows.
+ *
+ * Definitions: max drop is the lowest height over the line of sight within [0, range], the muzzle
+ * included. Subsonic distance is the first distance within the range where the velocity is under
+ * the speed of sound at the shooter, or null. Tolerance against step 1 rows: 1 distance unit, and
+ * 0.05 in or cm on the drop.
+ *
+ * Every case is an ordinary load at an ordinary range, so none can stall the run.
+ */
+describe('max drop and subsonic distance (#94)', () => {
+	const STEPS = [1, 5, 7, 25, 100, 250, 300, 1000];
+	const LOADS = [
+		['P223_G1', P223_G1],
+		['P223_SHORT_ZERO', P223_SHORT_ZERO],
+		['P308_G1', P308_G1],
+		['P338_G7_METRIC', P338_G7_METRIC]
+	];
+	const CASES = LOADS.flatMap(([name, profile]) =>
+		[1000, 333.3, 1500].flatMap((distance) => ['yd', 'm'].map((unit) => [name, unit, distance, profile]))
+	);
+
+	const keyPoints = (profile, unit, step, distance, atmosphere = null) => {
+		const { maxDrop, subsonicDist } = calculateFullTrajectory(profile, { distance, unit, step }, atmosphere, null);
+		return { maxDrop, subsonicDist };
+	};
+
+	/**
+	 * Lowest row and first subsonic row inside the range, unrounded: the rows of a step 1 table,
+	 * plus the row at the range itself from a table whose step is the range, for a fractional range.
+	 * 1e-6 absorbs float noise on a row that falls on the range.
+	 */
+	function step1Points(profile, unit, distance, atmosphere = null) {
+		const distanceUnit = unit === 'm' ? Unit.Meter : Unit.Yard;
+		const heightUnit = unit === 'm' ? Unit.Centimeter : Unit.Inch;
+		const table = (step) => calculateFullTrajectory(profile, { distance, unit, step }, atmosphere, null);
+		const result = table(1);
+		const rangeRow = table(distance).trajectory.at(-1);
+		near(rangeRow.distance.In(distanceUnit), distance, 1e-6, 'row at the range');
+		const rows = [...result.chartPoints, rangeRow]
+			.map((p) => ({ distance: p.distance.In(distanceUnit), drop: p.targetDrop.In(heightUnit), fps: p.velocity.In(Unit.FPS) }))
+			.filter((p) => p.distance <= distance + 1e-6)
+			.sort((a, b) => a.distance - b.distance);
+		const lowest = rows.reduce((low, p) => (p.drop < low.drop ? p : low));
+		const subsonic = rows.find((p) => p.fps < result.soundSpeedFPS);
+		return { lowest, subsonic: subsonic ? subsonic.distance : null };
+	}
+
+	it.each(CASES)('gives the same values at every step for %s in %s over %s', (_, unit, distance, profile) => {
+		const first = keyPoints(profile, unit, STEPS[0], distance);
+		for (const step of STEPS) expect(keyPoints(profile, unit, step, distance), `step ${step}`).toEqual(first);
+	});
+
+	it.each(CASES)('matches step 1 rows for %s in %s over %s', (_, unit, distance, profile) => {
+		const { lowest, subsonic } = step1Points(profile, unit, distance);
+		for (const step of STEPS) {
+			const actual = keyPoints(profile, unit, step, distance);
+			near(actual.maxDrop.distance, lowest.distance, 1, `max drop distance, step ${step}`);
+			near(actual.maxDrop.drop, lowest.drop, 0.05, `max drop, step ${step}`);
+			if (subsonic === null) expect(actual.subsonicDist, `step ${step}`).toBeNull();
+			else near(actual.subsonicDist, subsonic, 1, `subsonic distance, step ${step}`);
+		}
+	});
+
+	it.each(CASES)('stays within the range for %s in %s over %s', (_, unit, distance, profile) => {
+		for (const step of STEPS) {
+			const actual = keyPoints(profile, unit, step, distance);
+			expect(actual.maxDrop.distance, `step ${step}`).toBeLessThanOrEqual(distance);
+			if (actual.subsonicDist !== null) expect(actual.subsonicDist, `step ${step}`).toBeLessThanOrEqual(distance);
+		}
+	});
+
+	it('fixes a max drop read past the range', () => {
+		// 333.3 yd at step 100 used to give -34.3 in at 400 yd, a row past the range.
+		for (const step of [1, 100, 250]) {
+			expect(keyPoints(P308_G1, 'yd', step, 333.3).maxDrop, `step ${step}`).toEqual({ distance: 333.3, drop: -20.7 });
+		}
+	});
+
+	it('fixes a subsonic distance that depended on the step', () => {
+		// P308_G1 in m used to give 960 at step 5, 975 at step 25 and 1000 at step 100.
+		for (const step of [1, 5, 25, 100]) expect(keyPoints(P308_G1, 'm', step, 1000).subsonicDist, `step ${step}`).toBe(957);
+	});
+
+	it.each([
+		[1046, null],
+		[1047, 1047],
+		[1100, 1047]
+	])('gives the subsonic distance only when it is within the range: %s yd', (distance, expected) => {
+		// P308_G1 goes under the speed of sound between 1046 and 1047 yd on step 1 rows.
+		for (const step of [1, 25, 250, 1000]) {
+			expect(keyPoints(P308_G1, 'yd', step, distance).subsonicDist, `step ${step}`).toBe(expected);
+		}
+	});
+
+	it('reads the speed of sound of the air the shot flies in', () => {
+		const icao = keyPoints(P308_G1, 'yd', 25, 1500).subsonicDist;
+		const hot = keyPoints(P308_G1, 'yd', 25, 1500, ATMO_HOT_ALTITUDE).subsonicDist;
+		expect(hot).not.toBe(icao);
+		near(hot, step1Points(P308_G1, 'yd', 1500, ATMO_HOT_ALTITUDE).subsonic, 1, 'subsonic distance');
+	});
+
+	it('gives the muzzle as max drop when the bullet only rises within the range', () => {
+		// Zeroed at 100 yd, the bullet climbs from 1.5 in under the line of sight.
+		for (const step of [1, 5, 25]) {
+			expect(keyPoints(P308_G1, 'yd', step, 10).maxDrop, `step ${step}`).toEqual({ distance: 0, drop: -1.5 });
+		}
 	});
 });
 

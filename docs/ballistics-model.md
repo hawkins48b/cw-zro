@@ -131,7 +131,7 @@ The zero is the only saved distance. Near and far zero come from the trajectory.
 
 ## Angles
 
-**Uphill and downhill.** While its angle section is open, the scope view multiplies the distance by the cosine of the entered angle, or by the entered cosine, and then calculates a flat shot at that shorter distance. An entered cosine must be above 0 and at most 1, or the box shows a message and there is no result. An empty box is a flat shot ([#121](https://github.com/hawkins48b/cw-zro/issues/121)). This is an approximation: the engine's look angle is not used. Time, energy and velocity shown with it are those of the shorter distance. No other screen has an angle.
+**Uphill and downhill.** While its angle section is open, the scope view multiplies the distance by the cosine of the entered angle, or by the entered cosine, and then calculates a flat shot at that shorter distance. An entered cosine must be above 0 and at most 1 ([#121](https://github.com/hawkins48b/cw-zro/issues/121)), and an angle in degrees strictly between -90° and 90° ([#129](https://github.com/hawkins48b/cw-zro/issues/129)), or the box shows a message and there is no result. An empty box is a flat shot. This is an approximation: the engine's look angle is not used. Time, energy and velocity shown with it are those of the shorter distance. No other screen has an angle.
 
 **Cant.** Rotating the scope view recalculates the shot with a cant angle, for the reticle only. The adjustments shown come from the shot without cant. The zero is solved on the canted shot too. At 600 yd on the `.308` test profile, 5° gives 2.01 in of windage and 0.12 in more drop. Cant has a regression test and no independent check.
 
@@ -146,9 +146,15 @@ Values are rounded for display: 0.1 for MOA, MRAD, in and cm, 0.01 for ft and m.
 
 Energy is `weight × velocity² / 450400`, in ft-lb.
 
-**Max apex** ([#85](https://github.com/hawkins48b/cw-zro/issues/85)) is the highest point above the line of sight within the requested range. The library never sets its apex flag, so the same shot is fired again on a grid of about one unit, stopping at the far zero or the range. The result does not depend on the table step, and it matches a step 1 calculation within 1 distance unit and 0.05 in or cm. It is empty when the bullet stays below the line of sight. It is the highest point inside the range, so a bullet still rising at the end of the range gives that last point.
+**Max apex**, **max drop** and **subsonic distance** do not depend on the table step ([#85](https://github.com/hawkins48b/cw-zro/issues/85), [#94](https://github.com/hawkins48b/cw-zro/issues/94)). After the table, the same shot is fired again over the whole range on a grid of about one unit that ends on the range, keeping the zero and Mach crossing rows. The library never sets its apex flag, so these three come from that grid:
 
-`maxDrop` and `subsonicDist` do not have this treatment. They still read rows that depend on the step and can run past the range.
+| Value | Definition | Against step 1 rows |
+|-------|------------|---------------------|
+| `maxApex` | Highest point above the line of sight. Empty when the bullet stays below it. A bullet still rising at the end of the range gives that last point | Within 1 distance unit and 0.05 in or cm |
+| `maxDrop` | Lowest point under the line of sight within [0, range], the muzzle included. On a fractional range this is the row at the range, which step 1 rows do not have | Within 1 distance unit and 0.05 in or cm, the row at the range included |
+| `subsonicDist` | First row within the range whose velocity is under the speed of sound at the shooter (`soundSpeedFPS`), or empty. The engine's Mach crossing row compares with the local speed of sound, which differs as the bullet drops, so the value is that row or the next grid row | Within 1 distance unit (tests). Equal to step 1 rows on the 1470 cases measured for #94 |
+
+No row past the range counts. The second fire costs about as much as a step 1 table: about 3 ms more per calculation at 1000 yd and 12 to 14 ms more at 3000 yd, measured in the dev container on the test profiles during #94. The probe is not kept in the repository.
 
 ## MPBR
 
@@ -213,7 +219,8 @@ All ends are included. The gram and foot ends are the owner's rounded values, no
 | Profile form | Optic height, zero, diameter, weight, BC and velocity within the limits above. The form requires a positive optic height, although the calculators take a negative one | Form error stating the range, in the unit chosen |
 | Profile form, spin drift on | Twist and length must be positive and within the limits above | Form error stating the range, in the unit chosen |
 | Profile form, sensitivity on | Temperature and modifier must be plain finite decimals | Form error |
-| `calculateShotPoint`, `calculateFullTrajectory` | Range within the limit. Step at least 1, 25 when empty (full trajectory) | No result |
+| `calculateShotPoint`, `calculateFullTrajectory` | Range within the limit. Step at least 1, 25 when empty, and at most the range: a larger or infinite step is read as the range (full trajectory, `tableStep`, [#133](https://github.com/hawkins48b/cw-zro/issues/133)) | No result |
+| Ballistic page, step | At least 1 and at most the range, at least 1 for a range under 1 (`tableStepLimit`). Text and NaN count as under 1, an infinite step as over the range ([#130](https://github.com/hawkins48b/cw-zro/issues/130), [#133](https://github.com/hawkins48b/cw-zro/issues/133)) | A message under the box. The table uses `tableStep`: 1, or the range |
 | All five paths | BC at least 0.01 (`isUsableBc`) | No result. A dope card is not saved |
 | All five paths | Entered velocity finite and under 10000 fps, and velocity at the current temperature finite, at least 50 and under 10000 fps (`hasFlyableVelocity`). MPBR and the dope cards use no powder sensitivity | No result. A dope card is not saved |
 | All five paths | Optic height finite and within 10 in or 25.4 cm either way (`isUsableSightHeight`) | No result. A dope card is not saved |
@@ -226,6 +233,7 @@ All ends are included. The gram and foot ends are the owner's rounded values, no
 | Ballistic, scope view and trajectory validation pages, custom atmosphere | The engine ended the flight at its minimum altitude of -1410.748 ft, as it reports it: `fire` throws `TrajectoryRangeError` with `MinimumAltitudeReached`, or the zero solve fails after that stop cut one of its flights. The calculators run the default Euler engine through a subclass that only notes that stop ([`flightStop.js`](../src/lib/utils/flightStop.js)), so no result changes ([#125](https://github.com/hawkins48b/cw-zro/issues/125)) | No result, as before, and "altitude too low for this shot" under the altitude box. Validation returns `minimum_altitude` |
 | Ballistic page | Range above 0 and at most 3000 (`isUsableBallisticRange`). A negative range gives no result here, as on the compare page ([#122](https://github.com/hawkins48b/cw-zro/issues/122)) | No result, and a message under the box |
 | Scope view, angle in cos | Cosine finite, above 0 and at most 1 (`isUsableScopeAngle`). Empty is flat ([#121](https://github.com/hawkins48b/cw-zro/issues/121)) | No result, and a message under the box |
+| Scope view, angle in degrees | Angle finite and strictly between -90° and 90° (`isUsableScopeAngle`). Text that is not a number is rejected. Empty is flat ([#129](https://github.com/hawkins48b/cw-zro/issues/129)) | No result, and a message under the box |
 | Shot point, full trajectory, wind speed above 0 (`shotWinds`) | Speed at most 100 m/s, about 224 mph, in either unit. Direction a number or text that reads as a number, at most 1e6 degrees either way, so a negative angle is valid. An empty or whitespace text counts as 0°. Null, a missing value, an object or a boolean is not empty | No result |
 | Shot point, full trajectory, stored wind speed that is an array, object or boolean (`shotWinds`) | Rejected, because the page can still show it as a speed | No result |
 | Shot point, full trajectory, wind speed empty, text, 0, negative, null or missing (`shotWinds`) | No wind is used, so the direction is not checked | Normal result without wind |
@@ -315,6 +323,8 @@ For these, tests only show that results did not change:
 | Whole move to 3.1.0, worst tested case | 0.77 in and 1.18 fps, `.223` in cold air | #77 |
 
 The move to 3.1.0 also changes the drag interpolation and the zero solver, so its figures include more than density. Scope clicks moved by at most 1 click, in about 4 % of all tested cases.
+
+**Table and chart rows past the range.** Not changed by [#94](https://github.com/hawkins48b/cw-zro/issues/94), found in its security review. When the step does not divide the range, the table has no row at the range, and the engine can add a row past it. With extraData it records a flagged row (Mach or far zero crossing) during its last integration steps, and a Mach crossing there is recorded as the next table row. On a 1000 yd or m range, `P223_G1` at step 999 gives the rows 0, 999 and 1998, and at step 600 the rows 0, 600 and 1200. The charts also draw a far zero row past the range, at 1045.9 yd on `P308_G1` with a 1000 yd range and step 999. Max drop and subsonic distance ignore those rows and read within the range, so max drop can be at 1000 while the table ends at 999 or shows 1998.
 
 **Integration.** The Euler engine is not exact. At 1000 yd on the `.308` test profile with a 10 mph crosswind, it differs from the library's RK4 engine by 0.32 in of drop, 0.26 fps and 0.08 in of wind drift.
 

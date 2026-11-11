@@ -8,9 +8,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const storage = vi.hoisted(() => ({ values: /** @type {Record<string, any>} */ ({}) }));
 
 vi.mock('#lib/stores/localStore.svelte.js', () => ({
-	localStore: (key, init) => ({
+	localStore: (key, init, { seed = true } = {}) => ({
 		get value() {
-			if (!(key in storage.values)) storage.values[key] = typeof init === 'function' ? init() : init;
+			if (!(key in storage.values)) {
+				const value = typeof init === 'function' ? init() : init;
+				// As the real store: without seed, a missing key is not written.
+				if (!seed) return value;
+				storage.values[key] = value;
+			}
 			return storage.values[key];
 		},
 		set value(v) {
@@ -279,6 +284,193 @@ describe('zro-profiles ids read as text (#131)', () => {
 		const { profiles } = await load_([old], 3);
 		expect(profiles.get('3')).toMatchObject({ reticleType: 'red-dot', elevationClickValue: '0.5', clickLink: true });
 		expect(storage.values['zro-profiles'][0]).toMatchObject({ id: '3', reticleType: 'red-dot' });
+	});
+});
+
+describe('zro-profiles ids that cannot be used in a link (#134)', () => {
+	const load_ = async (value, active, extra = {}) => {
+		const { profiles } = await load('#lib/stores/profiles.svelte.js', { 'zro-profiles': value, 'zro-active-profile': active, ...extra });
+		const { activeProfile } = await import('#lib/stores/activeProfile.svelte.js');
+		return { profiles, activeProfile };
+	};
+	const slash = { ...GOOD_PROFILE, id: 'a/b', name: 'Slash' };
+	const empty = { ...GOOD_PROFILE, id: '', name: 'Empty' };
+	const isNew = { ...GOOD_PROFILE, id: 'new', name: 'New' };
+
+	it('opens, edits and deletes each renumbered profile by its new id', async () => {
+		const { profiles } = await load_([GOOD_PROFILE, slash, empty, isNew], 'p1');
+		expect(profiles.list.map((p) => p.id)).toEqual(['p1', 'a-b', 'profile', 'profile-2']);
+		expect(profiles.get('a-b').name).toBe('Slash');
+		expect(profiles.get('new')).toBeUndefined();
+		expect(profiles.update('profile', { name: 'Was empty' })).toBe(true);
+		expect(storage.values['zro-profiles'].map((p) => p.id)).toEqual(['p1', 'a-b', 'profile', 'profile-2']);
+		expect(profiles.remove('profile-2')).toBe(true);
+		expect(profiles.list.map((p) => [p.id, p.name])).toEqual([['p1', 'Load'], ['a-b', 'Slash'], ['profile', 'Was empty']]);
+	});
+
+	it.each([
+		['a/b', 'a-b', 'Slash'],
+		['', 'profile', 'Empty'],
+		['new', 'profile-2', 'New']
+	])('keeps the stored active id %j on its profile, under its new id', async (active, id, name) => {
+		const { activeProfile } = await load_([GOOD_PROFILE, slash, empty, isNew], active);
+		expect(activeProfile.id).toBe(id);
+		expect(activeProfile.profile.name).toBe(name);
+	});
+
+	it('makes a renumbered profile active by its new id', async () => {
+		const { activeProfile } = await load_([GOOD_PROFILE, slash], 'p1');
+		activeProfile.setActive('a-b');
+		expect(activeProfile.id).toBe('a-b');
+		expect(activeProfile.profile.name).toBe('Slash');
+	});
+
+	describe('references survive any save (security review of #134)', () => {
+		const x = { ...GOOD_PROFILE, id: 'x', name: 'Rifle X' };
+		const ab = { ...GOOD_PROFILE, id: 'a/b', name: 'Rifle AB' };
+		const entry = { id: 'e1', profileId: 'a/b', zeroDist: '100', zeroUnit: 'yd' };
+		const other = { id: 'e2', profileId: 'x', zeroDist: '200', zeroUnit: 'yd' };
+		const loadAll = async (active = 'a/b', compare = { entries: [entry, other], range: { distance: '500', unit: 'yd' }, yAxis: 'in' }) => {
+			const { profiles } = await load('#lib/stores/profiles.svelte.js', {
+				'zro-profiles': [x, ab],
+				'zro-active-profile': active,
+				'zro-compare-traj': compare
+			});
+			const { activeProfile } = await import('#lib/stores/activeProfile.svelte.js');
+			const { compareTrajectories } = await import('#lib/stores/compareTrajectories.svelte.js');
+			return { profiles, activeProfile, compareTrajectories };
+		};
+		const entryProfile = (profiles, compareTrajectories, id) =>
+			profiles.findStored(compareTrajectories.entries.find((e) => e.id === id).profileId);
+
+		it('writes the new ids and the references at load', async () => {
+			await loadAll();
+			expect(storage.values['zro-profiles'].map((p) => p.id)).toEqual(['x', 'a-b']);
+			expect(storage.values['zro-active-profile']).toBe('a-b');
+			expect(storage.values['zro-compare-traj'].entries.map((e) => e.profileId)).toEqual(['a-b', 'x']);
+		});
+
+		it.each([
+			['edits another profile', (profiles) => profiles.update('x', { name: 'Rifle X2' })],
+			['edits the profile itself', (profiles) => profiles.update('a-b', { velocity: '2900' })],
+			['adds a profile', (profiles) => profiles.add({ ...GOOD_PROFILE, id: undefined, name: 'New' })],
+			['removes another profile', (profiles) => profiles.remove('x')]
+		])('keeps the active profile on Rifle AB when the user %s', async (_, change) => {
+			const { profiles, activeProfile } = await loadAll();
+			change(profiles);
+			expect(activeProfile.id).toBe('a-b');
+			expect(activeProfile.profile.name).toBe('Rifle AB');
+		});
+
+		it.each([
+			['edits another profile', (profiles) => profiles.update('x', { name: 'Rifle X2' })],
+			['adds a profile', (profiles) => profiles.add({ ...GOOD_PROFILE, id: undefined, name: 'New' })],
+			['removes another profile', (profiles) => profiles.remove('x')]
+		])('keeps the compare entry on Rifle AB when the user %s', async (_, change) => {
+			const { profiles, compareTrajectories } = await loadAll();
+			change(profiles);
+			expect(entryProfile(profiles, compareTrajectories, 'e1').name).toBe('Rifle AB');
+		});
+
+		it('drops the compare entry only when its own profile is removed', async () => {
+			const { profiles, compareTrajectories } = await loadAll();
+			profiles.remove('a-b');
+			expect(entryProfile(profiles, compareTrajectories, 'e1')).toBeUndefined();
+			expect(entryProfile(profiles, compareTrajectories, 'e2').name).toBe('Rifle X');
+		});
+
+		it('keeps both references when the first session loads only the profiles store (/profiles/new)', async () => {
+			// Session 1: only the profiles store loads, and writes the renumbered list.
+			await load('#lib/stores/profiles.svelte.js', {
+				'zro-profiles': [x, ab],
+				'zro-active-profile': 'a/b',
+				'zro-compare-traj': { entries: [entry, other], range: { distance: '500', unit: 'yd' }, yAxis: 'in' }
+			});
+			expect(storage.values['zro-profiles'].map((p) => p.id)).toEqual(['x', 'a-b']);
+			// Session 2: a fresh start on the same storage, with no rename left to find.
+			vi.resetModules();
+			const { profiles } = await import('#lib/stores/profiles.svelte.js');
+			const { activeProfile } = await import('#lib/stores/activeProfile.svelte.js');
+			const { compareTrajectories } = await import('#lib/stores/compareTrajectories.svelte.js');
+			expect(activeProfile.id).toBe('a-b');
+			expect(activeProfile.profile.name).toBe('Rifle AB');
+			expect(entryProfile(profiles, compareTrajectories, 'e1').name).toBe('Rifle AB');
+			expect(entryProfile(profiles, compareTrajectories, 'e2').name).toBe('Rifle X');
+		});
+
+		it('keeps both references when the first session loads only the active profile', async () => {
+			await load('#lib/stores/profiles.svelte.js', {
+				'zro-profiles': [x, ab],
+				'zro-active-profile': 'a/b',
+				'zro-compare-traj': { entries: [entry], range: { distance: '500', unit: 'yd' }, yAxis: 'in' }
+			});
+			await import('#lib/stores/activeProfile.svelte.js');
+			vi.resetModules();
+			const { profiles } = await import('#lib/stores/profiles.svelte.js');
+			const { compareTrajectories } = await import('#lib/stores/compareTrajectories.svelte.js');
+			expect(entryProfile(profiles, compareTrajectories, 'e1').name).toBe('Rifle AB');
+		});
+
+		it('writes no reference key that was not stored', async () => {
+			await load('#lib/stores/profiles.svelte.js', { 'zro-profiles': [x, ab] });
+			expect('zro-active-profile' in storage.values).toBe(false);
+			expect('zro-compare-traj' in storage.values).toBe(false);
+		});
+
+		it.each([
+			['text', 'x'],
+			['null', null],
+			['entries not a list', { entries: 'a/b' }],
+			['an array', [entry]]
+		])('leaves a damaged compare state (%s) as stored', async (_, compare) => {
+			await load('#lib/stores/profiles.svelte.js', { 'zro-profiles': [x, ab], 'zro-active-profile': 'a/b', 'zro-compare-traj': compare });
+			expect(storage.values['zro-compare-traj']).toBe(compare);
+			expect(storage.values['zro-active-profile']).toBe('a-b');
+		});
+
+		it.each([[{}], [['a/b']], [true]])('leaves a damaged active id %j as stored', async (active) => {
+			await load('#lib/stores/profiles.svelte.js', { 'zro-profiles': [x, ab], 'zro-active-profile': active });
+			expect(storage.values['zro-active-profile']).toBe(active);
+		});
+
+		it('rewrites the compare entries when the compare store loads first', async () => {
+			storage.values = {
+				'zro-profiles': [x, ab],
+				'zro-compare-traj': { entries: [entry], range: { distance: '500', unit: 'yd' }, yAxis: 'in' }
+			};
+			vi.resetModules();
+			const { compareTrajectories } = await import('#lib/stores/compareTrajectories.svelte.js');
+			expect(compareTrajectories.entries[0].profileId).toBe('a-b');
+			expect(storage.values['zro-profiles'].map((p) => p.id)).toEqual(['x', 'a-b']);
+		});
+
+		it('leaves damaged compare entries and other references as stored', async () => {
+			const damaged = { id: 'e3', profileId: 5 };
+			await loadAll('x', { entries: [damaged, entry, null], range: { distance: '500', unit: 'yd' }, yAxis: 'in' });
+			expect(storage.values['zro-active-profile']).toBe('x');
+			expect(storage.values['zro-compare-traj'].entries).toEqual([damaged, { ...entry, profileId: 'a-b' }, null]);
+		});
+
+		it('writes nothing when no id is renumbered', async () => {
+			const list = [x, { ...GOOD_PROFILE, id: 'y' }];
+			const compare = { entries: [{ ...entry, profileId: 'y' }], range: { distance: '500', unit: 'yd' }, yAxis: 'in' };
+			await load('#lib/stores/profiles.svelte.js', { 'zro-profiles': list, 'zro-active-profile': 'y', 'zro-compare-traj': compare });
+			await import('#lib/stores/activeProfile.svelte.js');
+			await import('#lib/stores/compareTrajectories.svelte.js');
+			expect(storage.values['zro-profiles']).toBe(list);
+			expect(storage.values['zro-compare-traj']).toBe(compare);
+			expect(storage.values['zro-active-profile']).toBe('y');
+		});
+
+		it.each([['a stored active id that is a number', 7, '7'], ['the second of two duplicates', '1', '1']])(
+			'leaves %s as it was (#131)',
+			async (_, active, id) => {
+				const list = [{ ...GOOD_PROFILE, id: active === 7 ? 7 : '1', name: 'First' }, { ...GOOD_PROFILE, id: '1', name: 'Second' }];
+				const { activeProfile } = await load_(list, active);
+				expect(activeProfile.id).toBe(id);
+				expect(activeProfile.profile.name).toBe('First');
+			}
+		);
 	});
 });
 

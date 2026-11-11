@@ -317,6 +317,9 @@ function getUnit(key) {
 const round1 = (v) => Math.round(v * 10) / 10;
 const round2 = (v) => Math.round(v * 100) / 100;
 
+/** Float noise allowed on the last grid row of calculateFullTrajectory, in yd or m. */
+const RANGE_EPSILON = 1e-6;
+
 /**
  * Compute full trajectory for the ballistic calculator page.
  *
@@ -327,14 +330,15 @@ const round2 = (v) => Math.round(v * 100) / 100;
  * @param {object} [options]
  * @param {{ minimumAltitude?: boolean }} [options.report] - when given, minimumAltitude is set to
  *   whether a null result came from the engine's minimum altitude (flightStop.js, #125)
- * @returns {{ trajectory, chartPoints, nearZero, farZero, maxApex, soundSpeedFPS } | null}
+ * @returns {{ trajectory, chartPoints, nearZero, farZero, maxApex, maxDrop, soundSpeedFPS, subsonicDist } | null}
+ *   maxApex, maxDrop and subsonicDist do not depend on range.step and stay within the range.
  */
 export function calculateFullTrajectory(profile, range, atmosphere, wind, options = {}) {
 	const { calc, stops } = createFlightCalculator();
 	if (options.report) options.report.minimumAltitude = false;
 	try {
 		const maxDist = Math.abs(readDecimal(range.distance));
-		const stepVal = tableStep(range.step);
+		const stepVal = tableStep(range.step, maxDist);
 		if (!isUsableRange(maxDist)) return null;
 		if (!isUsableZeroDistance(profile.zeroDist)) return null;
 
@@ -426,34 +430,36 @@ export function calculateFullTrajectory(profile, range, atmosphere, wind, option
 		const nearZero = nearZeroPoint ? round1(nearZeroPoint.distance.In(distUnit)) : null;
 		const farZero = farZeroPoint ? round1(farZeroPoint.distance.In(distUnit)) : null;
 
-		// Max ordinate: highest positive targetDrop (bullet above line of sight), or null if the
-		// bullet stays below it within the range.
+		// Max ordinate, max drop and subsonic distance come from a second fire of the same shot on
+		// a grid of about one unit that depends only on the range (#85, #94).
 		//
-		// The table rows cannot give this: they depend on the step, and flagged rows run past the
+		// The table rows cannot give them: they depend on the step, and flagged rows run past the
 		// range. js-ballistics has no apex point either: TrajFlag.APEX exists but the engine never
-		// sets it. So the same shot is fired again on a grid of one unit that depends only on the
-		// range. It costs about as much as the main fire per yard, and stopping at the far zero
-		// (the apex always comes before it) makes that about 0.3 ms for a 100 yd zero.
+		// sets it. The grid fire costs about as much per unit as a step 1 table.
 		//
-		// Tolerance against a step 1 calculation: 1 distance unit and 0.05 in or cm, the rounding
-		// of the elevation. A whole range gives the very rows of step 1. A fractional one gives a
-		// step just under 1, so that the grid ends on the range and this fire never goes further
-		// than the main one, which could otherwise fail on a bullet that stops just past it.
-		// Against a 0.05 unit grid, step 1 is within 0.5 unit and 0.0002 in or cm of the top.
+		// The grid is the whole range: a fractional range gives a step just under 1, so that the
+		// grid ends on the range and this fire never goes further than the main one, which could
+		// otherwise fail on a bullet that stops just past it. extraData keeps the zero crossing rows
+		// (an arc under a unit wide can fall between grid rows) and the Mach crossing row.
 		const toDistance = isMetric ? UNew.Meter : UNew.Yard;
-		const apexRange = farZeroPoint
-			? Math.min(maxDist, farZeroPoint.distance.In(distUnit))
-			: maxDist;
-		const apexRows = calc.fire({
+		const gridRows = calc.fire({
 			shot,
-			trajectoryRange: toDistance(apexRange),
+			trajectoryRange,
 			trajectoryStep: toDistance(maxDist / Math.ceil(maxDist)),
-			// Keeps the zero crossing rows: an arc under a unit wide can fall between grid rows.
 			extraData: true
 		}).trajectory;
+		// The engine can record a flagged row just past the range: those do not count for max drop
+		// and subsonic distance. The tolerance only absorbs float noise on the last grid row.
+		const inRange = gridRows.filter((p) => p.distance.In(distUnit) <= maxDist + RANGE_EPSILON);
 
+		// Max ordinate: highest positive targetDrop (bullet above line of sight), or null if the
+		// bullet stays below it within the range. Tolerance against a step 1 calculation: 1
+		// distance unit and 0.05 in or cm, the rounding of the elevation. Against a 0.05 unit grid,
+		// step 1 is within 0.5 unit and 0.0002 in or cm of the top. Rows past the far zero are
+		// below the line of sight, so firing to the range gives the same apex as the fire that
+		// stopped at the far zero before #94.
 		let maxOrdPoint = null;
-		for (const p of apexRows) {
+		for (const p of gridRows) {
 			const elev = p.targetDrop.In(elevUnit);
 			if (elev > 0 && (maxOrdPoint === null || elev > maxOrdPoint.targetDrop.In(elevUnit))) {
 				maxOrdPoint = p;
@@ -466,9 +472,9 @@ export function calculateFullTrajectory(profile, range, atmosphere, wind, option
 				}
 			: null;
 
-		// --- Max drop: point with the lowest elevation (highest drop below zero) ---
-		let maxDropPoint = allPoints[0];
-		for (const p of allPoints) {
+		// --- Max drop: lowest targetDrop within the range, the muzzle included ---
+		let maxDropPoint = inRange[0] ?? null;
+		for (const p of inRange) {
 			if (p.targetDrop.In(elevUnit) < maxDropPoint.targetDrop.In(elevUnit)) {
 				maxDropPoint = p;
 			}
@@ -480,11 +486,13 @@ export function calculateFullTrajectory(profile, range, atmosphere, wind, option
 				}
 			: null;
 
-		// --- Speed of sound (from atmo) ---
+		// --- Speed of sound at the shooter (from atmo) ---
 		const soundSpeedFPS = atmo.mach.In(Unit.FPS);
 
-		// --- Subsonic distance: first point where bullet velocity drops below speed of sound ---
-		const subsonicPoint = allPoints.find((p) => p.velocity.In(Unit.FPS) < soundSpeedFPS);
+		// --- Subsonic distance: first row within the range below the speed of sound, or null ---
+		// The Mach crossing row is kept by extraData, so this is within one grid unit of the
+		// crossing, and usually on it.
+		const subsonicPoint = inRange.find((p) => p.velocity.In(Unit.FPS) < soundSpeedFPS);
 		const subsonicDist = subsonicPoint ? round1(subsonicPoint.distance.In(distUnit)) : null;
 
 		return { trajectory: tablePoints, chartPoints: allPoints, nearZero, farZero, maxApex, maxDrop, soundSpeedFPS, subsonicDist };

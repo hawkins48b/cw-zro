@@ -2,6 +2,9 @@ import { normalizeCompareEntries } from '#lib/utils/compareEntries.js';
 import { normalizeYAxisUnit } from '#lib/utils/yAxisUnit.js';
 import { storedObject, storedRange } from '#lib/utils/storedState.js';
 import { localStore } from './localStore.svelte.js';
+// Loads the profiles store first: it rewrites the entries' profile ids renumbered for links (#134)
+// before this store reads them.
+import './profiles.svelte.js';
 
 const defaults = {
 	entries: [],

@@ -158,29 +158,67 @@ export const MIN_TABLE_STEP = 1;
 export const MAX_CHART_TICKS = 120;
 
 /**
+ * Largest Ballistic table step for a range (#133, owner decision of 2026-11-11): the range itself, so
+ * the table has at least the muzzle row and the row at the range. A range under MIN_TABLE_STEP gives
+ * MIN_TABLE_STEP, so the two limits never cross. Without a usable range (empty, 0, text, not finite)
+ * there is no maximum: the range box shows its own message then.
+ *
+ * @param {unknown} distance - the range box value, read as calculateFullTrajectory reads it
+ * @returns {number}
+ */
+export function maxTableStep(distance) {
+	const range = Math.abs(readDecimal(distance));
+	if (!Number.isFinite(range) || range === 0) return Infinity;
+	return Math.max(MIN_TABLE_STEP, range);
+}
+
+/**
  * The step of the Ballistic table, as calculateFullTrajectory uses it: the size of the value typed,
  * at least MIN_TABLE_STEP; 25, the box's placeholder, for an empty box, 0 or anything that is not a
  * number. A typed step under 1 has always given rows 1 apart, so no table changed with #130.
  *
+ * With a range, a step above maxTableStep, infinite included, is read as the range (#133): the
+ * table shows the muzzle row and the row at the range. Before, a step of 1e9 or 1e999 gave no
+ * table, and a step above the range only the muzzle row. Steps up to the range are unchanged.
+ *
  * @param {unknown} step - the step box value
+ * @param {unknown} [distance] - the range box value; without it, no maximum
  * @returns {number}
  */
-export function tableStep(step) {
-	return Math.max(MIN_TABLE_STEP, Math.abs(readDecimal(step)) || 25);
+export function tableStep(step, distance) {
+	const value = Math.max(MIN_TABLE_STEP, Math.abs(readDecimal(step)) || 25);
+	return Math.min(value, maxTableStep(distance));
 }
 
 /**
- * Whether the step box shows no message (#130): empty (read as 25), or a finite number of at least
- * MIN_TABLE_STEP, read as the table reads it. Anything else shows the minimum, and the table keeps
- * the step tableStep gives.
+ * Which limit the step box shows, or null for none: 'min' (#130) under MIN_TABLE_STEP, for text, NaN
+ * or a negative value, as before; 'max' (#133) above maxTableStep(distance), and for an infinite
+ * step also without a range. An
+ * empty box (read as 25) shows nothing. A stored step is read the same way (#120: storedRange turns a
+ * damaged one into an empty box, so 25), so a stored step above the range shows the maximum too.
  *
  * @param {unknown} step - the step box value
+ * @param {unknown} [distance] - the range box value; without it, no maximum
+ * @returns {'min'|'max'|null}
+ */
+export function tableStepLimit(step, distance) {
+	if (typeof step === 'string' && step.trim() === '') return null;
+	const number = readDecimal(step);
+	if (Number.isNaN(number) || number < MIN_TABLE_STEP) return 'min';
+	if (number === Infinity || number > maxTableStep(distance)) return 'max';
+	return null;
+}
+
+/**
+ * Whether the step box shows no message: tableStepLimit gives none. The table keeps the step
+ * tableStep gives either way.
+ *
+ * @param {unknown} step - the step box value
+ * @param {unknown} [distance] - the range box value; without it, no maximum
  * @returns {boolean}
  */
-export function isUsableTableStep(step) {
-	if (typeof step === 'string' && step.trim() === '') return true;
-	const number = readDecimal(step);
-	return Number.isFinite(number) && number >= MIN_TABLE_STEP;
+export function isUsableTableStep(step, distance) {
+	return tableStepLimit(step, distance) === null;
 }
 
 /**

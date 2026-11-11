@@ -158,6 +158,8 @@
 					</div>
 					{#if angleUsable}
 						<p class="text-xs text-surface-600-400">{m.scope_view_angle_hint()}</p>
+					{:else if scopeView.elevation.unit === 'deg'}
+						<p class="text-xs text-error-500">{m.scope_view_deg_invalid()}</p>
 					{:else}
 						<p class="text-xs text-error-500">{m.scope_view_cos_invalid()}</p>
 					{/if}

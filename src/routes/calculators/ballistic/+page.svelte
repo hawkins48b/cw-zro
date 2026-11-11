@@ -9,10 +9,11 @@
 	import { formatLimit } from '#lib/utils/format.js';
 	import {
 		chartTickAmount,
-		isUsableTableStep,
 		MAX_DISTANCE,
 		MIN_TABLE_STEP,
-		tableStep
+		maxTableStep,
+		tableStep,
+		tableStepLimit
 	} from '#lib/utils/inputLimits.js';
 	import WindInput from '#lib/components/WindInput.svelte';
 	import AtmosphereCard from '#lib/components/AtmosphereCard.svelte';
@@ -39,8 +40,10 @@
 	// ── Trajectory computation ───────────────────────────────────────
 	// The range box shows the range message when the page does not calculate (#122).
 	let rangeUsable = $derived(isUsableBallisticRange(ballistic.range.distance));
-	// The step box shows the minimum under a step below it (#130). The table keeps tableStep.
-	let stepUsable = $derived(isUsableTableStep(ballistic.range.step));
+	// The step box shows the minimum under a step below it (#130), and the maximum, the range, over
+	// a step above it (#133). The table keeps tableStep, which reads a step above the range as the range.
+	let stepLimit = $derived(tableStepLimit(ballistic.range.step, ballistic.range.distance));
+	let chartStep = $derived(tableStep(ballistic.range.step, ballistic.range.distance));
 	let trajectory = $derived.by(() => {
 		const atmo = ballistic.atmosphere.useISA ? null : ballistic.atmosphere;
 		return ballisticPageTrajectory(activeProfile.profile, ballistic.range, atmo, ballistic.storedWind);
@@ -292,7 +295,7 @@
 			farZero,
 			maxApex,
 			maxDrop,
-			tableStep(ballistic.range.step)
+			chartStep
 		);
 		const chart = new ac(el, opts);
 		chart.render();
@@ -305,7 +308,7 @@
 		if (!ac || !el || !ballistic.options.showVelocityChart) return;
 
 		const velUnit = ballistic.options.velChartUnit ?? 'fps';
-		const opts = buildVelChartOptions(chartPoints, settings.darkMode, isMetric, velUnit, soundSpeedFPS, tableStep(ballistic.range.step));
+		const opts = buildVelChartOptions(chartPoints, settings.darkMode, isMetric, velUnit, soundSpeedFPS, chartStep);
 		const chart = new ac(el, opts);
 		chart.render();
 		return () => chart.destroy();
@@ -482,15 +485,17 @@
 							inputmode="decimal"
 							placeholder="25"
 							value={ballistic.range.step}
-							aria-invalid={!stepUsable}
+							aria-invalid={stepLimit !== null}
 							oninput={(e) => ballistic.setRange({ step: e.target.value })}
 						/>
 						<span class="text-sm text-surface-600-400 shrink-0">{distLabel}</span>
 					</div>
-					{#if stepUsable}
-						<p class="text-xs text-surface-600-400">{m.ballistic_step_hint()}</p>
-					{:else}
+					{#if stepLimit === 'min'}
 						<p class="text-xs text-error-500">{m.ballistic_step_min({ min: formatLimit(MIN_TABLE_STEP), unit: distLabel })}</p>
+					{:else if stepLimit === 'max'}
+						<p class="text-xs text-error-500">{m.ballistic_step_max({ max: formatLimit(maxTableStep(ballistic.range.distance)), unit: distLabel })}</p>
+					{:else}
+						<p class="text-xs text-surface-600-400">{m.ballistic_step_hint()}</p>
 					{/if}
 				</div>
 			</div>

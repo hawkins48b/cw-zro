@@ -56,7 +56,7 @@
 	// ── Resolve entries to profiles ──────────────────────────────────
 	let resolvedEntries = $derived(
 		compareTrajectories.entries.map((entry) => {
-			const profile = profiles.get(entry.profileId);
+			const profile = profiles.findStored(entry.profileId);
 			if (!profile) return null;
 			const zeroUnitLabel = entry.zeroUnit === 'm' ? m.unit_m() : m.unit_yd();
 			// The calculators get the profile as stored; the page shows its names as text (#120).
