@@ -15,7 +15,7 @@ updates:
     open-pull-requests-limit: 5
     groups:
       # Anything outside this group gets its own pull request: major updates,
-      # and js-ballistics at any level.
+      # and js-ballistics and apexcharts at any level.
       npm-minor-patch:
         patterns:
           - '*'
@@ -26,11 +26,12 @@ updates:
           # Calculation results depend on it, and any change to them needs owner
           # approval (#77), so it must not hide among other updates.
           - js-ballistics
-    ignore:
-      # Every update, not only majors. The licence changed at 7.4.0, 7.7.0 and
-      # 8.7.0, so its terms move within a major, and the target version is an
-      # owner decision (#75). Remove this only with that decision.
-      - dependency-name: apexcharts
+          # Pinned on 8.8.1 by owner decision (#75). Its licence changed at 7.4.0,
+          # 7.7.0 and 8.7.0, within majors, so every update is reviewed on its own:
+          # LICENSE.md diff, release notes, charts in a browser.
+          - apexcharts
+          # Its runtime dependency (8.x), under the same licence terms.
+          - apex-commons
 
   - package-ecosystem: github-actions
     directory: /

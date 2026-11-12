@@ -15,7 +15,7 @@ Versions are those locked in `package-lock.json` on `develop`.
 | UI | Skeleton, Tailwind CSS | 5.0.1, 4.3.4 |
 | Icons | `@lucide/svelte` | 1.69.0 |
 | Ballistics | `js-ballistics`, held ([#77](https://github.com/hawkins48b/cw-zro/issues/77)) | 2.2.0-beta.2 |
-| Charts | ApexCharts, lazy-loaded, held ([#75](https://github.com/hawkins48b/cw-zro/issues/75)) | 5.16.0 |
+| Charts | ApexCharts, lazy-loaded, pinned by owner decision ([#75](https://github.com/hawkins48b/cw-zro/issues/75)) | 8.8.1 |
 | PDF | `pdf-lib` | 1.17.1 |
 | Translations | Paraglide | 3.1.0 |
 | Tests | Vitest, jsdom | 5.1.0, 31.0.0 |
@@ -130,7 +130,7 @@ The input handling is written out five times: in `calculateShotPoint`, `calculat
 
 | Target | Command | Output | Difference |
 |--------|---------|--------|------------|
-| Web | `npm run build` | `build/` | Split in chunks: 87 JS files, ApexCharts and dope cards load on demand |
+| Web | `npm run build` | `build/` | Split in chunks: 92 JS files, ApexCharts and dope cards load on demand. The ApexCharts chunk is 950 kB, 280 kB gzipped (8.8.1; 605 kB and 165 kB on 5.16.0) |
 | Mobile | `npm run build:mobile` | `build/` | `BUILD_TARGET=capacitor` sets `bundleStrategy: 'single'`: 1 JS file |
 | Desktop | `npm run electron:build` | `dist-electron/` | The web build, served from `app://-` by `electron-serve` |
 
@@ -186,6 +186,8 @@ The web and desktop builds carry a `<meta>` Content-Security-Policy, written by 
 | `object-src` | `'none'` | |
 | `base-uri` | `'self'` | |
 | `form-action` | `'none'` | No form is submitted anywhere |
+
+ApexCharts 8.8.1 needs nothing more ([#75](https://github.com/hawkins48b/cw-zro/issues/75)): no `eval`, no inline script, no other host. Its two `fetch` calls embed fonts in chart exports, and the app hides the toolbar, so none runs.
 
 SvelteKit hashes only the scripts it writes. An inline script in [`app.html`](../src/app.html) would be blocked, so the dark mode script is the file [`static/theme-init.js`](../static/theme-init.js). A `<meta>` policy cannot set `frame-ancestors`; that needs a header from the web host. Downloads of `blob:` links (PDF and CSV) are navigations, which the policy does not cover.
 

@@ -143,7 +143,7 @@ There is no rollback step: build artifacts are kept for 1 day, and a deploy alwa
 
 ### Dependency decisions
 
-`js-ballistics` ([#77](https://github.com/hawkins48b/cw-zro/issues/77)) and ApexCharts ([#75](https://github.com/hawkins48b/cw-zro/issues/75)) are held. Both hold licence questions that affect every shipped build, and #77 also shifts results.
+`js-ballistics` ([#77](https://github.com/hawkins48b/cw-zro/issues/77)) is held. Its licence question affects every shipped build, and it also shifts results.
 
 - `js-ballistics` 3.x embeds LGPL-3.0 code, and its results differ.
-- ApexCharts terms changed several times between 5.x and 8.x. Whether ZRO's use of 5.16.0 fits its licence is for the owner and the vendor to settle.
+- ApexCharts is on 8.8.1 by owner decision of 2026-11-11 ([#75](https://github.com/hawkins48b/cw-zro/issues/75)), which accepts its current licence terms. Its `LICENSE.md` is the same in 8.7.0, 8.8.0 and 8.8.1. Its new dependency `apex-commons` 0.10.0 carries the same licence text under its own name.

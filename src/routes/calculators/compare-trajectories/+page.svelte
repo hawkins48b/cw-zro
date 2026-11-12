@@ -6,12 +6,7 @@
 	import { settings } from '#lib/stores/settings.svelte.js';
 	import { compareTrajectories } from '#lib/stores/compareTrajectories.svelte.js';
 	import { calculateFullTrajectory } from '#lib/utils/ballisticCalculator.js';
-	import {
-		chartLabelSeries,
-		chartLabelText,
-		compareSeriesName,
-		compareSeriesText
-	} from '#lib/utils/compareEntries.js';
+	import { compareSeriesText } from '#lib/utils/compareEntries.js';
 	import { shownProfile } from '#lib/utils/storedProfiles.js';
 	import { isUsableZeroDistance, MIN_ZERO_DISTANCE, MAX_ZERO_DISTANCE } from '#lib/utils/zeroDistance.js';
 	import { readDecimal } from '#lib/utils/decimal.js';
@@ -65,8 +60,8 @@
 				...entry,
 				profile,
 				shown,
-				seriesName: compareSeriesName(shown.name, entry.zeroDist, zeroUnitLabel),
-				seriesText: compareSeriesText(shown.name, entry.zeroDist, zeroUnitLabel)
+				// As typed: ApexCharts 8 writes series names as text (#75)
+				seriesName: compareSeriesText(shown.name, entry.zeroDist, zeroUnitLabel)
 			};
 		}).filter(Boolean)
 	);
@@ -105,7 +100,7 @@
 			}));
 			// An entry without a result has no series, so the color comes from the entry's position:
 			// a line must keep the color of the dot on its card.
-			series.push({ name: entry.seriesName, text: entry.seriesText, data, color: entryColor(i) });
+			series.push({ name: entry.seriesName, data, color: entryColor(i) });
 		}
 
 		return series.length > 0 ? series : null;
@@ -122,11 +117,10 @@
 	}
 
 	/**
-	 * @param {{ name: string, data: object[], color: string }[]} series - names escaped (#103)
+	 * @param {{ name: string, data: object[], color: string }[]} series - names as typed (#75)
 	 * @param {boolean} dark
-	 * @param {string[]} texts - the series names as the user reads them, for the chart label (#111)
 	 */
-	function buildChartOptions(series, dark, texts) {
+	function buildChartOptions(series, dark) {
 		const dAxisLabel = isMetric ? m.unit_meters() : m.unit_yards();
 		const dLabel = isMetric ? m.unit_m() : m.unit_yd();
 		const yLabel = Y_AXIS_OPTIONS.find((o) => o.value === yAxisKey)?.label();
@@ -146,10 +140,9 @@
 				animations: { enabled: false },
 				zoom: { enabled: false },
 				parentHeightOffset: 0,
-				// ApexCharts builds the svg aria-label from the escaped series names; this label
-				// replaces it and is written as text, not HTML (#111).
+				// The svg aria-label, in the app's language and written as text (#111)
 				accessibility: {
-					description: m.compare_chart_description({ names: texts.join(', ') })
+					description: m.compare_chart_description({ names: series.map((s) => s.name).join(', ') })
 				}
 			},
 			stroke: { width: 2, curve: 'monotoneCubic' },
@@ -191,6 +184,10 @@
 					}
 				]
 			},
+			// Series names are profile names typed by the user. ApexCharts 8 writes them as text only
+			// while no legend.formatter, legend.tooltipHoverFormatter or tooltip.y.title.formatter changes
+			// them: such a formatter's output is written as HTML, so it must escape it (#103, #75).
+			// src/test/apexcharts.test.js fails if one is added here.
 			tooltip: {
 				theme: dark ? 'dark' : 'light',
 				x: { formatter: (v) => `${v} ${dLabel}` },
@@ -207,31 +204,10 @@
 		const data = chartData;
 		if (!ac || !el || !data) return;
 
-		const texts = data.map(({ name, text }) => ({ name, text }));
-		const series = data.map(({ text, ...rest }) => rest);
-		const opts = buildChartOptions(series, settings.darkMode, texts.map(({ text }) => text));
-
-		// ApexCharts copies the escaped series names into the aria-labels of the legend items and
-		// of the keyboard-focused data point with setAttribute, so a screen reader would read
-		// `&amp;`. Put each element's own series name back as text whenever it writes one (#111).
-		const fixLabels = () => {
-			for (const node of el.querySelectorAll('[aria-label]')) {
-				const index = chartLabelSeries(node);
-				if (index === null) continue;
-				const label = node.getAttribute('aria-label') ?? '';
-				const fixed = chartLabelText(label, texts[index]);
-				if (fixed !== label) node.setAttribute('aria-label', fixed);
-			}
-		};
-		const observer = new MutationObserver(fixLabels);
-		observer.observe(el, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-label'] });
-
+		const opts = buildChartOptions(data, settings.darkMode);
 		const chart = new ac(el, opts);
 		chart.render();
-		return () => {
-			observer.disconnect();
-			chart.destroy();
-		};
+		return () => chart.destroy();
 	});
 
 	// ── Helper ───────────────────────────────────────────────────────

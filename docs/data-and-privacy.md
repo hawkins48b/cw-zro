@@ -60,6 +60,7 @@ Checked on 2026-11-05 by reading the code:
 - **Storage:** searched for `localStorage`, `sessionStorage`, `indexedDB`, `document.cookie`, `caches` and `serviceWorker`, in `src/` and in the generated Paraglide runtime.
 - **Build output:** listed every URL in `build/`. They are XML namespaces, library error links, code comments, placeholder hosts for URL parsing, the two GitHub links, and the `pdf-lib` project link. None of those is requested by the code above.
 - **Capacitor:** no plugin is imported in `src/`.
+- **Rechecked on 2026-11-12** for [#75](https://github.com/hawkins48b/cw-zro/issues/75), ApexCharts 8.8.1: its chunk has two `fetch` calls, used only to embed fonts in chart exports, which the app never starts (no toolbar), and one new URL, `https://apexcharts.com/pricing`, printed in a console warning only when a paid feature is used. The app uses none. In Chromium, the four chart pages of a production build logged no Content-Security-Policy violation, so no script, style, image, font or `fetch` request went to another host there.
 - **Rechecked on 2026-11-10** for [#96](https://github.com/hawkins48b/cw-zro/issues/96) and [#102](https://github.com/hawkins48b/cw-zro/issues/102): the `localStorage` keys in `src/lib/stores/` and `storedLocale.js`, and the generated runtime, where `TREE_SHAKE_COOKIE_STRATEGY_USED` is now `false`, so its cookie code never runs. `document.cookie` is only written by `clearLegacyLocaleCookie`, to delete the old cookie.
 
 **Not checked:**

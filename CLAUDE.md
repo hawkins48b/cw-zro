@@ -40,9 +40,10 @@ All scripts: [README](README.md#scripts). Setup: [docs/development.md](docs/deve
 Do not upgrade these, not even within a major, without an owner decision on the issue:
 
 - **`js-ballistics`** stays on 2.2.0-beta.2, Euler engine ([#77](https://github.com/hawkins48b/cw-zro/issues/77)). 3.1.0 embeds LGPL-3.0 code and shifts results.
-- **`apexcharts`** stays on 5.16.0 ([#75](https://github.com/hawkins48b/cw-zro/issues/75)). Its licence terms are the open question.
 
-`js-ballistics` is pinned to an exact version. `apexcharts` has a caret range, so `npm update` can move it. Use `npm ci`, and check the lockfile diff.
+`apexcharts` is no longer held: it is pinned on 8.8.1 by owner decision ([#75](https://github.com/hawkins48b/cw-zro/issues/75)), which accepts its licence terms. Those terms changed within majors (7.4.0, 7.7.0, 8.7.0), so update it only in its own pull request: diff its `LICENSE.md` against 8.8.1, and stop for the owner if the text changed. It brings `apex-commons` (same licence), locked at 0.10.0.
+
+Both are pinned to an exact version. Use `npm ci`, and check the lockfile diff.
 
 ## Code rules
 

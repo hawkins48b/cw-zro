@@ -32,17 +32,3 @@ export function formatFixed(value, decimals = 1) {
 export function formatLimit(value) {
 	return formatNumber(value, { useGrouping: false, maximumFractionDigits: 6 });
 }
-
-/**
- * Escape a string for use as HTML text content, such as a chart series name
- * that ApexCharts writes with innerHTML.
- * Quotes stay as they are, because ApexCharts also writes the same string to
- * an aria-label with setAttribute, which does not decode entities. This keeps
- * quotes readable there only: names with & < > do show entities in the aria-label.
- * Because quotes stay, this is not safe inside HTML attribute values.
- * @param {unknown} value
- * @returns {string}
- */
-export function escapeHtmlText(value) {
-	return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}

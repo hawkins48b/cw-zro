@@ -22,7 +22,7 @@ nvm install        # or any Node from the table above
 npm ci
 ```
 
-Use `npm ci`, not `npm install`: it installs exactly what the lockfile holds, which keeps `js-ballistics` and `apexcharts` on their held versions. `npm ci` also runs `svelte-kit sync`. The Paraglide code in `src/lib/paraglide` is generated the first time Vite or Vitest runs.
+Use `npm ci`, not `npm install`: it installs exactly what the lockfile holds, which keeps `js-ballistics` and `apexcharts` on their pinned versions. `npm ci` also runs `svelte-kit sync`. The Paraglide code in `src/lib/paraglide` is generated the first time Vite or Vitest runs.
 
 No `.env` file is needed. The only environment variable the app reads is `BUILD_TARGET`, and only `build:mobile` sets it.
 
@@ -123,4 +123,4 @@ The fuses make a packaged app ignore `--inspect` and `ELECTRON_RUN_AS_NODE`, and
 
 ## Dependency updates
 
-See [Dependency Updates](../README.md#dependency-updates) in the README. `js-ballistics` is pinned to an exact version in `package.json` ([#126](https://github.com/hawkins48b/cw-zro/issues/126)). `apexcharts` still has a caret range, so `npm update` could move it. Only the lockfile and the Dependabot rules keep it in place.
+See [Dependency Updates](../README.md#dependency-updates) in the README. `js-ballistics` ([#126](https://github.com/hawkins48b/cw-zro/issues/126)) and `apexcharts` ([#75](https://github.com/hawkins48b/cw-zro/issues/75)) are pinned to exact versions in `package.json`, so `npm update` does not move them. `apex-commons`, which ApexCharts needs, has a `^0.10.0` range there: only the lockfile keeps it on 0.10.0.
