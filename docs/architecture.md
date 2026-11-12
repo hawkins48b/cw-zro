@@ -14,7 +14,7 @@ Versions are those locked in `package-lock.json` on `develop`.
 | Language | JavaScript, no TypeScript | |
 | UI | Skeleton, Tailwind CSS | 5.0.1, 4.3.4 |
 | Icons | `@lucide/svelte` | 1.69.0 |
-| Ballistics | `js-ballistics`, held ([#77](https://github.com/hawkins48b/cw-zro/issues/77)) | 2.2.0-beta.2 |
+| Ballistics | `js-ballistics`, pinned by owner decision ([#77](https://github.com/hawkins48b/cw-zro/issues/77)), with its WebAssembly engine bclibc (LGPL-3.0) | 3.1.0 (bclibc 2.0.0) |
 | Charts | ApexCharts, lazy-loaded, pinned by owner decision ([#75](https://github.com/hawkins48b/cw-zro/issues/75)) | 8.8.1 |
 | PDF | `pdf-lib` | 1.17.1 |
 | Translations | Paraglide | 3.1.0 |
@@ -178,7 +178,7 @@ The web and desktop builds carry a `<meta>` Content-Security-Policy, written by 
 | Directive | Value | Why |
 |-----------|-------|-----|
 | `default-src` | `'self'` | Anything not listed comes from the app only |
-| `script-src` | `'self'` and the hash of SvelteKit's start script | No other inline script, no `eval` |
+| `script-src` | `'self'`, `'wasm-unsafe-eval'` and the hash of SvelteKit's start script | No other inline script, no `eval`. `'wasm-unsafe-eval'` lets `js-ballistics` 3 compile its embedded WebAssembly engine; without it every calculation fails ([#77](https://github.com/hawkins48b/cw-zro/issues/77), owner decision of 2026-11-12). It does not allow `eval()` or `new Function()` |
 | `style-src` | `'self' 'unsafe-inline'` | ApexCharts, Svelte transitions and `style:` set inline styles |
 | `img-src` | `'self' data: blob:` | ApexCharts |
 | `font-src` | `'self' data:` | |
@@ -188,6 +188,8 @@ The web and desktop builds carry a `<meta>` Content-Security-Policy, written by 
 | `form-action` | `'none'` | No form is submitted anywhere |
 
 ApexCharts 8.8.1 needs nothing more ([#75](https://github.com/hawkins48b/cw-zro/issues/75)): no `eval`, no inline script, no other host. Its two `fetch` calls embed fonts in chart exports, and the app hides the toolbar, so none runs.
+
+`'wasm-unsafe-eval'` is there for `js-ballistics` 3.1.0 ([#77](https://github.com/hawkins48b/cw-zro/issues/77), owner decision of 2026-11-12). Its engine, bclibc, is WebAssembly embedded in the bundle as text and compiled on the device with `WebAssembly.instantiate`. A `script-src` without this keyword refuses that compile (checked in Chromium: "Refused to compile or instantiate WebAssembly module"), and every calculator and dope card then fails. The keyword allows compiling WebAssembly only; `eval()`, `new Function()` and inline scripts stay blocked, and no code is loaded from another origin.
 
 SvelteKit hashes only the scripts it writes. An inline script in [`app.html`](../src/app.html) would be blocked, so the dark mode script is the file [`static/theme-init.js`](../static/theme-init.js). A `<meta>` policy cannot set `frame-ancestors`; that needs a header from the web host. Downloads of `blob:` links (PDF and CSV) are navigations, which the policy does not cover.
 

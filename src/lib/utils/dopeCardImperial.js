@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts } from 'pdf-lib';
-import { Calculator, Weapon, DragModel, Ammo, Atmo, Wind, Shot, UNew, Unit, Table, TrajectoryRangeError } from 'js-ballistics';
+import { Weapon, DragModel, Ammo, Atmo, Wind, Shot, UNew, Unit, DragTables, TrajFlag, RangeError as TrajectoryRangeError } from 'js-ballistics';
+import { Calculator, EVENT_ROWS } from './ballisticEngine.js';
 import { findZeroCrossings, ZERO_SEARCH_RANGE, isFlyableZeroElevation } from './dopeCardZeros.js';
 import { hasFiniteElevation, isUsableZeroDistance, zeroDistanceValue } from './zeroDistance.js';
 import { readDecimal } from './decimal.js';
@@ -50,7 +51,7 @@ export async function generateImperialDopeCard(profile) {
 		// 25 yd impact
 		const p25 = findPoint(shot1, Unit.Yard, 25);
 		if (p25) {
-			const drop25 = fmtSigned(Math.round(p25.targetDrop.In(Unit.Inch) * 10) / 10);
+			const drop25 = fmtSigned(Math.round(p25.slantHeight.In(Unit.Inch) * 10) / 10);
 			drawHeaderText(firstPage, helveticaFont, 'impact25', drop25);
 		}
 		// Optic name
@@ -62,7 +63,7 @@ export async function generateImperialDopeCard(profile) {
 		// 100 yd impact
 		const p100 = findPoint(shot1, Unit.Yard, 100);
 		if (p100) {
-			const drop100 = fmtSigned(Math.round(p100.targetDrop.In(Unit.Inch) * 10) / 10);
+			const drop100 = fmtSigned(Math.round(p100.slantHeight.In(Unit.Inch) * 10) / 10);
 			drawHeaderText(firstPage, helveticaFont, 'impact100', drop100);
 		}
 		// Height over bore (in)
@@ -76,7 +77,7 @@ export async function generateImperialDopeCard(profile) {
 	}
 
 	function fillGraph() {
-		const points = shot25.map((p) => ({ distance: p.distance.In(Unit.Yard), drop: p.targetDrop.In(Unit.Inch) }));
+		const points = shot25.map((p) => ({ distance: p.distance.In(Unit.Yard), drop: p.slantHeight.In(Unit.Inch) }));
 		drawDropGraph(firstPage, helveticaFont, CARD_LAYOUTS.imperial.graph, points);
 	}
 
@@ -85,14 +86,14 @@ export async function generateImperialDopeCard(profile) {
 			const { distance } = target;
 			// No wind: elevation. A negative drop adjustment (below the line of sight) is dialled up.
 			const pNW = findPoint(shot25, Unit.Yard, distance);
-			const adj = pNW ? pNW.dropAdjustment.In(Unit.MOA) : NaN;
+			const adj = pNW ? pNW.dropAngle.In(Unit.MOA) : NaN;
 			// Light (8 mph) and strong (20 mph) wind: windage
 			const pLW = findPoint(shot25Wind8, Unit.Yard, distance);
 			const pSW = findPoint(shot25Wind20, Unit.Yard, distance);
 			drawPointsOfAim(firstPage, helveticaFont, target, {
 				elevation: pNW ? { value: -adj, label: fmtDopeAdj(adj) } : null,
-				light: pLW ? windMark(pLW.windageAdjustment.In(Unit.MOA)) : null,
-				strong: pSW ? windMark(pSW.windageAdjustment.In(Unit.MOA)) : null
+				light: pLW ? windMark(pLW.windageAngle.In(Unit.MOA)) : null,
+				strong: pSW ? windMark(pSW.windageAngle.In(Unit.MOA)) : null
 			});
 		}
 	}
@@ -127,7 +128,7 @@ function computeTrajectory(profile, range, windSpeedMph, forZeros = false) {
 			: UNew.Inch(readDecimal(profile.bulletDiameter));
 		const bc = readDecimal(profile.bc);
 		if (!isUsableBc(bc)) return null;
-		const dragTable = profile.bcType === 'G7' ? Table.G7 : Table.G1;
+		const dragTable = profile.bcType === 'G7' ? DragTables.G7 : DragTables.G1;
 		const dm = new DragModel({ bc, dragTable, weight, diameter });
 
 		const mv = profile.velocityUnit === 'mps'
@@ -154,9 +155,10 @@ function computeTrajectory(profile, range, windSpeedMph, forZeros = false) {
 		calc.setWeaponZero(shot, zeroDist);
 		if (!hasFiniteElevation(shot)) return null;
 		if (forZeros && !isFlyableZeroElevation(weapon.zeroElevation)) return null;
-		const result = calc.fire({ shot, trajectoryRange: trajRange, trajectoryStep: trajStep, extraData: forZeros });
+		const filterFlags = forZeros ? EVENT_ROWS : TrajFlag.RANGE;
+		const result = calc.fire({ shot, trajectoryRange: trajRange, trajectoryStep: trajStep, filterFlags });
 		if (!result || result.length === 0) return null;
-		return Array.isArray(result) ? result : (result.trajectory ?? []);
+		return result.records;
 	} catch (e) {
 		// A search for crossings can use the flight up to where the engine stopped it.
 		if (forZeros && e instanceof TrajectoryRangeError) return e.incompleteTrajectory;

@@ -16,6 +16,7 @@ import {
 	shownWindDirection
 } from '#lib/utils/storedWind.js';
 import { P308_G1 } from './fixtures/ballisticProfiles.js';
+import { windVector } from './fixtures/windVector.js';
 
 const YD_600 = { distance: 600, unit: 'yd', step: 100 };
 const windFrom = (direction) => ({ speed: '10', speedUnit: 'mph', direction });
@@ -29,17 +30,18 @@ const SHOTS = [
 describe('direction on the real engine', () => {
 	describe.each(SHOTS)('%s, 10 mph, .308 at 600 yd', (_, shoot) => {
 		const windage = (direction) => shoot(windFrom(direction)).windage.In(Unit.Inch);
-		const drop = (wind) => shoot(wind).targetDrop.In(Unit.Inch);
+		const drop = (wind) => shoot(wind).slantHeight.In(Unit.Inch);
 
 		it('drifts a wind from the right (90°) to the left', () => {
-			// Measured before #106 with the engine's 270°, the same wind: -33.92 in.
+			// Measured before #106 with the engine's 270°, the same wind: -33.92 in, on js-ballistics
+			// 2.2 and on 3.1 with RK4 (#77).
 			expect(windage('90')).toBeCloseTo(-33.92, 2);
-			expect(shoot(windFrom('90')).windageAdjustment.In(Unit.MOA)).toBeLessThan(0);
+			expect(shoot(windFrom('90')).windageAngle.In(Unit.MOA)).toBeLessThan(0);
 		});
 
 		it('drifts a wind from the left (270°) to the right', () => {
 			expect(windage('270')).toBeCloseTo(33.92, 2);
-			expect(shoot(windFrom('270')).windageAdjustment.In(Unit.MOA)).toBeGreaterThan(0);
+			expect(shoot(windFrom('270')).windageAngle.In(Unit.MOA)).toBeGreaterThan(0);
 		});
 
 		it('reads an angle the same after any whole turn', () => {
@@ -86,7 +88,7 @@ describe('halfTurn', () => {
 /** The x and z of the wind the engine got before #106, for an old stored direction. */
 function oldWindVector(direction) {
 	const degrees = typeof direction === 'string' && direction.trim() === '' ? 0 : parseFloat(String(direction).replace(',', '.'));
-	return new Wind({ velocity: UNew.MPH(10), directionFrom: UNew.Degree(degrees) }).vector;
+	return windVector(new Wind({ velocity: UNew.MPH(10), directionFrom: UNew.Degree(degrees) }));
 }
 
 describe('shownWindDirection', () => {
@@ -119,9 +121,9 @@ describe('shownWindDirection', () => {
 	])('gives the engine the same wind for %j as before #106', (old) => {
 		const [now] = shotWinds(windFrom(shownWindDirection(old)));
 		const before = oldWindVector(old);
-		expect(now.vector.x).toBeCloseTo(before.x, 9);
-		expect(now.vector.z).toBeCloseTo(before.z, 9);
-		expect(now.vector.y).toBe(0);
+		expect(windVector(now).x).toBeCloseTo(before.x, 9);
+		expect(windVector(now).z).toBeCloseTo(before.z, 9);
+		expect(windVector(now).y).toBe(0);
 	});
 
 	const throwsAsText = JSON.parse('{"toString":1}');
@@ -167,7 +169,7 @@ describe('migrateStoredWind', () => {
 	it('turns an empty old direction, which was a tailwind, into 180', () => {
 		const migrated = migrateStoredWind({ ...old, direction: '' });
 		expect(migrated.direction).toBe('180');
-		const drop = (wind) => calculateShotPoint(P308_G1, YD_600, null, wind).targetDrop.In(Unit.Inch);
+		const drop = (wind) => calculateShotPoint(P308_G1, YD_600, null, wind).slantHeight.In(Unit.Inch);
 		expect(drop(migrated)).toBeGreaterThan(drop(null));
 	});
 
@@ -214,8 +216,8 @@ describe('migrateStoredWind', () => {
 			// The engine gets what migrateClockWind gave it before #106.
 			const [now] = shotWinds(migrated);
 			const before = oldWindVector(migrateClockWind(clock(hour)).direction);
-			expect(now.vector.x).toBeCloseTo(before.x, 9);
-			expect(now.vector.z).toBeCloseTo(before.z, 9);
+			expect(windVector(now).x).toBeCloseTo(before.x, 9);
+			expect(windVector(now).z).toBeCloseTo(before.z, 9);
 		});
 
 		it('converts a clock wind once', () => {

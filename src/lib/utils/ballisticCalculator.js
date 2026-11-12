@@ -1,17 +1,16 @@
 import {
-	Calculator,
 	Weapon,
 	DragModel,
 	Ammo,
 	Atmo,
 	Shot,
 	UNew,
-	Table,
+	DragTables,
 	Unit,
 	TrajFlag,
-	TrajectoryRangeError,
-	defaultEngineConfig
+	RangeError as TrajectoryRangeError
 } from 'js-ballistics';
+import { Calculator, ENGINE_CONFIG, EVENT_ROWS } from './ballisticEngine.js';
 import { shotWinds } from './shotWind.js';
 import {
 	hasFiniteElevation,
@@ -196,7 +195,7 @@ export function calculateShotPoint(profile, range, atmosphere, wind, options = {
 		// --- Drag model ---
 		const bc = readDecimal(profile.bc);
 		if (!isUsableBc(bc)) return null;
-		const dragTable = profile.bcType === 'G7' ? Table.G7 : Table.G1;
+		const dragTable = profile.bcType === 'G7' ? DragTables.G7 : DragTables.G1;
 		const dm = new DragModel({ bc, dragTable, weight, diameter, length });
 
 		// --- Muzzle velocity ---
@@ -226,6 +225,10 @@ export function calculateShotPoint(profile, range, atmosphere, wind, options = {
 		// --- Compute ---
 		if (!hasFlyableVelocity(ammo, atmo)) return null;
 		const cantDeg = options.cantAngle ?? 0;
+		// A cant that is not a finite number hangs the zero solve of js-ballistics 3 for good (#77);
+		// 2.2 returned a NaN elevation, which hasFiniteElevation caught. The Scope View only passes
+		// a finite stored rotation (storedRotation), so this changes no result there.
+		if (!Number.isFinite(Number(cantDeg))) return null;
 		const shot = new Shot({ weapon, ammo, atmo, winds, cantAngle: cantDeg !== 0 ? UNew.Degree(cantDeg) : undefined });
 		calc.setWeaponZero(shot, zeroDistance);
 		if (!hasFiniteElevation(shot)) {
@@ -256,17 +259,17 @@ export function getElevationValue(point, unit) {
 	if (!point) return null;
 	switch (unit) {
 		case 'MOA':
-			return round1(point.dropAdjustment.In(getUnit('MOA')));
+			return round1(point.dropAngle.In(getUnit('MOA')));
 		case 'MRAD':
-			return round1(point.dropAdjustment.In(getUnit('MRAD')));
+			return round1(point.dropAngle.In(getUnit('MRAD')));
 		case 'IN':
-			return round1(point.targetDrop.In(getUnit('IN')));
+			return round1(point.slantHeight.In(getUnit('IN')));
 		case 'FT':
-			return round2(point.targetDrop.In(getUnit('FT')));
+			return round2(point.slantHeight.In(getUnit('FT')));
 		case 'CM':
-			return round1(point.targetDrop.In(getUnit('CM')));
+			return round1(point.slantHeight.In(getUnit('CM')));
 		case 'M':
-			return round2(point.targetDrop.In(getUnit('M')));
+			return round2(point.slantHeight.In(getUnit('M')));
 		default:
 			return null;
 	}
@@ -280,9 +283,9 @@ export function getWindageValue(point, unit) {
 	if (!point) return null;
 	switch (unit) {
 		case 'MOA':
-			return round1(point.windageAdjustment.In(getUnit('MOA')));
+			return round1(point.windageAngle.In(getUnit('MOA')));
 		case 'MRAD':
-			return round1(point.windageAdjustment.In(getUnit('MRAD')));
+			return round1(point.windageAngle.In(getUnit('MRAD')));
 		case 'IN':
 			return round1(point.windage.In(getUnit('IN')));
 		case 'FT':
@@ -379,7 +382,7 @@ export function calculateFullTrajectory(profile, range, atmosphere, wind, option
 		}
 		const bc = readDecimal(profile.bc);
 		if (!isUsableBc(bc)) return null;
-		const dragTable = profile.bcType === 'G7' ? Table.G7 : Table.G1;
+		const dragTable = profile.bcType === 'G7' ? DragTables.G7 : DragTables.G1;
 		const dm = new DragModel({ bc, dragTable, weight, diameter, length });
 
 		// --- Muzzle velocity ---
@@ -415,11 +418,11 @@ export function calculateFullTrajectory(profile, range, atmosphere, wind, option
 			reportStop(options.report, null, stops);
 			return null;
 		}
-		const hitResult = calc.fire({ shot, trajectoryRange, trajectoryStep, extraData: true });
+		const hitResult = calc.fire({ shot, trajectoryRange, trajectoryStep, filterFlags: EVENT_ROWS });
 
 		if (!hitResult || hitResult.length === 0) return null;
 
-		const allPoints = hitResult.trajectory;
+		const allPoints = hitResult.records;
 		const tablePoints = allPoints.filter((p) => p.flag & TrajFlag.RANGE);
 
 		// --- Key trajectory points via flags ---
@@ -436,25 +439,26 @@ export function calculateFullTrajectory(profile, range, atmosphere, wind, option
 		// a grid of about one unit that depends only on the range (#85, #94).
 		//
 		// The table rows cannot give them: they depend on the step, and flagged rows run past the
-		// range. js-ballistics has no apex point either: TrajFlag.APEX exists but the engine never
-		// sets it. The grid fire costs about as much per unit as a step 1 table.
+		// range. js-ballistics 3 can give an exact apex row (TrajFlag.APEX), but it is not asked for
+		// (EVENT_ROWS), so that the charts keep the rows they had on 2.2. The grid fire costs about
+		// as much per unit as a step 1 table.
 		//
 		// The grid is the whole range: a fractional range gives a step just under 1, so that the
 		// grid ends on the range and this fire never goes further than the main one, which could
-		// otherwise fail on a bullet that stops just past it. extraData keeps the zero crossing rows
+		// otherwise fail on a bullet that stops just past it. EVENT_ROWS keeps the zero crossing rows
 		// (an arc under a unit wide can fall between grid rows) and the Mach crossing row.
 		const toDistance = isMetric ? UNew.Meter : UNew.Yard;
 		const gridRows = calc.fire({
 			shot,
 			trajectoryRange,
 			trajectoryStep: toDistance(maxDist / Math.ceil(maxDist)),
-			extraData: true
-		}).trajectory;
+			filterFlags: EVENT_ROWS
+		}).records;
 		// The engine can record a flagged row just past the range: those do not count for max drop
 		// and subsonic distance. The tolerance only absorbs float noise on the last grid row.
 		const inRange = gridRows.filter((p) => p.distance.In(distUnit) <= maxDist + RANGE_EPSILON);
 
-		// Max ordinate: highest positive targetDrop (bullet above line of sight), or null if the
+		// Max ordinate: highest positive slantHeight (bullet above line of sight), or null if the
 		// bullet stays below it within the range. Tolerance against a step 1 calculation: 1
 		// distance unit and 0.05 in or cm, the rounding of the elevation. Against a 0.05 unit grid,
 		// step 1 is within 0.5 unit and 0.0002 in or cm of the top. Rows past the far zero are
@@ -462,29 +466,29 @@ export function calculateFullTrajectory(profile, range, atmosphere, wind, option
 		// stopped at the far zero before #94.
 		let maxOrdPoint = null;
 		for (const p of gridRows) {
-			const elev = p.targetDrop.In(elevUnit);
-			if (elev > 0 && (maxOrdPoint === null || elev > maxOrdPoint.targetDrop.In(elevUnit))) {
+			const elev = p.slantHeight.In(elevUnit);
+			if (elev > 0 && (maxOrdPoint === null || elev > maxOrdPoint.slantHeight.In(elevUnit))) {
 				maxOrdPoint = p;
 			}
 		}
 		const maxApex = maxOrdPoint
 			? {
 					distance: round1(maxOrdPoint.distance.In(distUnit)),
-					elevation: round1(maxOrdPoint.targetDrop.In(elevUnit))
+					elevation: round1(maxOrdPoint.slantHeight.In(elevUnit))
 				}
 			: null;
 
-		// --- Max drop: lowest targetDrop within the range, the muzzle included ---
+		// --- Max drop: lowest slantHeight within the range, the muzzle included ---
 		let maxDropPoint = inRange[0] ?? null;
 		for (const p of inRange) {
-			if (p.targetDrop.In(elevUnit) < maxDropPoint.targetDrop.In(elevUnit)) {
+			if (p.slantHeight.In(elevUnit) < maxDropPoint.slantHeight.In(elevUnit)) {
 				maxDropPoint = p;
 			}
 		}
 		const maxDrop = maxDropPoint
 			? {
 					distance: round1(maxDropPoint.distance.In(distUnit)),
-					drop: round1(maxDropPoint.targetDrop.In(elevUnit))
+					drop: round1(maxDropPoint.slantHeight.In(elevUnit))
 				}
 			: null;
 
@@ -492,7 +496,7 @@ export function calculateFullTrajectory(profile, range, atmosphere, wind, option
 		const soundSpeedFPS = atmo.mach.In(Unit.FPS);
 
 		// --- Subsonic distance: first row within the range below the speed of sound, or null ---
-		// The Mach crossing row is kept by extraData, so this is within one grid unit of the
+		// The Mach crossing row is kept by EVENT_ROWS, so this is within one grid unit of the
 		// crossing, and usually on it.
 		const subsonicPoint = inRange.find((p) => p.velocity.In(Unit.FPS) < soundSpeedFPS);
 		const subsonicDist = subsonicPoint ? round1(subsonicPoint.distance.In(distUnit)) : null;
@@ -520,9 +524,9 @@ const MPBR_MAX_ELEVATION = 0.5;
 const MPBR_MAX_RANGE = 20000;
 
 /** Fire a shot and return its rows, up to where the engine stopped it if it stopped early. */
-function flightRows(calc, shot, trajectoryRange, trajectoryStep, extraData = false) {
+function flightRows(calc, shot, trajectoryRange, trajectoryStep, filterFlags = TrajFlag.RANGE) {
 	try {
-		return calc.fire({ shot, trajectoryRange, trajectoryStep, extraData }).trajectory;
+		return calc.fire({ shot, trajectoryRange, trajectoryStep, filterFlags }).records;
 	} catch (e) {
 		if (e instanceof TrajectoryRangeError) return e.incompleteTrajectory;
 		throw e;
@@ -531,7 +535,7 @@ function flightRows(calc, shot, trajectoryRange, trajectoryStep, extraData = fal
 
 /** Rows as plain numbers in mm, for the searches below: { x: distance, y: height over LoS }. */
 function heightRows(rows) {
-	return rows.map((p) => ({ x: p.distance.In(Unit.Millimeter), y: p.targetDrop.In(Unit.Millimeter) }));
+	return rows.map((p) => ({ x: p.distance.In(Unit.Millimeter), y: p.slantHeight.In(Unit.Millimeter) }));
 }
 
 /** Index of the highest row. */
@@ -575,17 +579,22 @@ function descentCrossing(rows, top, height) {
  *
  * The zero is the near crossing of that arc, where the bullet comes up through the line of sight
  * (#109), as the closest whole unit that keeps the apex inside the zone: the unit under the
- * crossing when the solver's step past the distance lowers the arc enough, else the unit above.
- * A further near zero gives a lower arc. A near crossing under 1 unit becomes MIN_ZERO_DISTANCE.
+ * crossing if it does, else the unit above. A further near zero gives a lower arc, so on
+ * js-ballistics 3, which zeroes on the distance (#77), the unit under fits only when the crossing
+ * is on a whole unit, and the unit above is the usual answer. A near crossing under 1 unit becomes
+ * MIN_ZERO_DISTANCE.
  * Every value returned describes the shot zeroed at optimalZero, the one the user saves to the
  * profile, so optimalZero equals nearZero.
  *
  * Tolerance: 1 unit of near zero moves the arc far more than 1 unit of far zero does, so
  * mpbrMax can be several units under the best any zero can give. Measured against the arc whose
- * apex touches the top (#109): at most 2.2% on the baseline targets (5.9 m on the .308 with
- * 20 cm), 4% up to 30 in or 100 cm, and more on huge targets or slow loads, up to about 27% where
- * the near crossing is under 1 unit. A walk over whole near zeros gives the same mpbrMax. Distances come from step 1 rows, read between rows, which adds under 0.01 unit,
- * and the output is rounded to 0.1.
+ * apex touches the top on js-ballistics 2.2 (#109): at most 2.2% on the baseline targets (5.9 m on
+ * the .308 with 20 cm), 4% up to 30 in or 100 cm, and more on huge targets or slow loads, up to
+ * about 27% where the near crossing is under 1 unit. On 3.1 (#77), against near zeros walked in
+ * 0.02 unit steps on the four test loads: at most 2.6% on 8 in and 20 cm (7.6 yd on the .308 with
+ * 8 in) and 3.3% on 30 in. A walk over whole near zeros gives the same mpbrMax. Distances come
+ * from step 1 rows, read between rows, which adds under 0.01 unit, and the output is rounded to
+ * 0.1.
  *
  * Returns null when no shot fits: the arc cannot reach the top of the zone within
  * MPBR_MAX_ELEVATION, the bullet never comes up through the line of sight (a sight height of 0
@@ -593,7 +602,8 @@ function descentCrossing(rows, top, height) {
  * past the apex, where it would be a far zero.
  *
  * Cost, as a hard bound: at most 54 fires (10 doublings, 40 halvings, the arc, two zeroed shots,
- * the chart) and two zero solves of up to 60 integrations each, so 174 integrations. Each one
+ * the chart) and two zero solves of up to 60 integrations each, run a second time from another
+ * start when the first fails (ballisticEngine.js), so 294 integrations. Each one
  * ends with the flight or at MPBR_MAX_RANGE, so a call takes about 40 ms on an ordinary target
  * and seconds on an absurd input. There is no time limit: this only runs from a button.
  *
@@ -648,7 +658,7 @@ export function calculateMPBR(profile, targetSizeStr, targetUnit) {
 		}
 		const bc = readDecimal(profile.bc);
 		if (!isUsableBc(bc)) return null;
-		const dragTable = profile.bcType === 'G7' ? Table.G7 : Table.G1;
+		const dragTable = profile.bcType === 'G7' ? DragTables.G7 : DragTables.G1;
 		const dm = new DragModel({ bc, dragTable, weight, diameter, length });
 
 		const mv =
@@ -672,7 +682,7 @@ export function calculateMPBR(profile, targetSizeStr, targetUnit) {
 		// ── Search: the elevation that puts the apex on the top of the zone ──
 		// The apex of the same shot in a vacuum is further out than with drag, so firing that far
 		// is enough, and it saves following the bullet down on every try.
-		const gravity = Math.abs(defaultEngineConfig.cGravityConstant);
+		const gravity = Math.abs(ENGINE_CONFIG.gravityConstant);
 		const apexHeight = (elevation) => {
 			weapon.zeroElevation = UNew.Radian(elevation);
 			const vacuumApexFeet = (muzzleFps ** 2 * Math.sin(2 * elevation)) / (2 * gravity);
@@ -714,11 +724,12 @@ export function calculateMPBR(profile, targetSizeStr, targetUnit) {
 			if (!hasFiniteElevation(shot)) return null;
 			return heightRows(flightRows(calc, shot, longestFlight, oneUnit));
 		};
-		// The solver zeroes on its first step past the distance, about 0.1 yd further out, which
-		// lowers a near zero arc. So the unit under the crossing can still keep the apex inside, as
-		// 21 yd does for a crossing at 21.06 yd: try it first, then the unit above. A crossing under
-		// 1 unit comes up to MIN_ZERO_DISTANCE, a lower arc, and never to the zero of 0 that would
-		// hang the solver.
+		// Try the unit under the crossing first, then the unit above. js-ballistics 2.2 zeroed on its
+		// first step past the distance, about 0.1 yd further out, which lowered the arc, so the unit
+		// under often fitted (21 yd for a crossing at 21.06 yd). 3.1 zeroes on the distance (#77), so
+		// the unit under gives a higher arc than the best one and fits only on a whole unit crossing:
+		// that crossing now gives 22 yd. A crossing under 1 unit comes up to MIN_ZERO_DISTANCE, a lower
+		// arc, and never to a zero of 0, which hung the 2.2 solver.
 		let optimalZero = Math.max(Math.floor(nearCrossing), MIN_ZERO_DISTANCE);
 		let rows = zeroedRows(optimalZero);
 		if (!rows) return null;
@@ -746,7 +757,7 @@ export function calculateMPBR(profile, targetSizeStr, targetUnit) {
 
 		// ── Final detailed trajectory for chart ──────────────────────────
 		const chartMaxDist = Math.ceil((mpbrMaxDistMM / mmPerDist) * 1.2 / 50) * 50;
-		const chartPoints = flightRows(calc, shot, toDistance(chartMaxDist), toDistance(5), true);
+		const chartPoints = flightRows(calc, shot, toDistance(chartMaxDist), toDistance(5), EVENT_ROWS);
 		if (!chartPoints || chartPoints.length === 0) return null;
 
 		// Near/far zero via flags, with manual fallback
@@ -758,8 +769,8 @@ export function calculateMPBR(profile, targetSizeStr, targetUnit) {
 		if (fzPt) farZero = Math.round(fzPt.distance.In(distUnitEnum));
 		if (nearZero === null || farZero === null) {
 			for (let i = 1; i < chartPoints.length; i++) {
-				const prev = chartPoints[i - 1].targetDrop.In(Unit.Millimeter);
-				const curr = chartPoints[i].targetDrop.In(Unit.Millimeter);
+				const prev = chartPoints[i - 1].slantHeight.In(Unit.Millimeter);
+				const curr = chartPoints[i].slantHeight.In(Unit.Millimeter);
 				if (prev < 0 && curr >= 0 && nearZero === null) {
 					nearZero = Math.round(chartPoints[i].distance.In(distUnitEnum));
 				} else if (prev >= 0 && curr < 0 && nearZero !== null && farZero === null) {

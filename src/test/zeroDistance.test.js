@@ -5,7 +5,7 @@
  * hanging the run.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Calculator } from 'js-ballistics';
+import { Calculator } from '#lib/utils/ballisticEngine.js';
 import { calculateShotPoint, calculateFullTrajectory } from '#lib/utils/ballisticCalculator.js';
 import { calculateTrajectoryValidation } from '#lib/utils/trajectoryValidation.js';
 import { generateImperialDopeCard } from '#lib/utils/dopeCardImperial.js';

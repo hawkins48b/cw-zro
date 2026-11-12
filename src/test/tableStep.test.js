@@ -119,7 +119,7 @@ describe('a step below the minimum changes no table', () => {
 	const rows = (step) =>
 		calculateFullTrajectory(P308_G1, { distance: '1000', unit: 'yd', step }, null, null).trajectory.map((p) => [
 			p.distance.In(Unit.Yard),
-			p.targetDrop.In(Unit.Inch)
+			p.slantHeight.In(Unit.Inch)
 		]);
 
 	it('gives the rows of step 1 for a step of 0.001, at most one per yard', () => {
@@ -259,7 +259,7 @@ describe('a step above the range gives the table of the range (#133)', () => {
 	});
 	const result = (step, distance = '1000') => calculateFullTrajectory(P308_G1, { distance, unit: 'yd', step }, null, null);
 	const rows = (step, distance) =>
-		result(step, distance).trajectory.map((p) => [p.distance.In(Unit.Yard), p.targetDrop.In(Unit.Inch)]);
+		result(step, distance).trajectory.map((p) => [p.distance.In(Unit.Yard), p.slantHeight.In(Unit.Inch)]);
 
 	it('gives the muzzle row and the row at the range for a step equal to the range', () => {
 		const table = rows('1000');

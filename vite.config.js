@@ -12,12 +12,15 @@ const isCapacitor = process.env.BUILD_TARGET === 'capacitor';
 // with the hashes of SvelteKit's inline scripts. The mobile build has none until it is
 // tested on a device. 'unsafe-inline' styles: ApexCharts, Svelte transitions and style:
 // directives set inline styles. data: and blob: images: ApexCharts and the chart exports.
-// The app loads and sends nothing outside its own origin (docs/data-and-privacy.md).
+// 'wasm-unsafe-eval' (#77, owner decision of 2026-11-12): js-ballistics 3 compiles its WebAssembly engine
+// (bclibc), embedded in the bundle, with WebAssembly.instantiate, which a script-src without it
+// refuses, and every calculator then fails. It allows compiling WebAssembly only, not eval() or
+// new Function(). The app loads and sends nothing outside its own origin (docs/data-and-privacy.md).
 const csp = {
 	mode: 'hash',
 	directives: {
 		'default-src': ['self'],
-		'script-src': ['self'],
+		'script-src': ['self', 'wasm-unsafe-eval'],
 		'style-src': ['self', 'unsafe-inline'],
 		'img-src': ['self', 'data:', 'blob:'],
 		'font-src': ['self', 'data:'],
@@ -54,11 +57,6 @@ export default defineConfig({
 				: { csp })
 		})
 	],
-	ssr: {
-		// js-ballistics uses extensionless ESM imports which Node.js strict ESM can't resolve.
-		// Bundling it for SSR lets Vite handle the resolution instead of Node.
-		noExternal: ['js-ballistics']
-	},
 	test: {
 		include: ['src/**/*.test.js'],
 		environment: 'jsdom',

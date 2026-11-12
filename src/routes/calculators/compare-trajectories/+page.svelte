@@ -96,7 +96,7 @@
 			const yUnit = getYUnit(yAxisKey);
 			const data = (result.trajectory ?? []).map((p) => ({
 				x: Math.round(p.distance.In(distUnit) * 10) / 10,
-				y: Math.round(p.targetDrop.In(yUnit) * 100) / 100
+				y: Math.round(p.slantHeight.In(yUnit) * 100) / 100
 			}));
 			// An entry without a result has no series, so the color comes from the entry's position:
 			// a line must keep the color of the dot on its card.

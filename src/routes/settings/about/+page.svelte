@@ -1,6 +1,7 @@
 <script>
 	import { m } from '#lib/paraglide/messages.js';
-	import { ExternalLinkIcon } from '@lucide/svelte';
+	import { localizeHref } from '#lib/paraglide/runtime.js';
+	import { ExternalLinkIcon, ScaleIcon } from '@lucide/svelte';
 	import GithubIcon from '#lib/components/GithubIcon.svelte';
 	import favicon from '#lib/assets/favicon.svg';
 </script>
@@ -60,5 +61,31 @@
 			<span>o-murphy/js-ballistics</span>
 			<ExternalLinkIcon class="size-4" />
 		</a>
+	</div>
+
+	<!-- bclibc, the LGPL-3.0 engine inside js-ballistics 3 (#77) -->
+	<div class="card p-6 space-y-3">
+		<h2 class="font-semibold">{m.about_bclibc()}</h2>
+		<p class="text-sm text-surface-600-400">{m.about_bclibc_desc()}</p>
+		<div class="flex flex-wrap gap-2">
+			<a
+				href="https://github.com/ballistics-lab/bclibc/tree/v2.0.0"
+				target="_blank"
+				rel="noopener noreferrer"
+				class="btn preset-tonal-surface inline-flex items-center gap-2"
+				title={m.about_view_on_github()}
+			>
+				<GithubIcon class="size-5" />
+				<span>ballistics-lab/bclibc</span>
+				<ExternalLinkIcon class="size-4" />
+			</a>
+			<a
+				href={localizeHref('/settings/about/licenses')}
+				class="btn preset-tonal-surface inline-flex items-center gap-2"
+			>
+				<ScaleIcon class="size-5" />
+				<span>{m.about_licenses()}</span>
+			</a>
+		</div>
 	</div>
 </div>

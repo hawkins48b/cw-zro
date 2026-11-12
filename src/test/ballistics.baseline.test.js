@@ -1,17 +1,21 @@
 /**
  * Layer 1 of the ballistics reference tests (#70): regression baseline.
  *
- * Purpose: js-ballistics is going from 2.2.0-beta.2 to 3.x (#77). These numbers are what the
- * app computes today with explicit inputs, so any change in results fails here. They are
- * written out by hand on purpose, not toMatchSnapshot, so a change cannot be accepted by
- * rerunning with -u. They are what the app does, NOT proof that it is right. The check
- * against outside data is layer 2, ballistics.published.test.js.
+ * Purpose: these numbers are what the app computes today with explicit inputs, so any change in
+ * results fails here. They are written out by hand on purpose, not toMatchSnapshot, so a change
+ * cannot be accepted by rerunning with -u. They are what the app does, NOT proof that it is right.
+ * The check against outside data is layer 2, ballistics.published.test.js.
  *
  * If a test here fails after an upgrade, do not just copy the new number in. Check layer 2
  * first, then decide whether the shift is acceptable. Solver changes alone do show up: at
- * 1000 yd on P308_G1 with a 10 mph crosswind, the library's RK4 engine differs from the
- * Euler engine the app uses today by 0.32 in drop, 0.26 fps, 0.08 in wind drift and
- * 0.007 MOA zero angle. All of that is outside the tolerances below.
+ * 1000 yd on P308_G1 with a 10 mph crosswind, the RK4 engine of js-ballistics 2.2 differed from
+ * its Euler engine, which the app used then, by 0.32 in drop, 0.26 fps, 0.08 in wind drift and
+ * 0.007 MOA zero angle. All of that is outside the tolerances below. The app runs RK4 since #77.
+ *
+ * Recorded on js-ballistics 2.2.0-beta.2 (Euler), then re-recorded on 3.1.0 with RK4 for #77 (owner
+ * decisions of 2026-11-11 and 2026-11-12): only the values outside their tolerance against the 2.2
+ * value, with no tolerance changed. The old and new
+ * values are in the delivery document of #77.
  *
  * Tolerances, absolute, on values recorded to the digits shown:
  *
@@ -48,15 +52,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
 	Ammo,
 	Atmo,
-	Calculator,
 	DragModel,
-	EulerIntegrationEngine,
 	Shot,
-	Table,
+	DragTables,
 	UNew,
 	Unit,
 	Weapon
 } from 'js-ballistics';
+import { Calculator, ENGINE_CONFIG } from '#lib/utils/ballisticEngine.js';
 import {
 	calculateShotPoint,
 	getElevationValue,
@@ -103,11 +106,11 @@ function near(actual, expected, tolerance, label) {
  * yd, fps, in, ft-lb in `imperial` and `hotAltitude`; m, m/s, cm, J in `metric` and `coldMetric`.
  *
  * - imperial: ICAO atmosphere, WIND_10MPH. metric: ICAO atmosphere, WIND_4MPS.
- * - hotAltitude: ATMO_HOT_ALTITUDE, 10 mph from 45 degrees.
- * - coldMetric: ATMO_COLD_METRIC, 4 m/s from 300 degrees.
+ * - hotAltitude: ATMO_HOT_ALTITUDE, 10 mph from 225 degrees (45 in the engine's angle, #106).
+ * - coldMetric: ATMO_COLD_METRIC, 4 m/s from 120 degrees (300 in the engine's angle, #106).
  * - scope600yd: [elevation, windage] by display unit, 600 yd, WIND_10MPH.
  * - spinDriftIn: windage at 500 and 1000 yd, spin drift on, no wind.
- * - mpbr8in, mpbr20cm: the only values here to change on purpose. Re-recorded for #86: the search
+ * - mpbr8in, mpbr20cm: changed on purpose besides #77. Re-recorded for #86: the search
  *   used to walk zeros up to 200 on 5 unit rows, so mpbrMin, mpbrMax and the apex distance sat on
  *   the 5 unit grid; it now bisects to the best arc and reads between step 1 rows. Re-recorded for
  *   #109 (owner decision of 2026-11-11): optimalZero went from the far crossing to the near
@@ -121,132 +124,132 @@ const REFERENCE = {
 		imperial: [
 			[100, 2848, 0.0988, 0, 1.09, 990.5],
 			[300, 2156.59, 0.341, -9.29, 11.13, 567.9],
-			[500, 1577.06, 0.6669, -49.55, 35.89, 303.7],
-			[800, 1038.74, 1.3889, -232.2, 114.08, 131.8],
-			[1000, 895.48, 2.0152, -503.62, 191.71, 97.9]
+			[500, 1577.06, 0.6669, -49.53, 35.89, 303.7],
+			[800, 1038.57, 1.3889, -232.14, 114.08, 131.8],
+			[1000, 895.31, 2.0152, -503.55, 191.73, 97.9]
 		],
 		metric: [
 			[100, 857.43, 0.1087, 0.08, 2.98, 1310.2],
 			[300, 630.34, 0.3809, -32.11, 30.86, 708.1],
-			[500, 445.5, 0.7594, -167.44, 101.25, 353.7],
-			[800, 297.31, 1.6125, -803.33, 320.98, 157.5],
-			[1000, 258.18, 2.3384, -1746.73, 530.3, 118.8]
+			[500, 445.5, 0.7594, -167.38, 101.25, 353.7],
+			[800, 297.25, 1.6125, -803.16, 320.98, 157.5],
+			[1000, 258.12, 2.3384, -1746.59, 530.35, 118.8]
 		],
 		zeroMoa: 4.1124,
 		zeroMrad: 1.19625,
-		keyPointsYd: { nearZero: 100.2, farZero: 124.2, maxApex: { distance: 110, elevation: 0 }, maxDrop: { distance: 1000, drop: -503.6 }, subsonicDist: 731.2 },
-		keyPointsM: { nearZero: 91.7, farZero: 113.5, maxApex: { distance: 105, elevation: 0.1 }, maxDrop: { distance: 1000, drop: -1746.7 }, subsonicDist: 668.6 },
+		keyPointsYd: { nearZero: 100, farZero: 124.2, maxApex: { distance: 110, elevation: 0 }, maxDrop: { distance: 1000, drop: -503.5 }, subsonicDist: 732 },
+		keyPointsM: { nearZero: 91.4, farZero: 113.7, maxApex: { distance: 105, elevation: 0.1 }, maxDrop: { distance: 1000, drop: -1746.6 }, subsonicDist: 669 },
 		hotAltitude: [
-			[300, 2363.19, 0.3256, -8.16, 5.97, 682],
-			[1000, 1070.6, 1.712, -363.72, 98.14, 140]
+			[300, 2363.27, 0.3256, -8.16, 5.97, 682],
+			[1000, 1070.5, 1.712, -363.61, 98.13, 140]
 		],
 		coldMetric: [
-			[300, 668.35, 0.37, -29.82, -22.97, 796.1],
-			[1000, 274.35, 2.1628, -1469.54, -399.26, 134.1]
+			[300, 668.3, 0.37, -29.82, -22.97, 796.1],
+			[1000, 274.28, 2.1632, -1469.72, -399.37, 134.1]
 		],
-		scope600yd: { MOA: [-14.1, 8.9], MRAD: [-4.1, 2.6], IN: [-88.9, 55.9], FT: [-7.41, 4.66], CM: [-225.8, 142.1], M: [-2.26, 1.42] },
+		scope600yd: { MOA: [-14.1, 8.9], MRAD: [-4.1, 2.6], IN: [-88.9, 55.9], FT: [-7.41, 4.66], CM: [-225.7, 142.1], M: [-2.26, 1.42] },
 		spinDriftIn: [2.105, 15.93],
-		mpbr8in: { optimalZero: 39, nearZero: 39, farZero: 286, mpbrMin: 0, mpbrMax: 331.7, maxOrdinate: { elevation: 3.9, distance: 170 }, halfTarget: 4, useMetric: false },
-		mpbr20cm: { optimalZero: 36, nearZero: 36, farZero: 260, mpbrMin: 0, mpbrMax: 301.4, maxOrdinate: { elevation: 9.8, distance: 154 }, halfTarget: 10, useMetric: true }
+		mpbr8in: { optimalZero: 39, nearZero: 39, farZero: 287, mpbrMin: 0, mpbrMax: 332.5, maxOrdinate: { elevation: 4, distance: 170 }, halfTarget: 4, useMetric: false },
+		mpbr20cm: { optimalZero: 36, nearZero: 36, farZero: 261, mpbrMin: 0, mpbrMax: 301.9, maxOrdinate: { elevation: 9.8, distance: 155 }, halfTarget: 10, useMetric: true }
 	},
 	P308_G1: {
 		profile: P308_G1,
 		imperial: [
 			[100, 2456.69, 0.1176, 0, 0.77, 2251.2],
-			[300, 2094.4, 0.3821, -15.29, 7.48, 1636.2],
-			[500, 1765.42, 0.6943, -62.63, 22.57, 1162.5],
-			[800, 1351.93, 1.2788, -223.98, 65.67, 681.7],
-			[1000, 1151.82, 1.7616, -422.41, 110.8, 494.9]
+			[300, 2094.3, 0.3821, -15.29, 7.48, 1636.2],
+			[500, 1765.29, 0.6943, -62.63, 22.57, 1162.5],
+			[800, 1351.74, 1.2788, -223.98, 65.67, 681.7],
+			[1000, 1151.6, 1.7616, -422.43, 110.82, 494.9]
 		],
 		metric: [
 			[100, 743.41, 0.1291, -0.35, 2.1, 3008.5],
-			[300, 623.65, 0.4228, -50.18, 20.57, 2117.2],
-			[500, 516.29, 0.7755, -202.25, 62.59, 1451],
-			[800, 386.65, 1.4505, -731.17, 184.01, 813.8],
-			[1000, 330.41, 2.0134, -1395.79, 310.15, 594.3]
+			[300, 623.63, 0.4228, -50.18, 20.57, 2117.2],
+			[500, 516.25, 0.7755, -202.25, 62.59, 1451],
+			[800, 386.58, 1.4505, -731.17, 184.01, 813.8],
+			[1000, 330.34, 2.0134, -1395.88, 310.21, 594.3]
 		],
-		zeroMoa: 3.922,
-		zeroMrad: 1.14087,
-		keyPointsYd: { nearZero: 56, farZero: 100.2, maxApex: { distance: 80, elevation: 0.1 }, maxDrop: { distance: 1000, drop: -422.4 }, subsonicDist: null },
-		keyPointsM: { nearZero: 51.2, farZero: 91.6, maxApex: { distance: 70, elevation: 0.3 }, maxDrop: { distance: 1000, drop: -1395.8 }, subsonicDist: 957 },
+		zeroMoa: 3.918,
+		zeroMrad: 1.13967,
+		keyPointsYd: { nearZero: 56, farZero: 100, maxApex: { distance: 80, elevation: 0.1 }, maxDrop: { distance: 1000, drop: -422.4 }, subsonicDist: null },
+		keyPointsM: { nearZero: 51.2, farZero: 91.6, maxApex: { distance: 70, elevation: 0.3 }, maxDrop: { distance: 1000, drop: -1395.9 }, subsonicDist: 957 },
 		hotAltitude: [
 			[300, 2204.8, 0.3724, -14.47, 4.1, 1813.2],
-			[1000, 1371.14, 1.589, -356.16, 57.08, 701.3]
+			[1000, 1371.06, 1.589, -356.15, 57.08, 701.3]
 		],
 		coldMetric: [
-			[300, 644.81, 0.4158, -48.5, -15.42, 2263.3],
-			[1000, 358.82, 1.8925, -1252.37, -227.27, 700.9]
+			[300, 644.76, 0.4158, -48.5, -15.42, 2263.3],
+			[1000, 358.71, 1.8928, -1252.6, -227.36, 700.9]
 		],
-		scope600yd: { MOA: [-16.3, 5.4], MRAD: [-4.7, 1.6], IN: [-102.2, 33.9], FT: [-8.51, 2.83], CM: [-259.5, 86.2], M: [-2.6, 0.86] },
+		scope600yd: { MOA: [-16.3, 5.4], MRAD: [-4.7, 1.6], IN: [-102.2, 33.9], FT: [-8.52, 2.83], CM: [-259.5, 86.2], M: [-2.6, 0.86] },
 		spinDriftIn: [2.346, 12.892],
-		mpbr8in: { optimalZero: 21, nearZero: 21, farZero: 249, mpbrMin: 0, mpbrMax: 293.1, maxOrdinate: { elevation: 4, distance: 138 }, halfTarget: 4, useMetric: false },
-		mpbr20cm: { optimalZero: 20, nearZero: 20, farZero: 220, mpbrMin: 0, mpbrMax: 261.3, maxOrdinate: { elevation: 9.2, distance: 123 }, halfTarget: 10, useMetric: true }
+		mpbr8in: { optimalZero: 22, nearZero: 22, farZero: 240, mpbrMin: 0, mpbrMax: 286.4, maxOrdinate: { elevation: 3.6, distance: 134 }, halfTarget: 4, useMetric: false },
+		mpbr20cm: { optimalZero: 20, nearZero: 20, farZero: 221, mpbrMin: 0, mpbrMax: 262.2, maxOrdinate: { elevation: 9.3, distance: 123 }, halfTarget: 10, useMetric: true }
 	},
 	P65_G7: {
 		profile: P65_G7,
 		imperial: [
 			[100, 2560.09, 0.1139, 0, 0.63, 2037.2],
-			[300, 2274.31, 0.3626, -12.78, 5.94, 1607.8],
-			[500, 2008.15, 0.6434, -52.6, 17.47, 1253.5],
-			[800, 1640.46, 1.1392, -180.56, 49.35, 836.5],
-			[1000, 1413.55, 1.5333, -328.3, 83.14, 621.1]
+			[300, 2274.23, 0.3626, -12.78, 5.94, 1607.8],
+			[500, 2008.01, 0.6434, -52.6, 17.47, 1253.5],
+			[800, 1640.26, 1.1392, -180.56, 49.35, 836.5],
+			[1000, 1413.32, 1.5333, -328.31, 83.16, 621.1]
 		],
 		metric: [
 			[100, 776.11, 0.1249, -0.21, 1.74, 2732.4],
-			[300, 681.46, 0.3999, -42.14, 16.46, 2106.6],
-			[500, 593.9, 0.7144, -169.16, 48.72, 1600.1],
-			[800, 473.59, 1.28, -581.53, 139.4, 1017.4],
-			[1000, 400.14, 1.7395, -1067.36, 237.54, 726.3]
+			[300, 681.43, 0.3999, -42.14, 16.46, 2106.6],
+			[500, 593.86, 0.7144, -169.16, 48.72, 1600.1],
+			[800, 473.53, 1.28, -581.53, 139.4, 1017.4],
+			[1000, 400.07, 1.7395, -1067.42, 237.59, 726.3]
 		],
-		zeroMoa: 4.1642,
-		zeroMrad: 1.2113,
-		keyPointsYd: { nearZero: 75, farZero: 100.2, maxApex: { distance: 90, elevation: 0 }, maxDrop: { distance: 1000, drop: -328.3 }, subsonicDist: null },
+		zeroMoa: 4.1611,
+		zeroMrad: 1.2104,
+		keyPointsYd: { nearZero: 75.2, farZero: 100, maxApex: { distance: 90, elevation: 0 }, maxDrop: { distance: 1000, drop: -328.3 }, subsonicDist: null },
 		keyPointsM: { nearZero: 68.7, farZero: 91.6, maxApex: { distance: 80, elevation: 0.1 }, maxDrop: { distance: 1000, drop: -1067.4 }, subsonicDist: null },
 		hotAltitude: [
 			[300, 2361.87, 0.3558, -12.24, 3.61, 1734],
-			[1000, 1651.54, 1.4192, -290.38, 47.15, 847.8]
+			[1000, 1651.46, 1.4192, -290.38, 47.15, 847.8]
 		],
 		coldMetric: [
-			[300, 698.38, 0.395, -41.01, -9.22, 2212.5],
-			[1000, 445.34, 1.6503, -982.88, -127.46, 899.7]
+			[300, 698.34, 0.395, -41.01, -9.22, 2212.5],
+			[1000, 445.22, 1.6505, -983.02, -127.52, 899.2]
 		],
-		scope600yd: { MOA: [-13.5, 4.1], MRAD: [-3.9, 1.2], IN: [-84.9, 26], FT: [-7.08, 2.16], CM: [-215.8, 65.9], M: [-2.16, 0.66] },
+		scope600yd: { MOA: [-13.5, 4.1], MRAD: [-3.9, 1.2], IN: [-85, 26], FT: [-7.08, 2.16], CM: [-215.8, 65.9], M: [-2.16, 0.66] },
 		spinDriftIn: [1.657, 8.119],
-		mpbr8in: { optimalZero: 27, nearZero: 27, farZero: 264, mpbrMin: 0, mpbrMax: 311, maxOrdinate: { elevation: 3.9, distance: 148 }, halfTarget: 4, useMetric: false },
-		mpbr20cm: { optimalZero: 25, nearZero: 25, farZero: 239, mpbrMin: 0, mpbrMax: 281.7, maxOrdinate: { elevation: 9.7, distance: 134 }, halfTarget: 10, useMetric: true }
+		mpbr8in: { optimalZero: 27, nearZero: 27, farZero: 265, mpbrMin: 0, mpbrMax: 312.3, maxOrdinate: { elevation: 4, distance: 149 }, halfTarget: 4, useMetric: false },
+		mpbr20cm: { optimalZero: 25, nearZero: 25, farZero: 240, mpbrMin: 0, mpbrMax: 282.7, maxOrdinate: { elevation: 9.8, distance: 135 }, halfTarget: 10, useMetric: true }
 	},
 	P338_G7_METRIC: {
 		profile: P338_G7_METRIC,
 		imperial: [
 			[100, 2820.31, 0.1037, 0.03, 0.53, 4415.1],
-			[300, 2534.07, 0.3281, -9.58, 4.95, 3564.4],
-			[500, 2264.53, 0.5786, -40.95, 14.49, 2846.5],
-			[800, 1892.71, 1.0134, -141.28, 40.46, 1988.5],
-			[1000, 1663.18, 1.3516, -255.18, 67.45, 1535.4]
+			[300, 2533.99, 0.3281, -9.58, 4.95, 3564.4],
+			[500, 2264.39, 0.5786, -40.95, 14.49, 2846.5],
+			[800, 1892.51, 1.0134, -141.28, 40.46, 1988.5],
+			[1000, 1662.95, 1.3516, -255.19, 67.45, 1535.4]
 		],
 		metric: [
 			[100, 855.44, 0.1137, 0, 1.46, 5927.9],
-			[300, 760.53, 0.3616, -31.91, 13.73, 4685.5],
-			[500, 671.78, 0.6415, -132.05, 40.39, 3655.7],
-			[800, 550.23, 1.135, -454.19, 114.03, 2452.5],
-			[1000, 475.54, 1.526, -825.6, 191.84, 1831.9]
+			[300, 760.51, 0.3616, -31.91, 13.73, 4685.5],
+			[500, 671.73, 0.6415, -132.05, 40.39, 3655.7],
+			[800, 550.16, 1.135, -454.19, 114.03, 2451.9],
+			[1000, 475.46, 1.526, -825.63, 191.88, 1831.3]
 		],
-		zeroMoa: 3.8582,
-		zeroMrad: 1.12231,
+		zeroMoa: 3.8559,
+		zeroMrad: 1.12163,
 		keyPointsYd: { nearZero: 85.3, farZero: 109.5, maxApex: { distance: 95, elevation: 0 }, maxDrop: { distance: 1000, drop: -255.2 }, subsonicDist: null },
 		keyPointsM: { nearZero: 78, farZero: 100.1, maxApex: { distance: 90, elevation: 0.1 }, maxDrop: { distance: 1000, drop: -825.6 }, subsonicDist: null },
 		hotAltitude: [
 			[300, 2621.43, 0.3226, -9.19, 3.06, 3814.4],
-			[1000, 1903.56, 1.2633, -228.81, 39.23, 2011.3]
+			[1000, 1903.47, 1.2633, -228.81, 39.23, 2011.3]
 		],
 		coldMetric: [
-			[300, 777.78, 0.3576, -31.08, -7.28, 4900.4],
-			[1000, 521.34, 1.4578, -767.47, -99.34, 2201.7]
+			[300, 777.73, 0.3576, -31.08, -7.28, 4899.8],
+			[1000, 521.21, 1.4578, -767.56, -99.39, 2200.7]
 		],
-		scope600yd: { MOA: [-10.6, 3.4], MRAD: [-3.1, 1], IN: [-66.4, 21.4], FT: [-5.54, 1.79], CM: [-168.8, 54.5], M: [-1.69, 0.54] },
+		scope600yd: { MOA: [-10.6, 3.4], MRAD: [-3.1, 1], IN: [-66.4, 21.5], FT: [-5.54, 1.79], CM: [-168.8, 54.5], M: [-1.69, 0.54] },
 		spinDriftIn: [1.564, 7.386],
-		mpbr8in: { optimalZero: 31, nearZero: 31, farZero: 287, mpbrMin: 0, mpbrMax: 338.9, maxOrdinate: { elevation: 3.8, distance: 162 }, halfTarget: 4, useMetric: false },
-		mpbr20cm: { optimalZero: 28, nearZero: 28, farZero: 265, mpbrMin: 0, mpbrMax: 311.8, maxOrdinate: { elevation: 10, distance: 149 }, halfTarget: 10, useMetric: true }
+		mpbr8in: { optimalZero: 31, nearZero: 31, farZero: 288, mpbrMin: 0, mpbrMax: 340, maxOrdinate: { elevation: 3.8, distance: 162 }, halfTarget: 4, useMetric: false },
+		mpbr20cm: { optimalZero: 29, nearZero: 29, farZero: 258, mpbrMin: 0, mpbrMax: 305.9, maxOrdinate: { elevation: 9.2, distance: 146 }, halfTarget: 10, useMetric: true }
 	}
 };
 
@@ -258,7 +261,7 @@ function expectImperialRows(trajectory, rows) {
 		const at = `${distance} yd`;
 		near(p.velocity.In(Unit.FPS), velocity, TOL.fps, `velocity ${at}`);
 		near(p.time, time, TOL.time, `time ${at}`);
-		near(p.targetDrop.In(Unit.Inch), drop, TOL.inch, `drop ${at}`);
+		near(p.slantHeight.In(Unit.Inch), drop, TOL.inch, `drop ${at}`);
 		near(p.windage.In(Unit.Inch), windage, TOL.inch, `windage ${at}`);
 		near(p.energy.In(Unit.FootPound), energy, TOL.energy, `energy ${at}`);
 	}
@@ -270,7 +273,7 @@ function expectMetricRows(trajectory, rows) {
 		const at = `${distance} m`;
 		near(p.velocity.In(Unit.MPS), velocity, TOL.mps, `velocity ${at}`);
 		near(p.time, time, TOL.time, `time ${at}`);
-		near(p.targetDrop.In(Unit.Centimeter), drop, TOL.cm, `drop ${at}`);
+		near(p.slantHeight.In(Unit.Centimeter), drop, TOL.cm, `drop ${at}`);
 		near(p.windage.In(Unit.Centimeter), windage, TOL.cm, `windage ${at}`);
 		near(p.energy.In(Unit.Joule), energy, TOL.energy, `energy ${at}`);
 	}
@@ -350,7 +353,7 @@ describe.each(PROFILES)('trajectory baseline: %s', (_, ref) => {
 		const row = calculateFullTrajectory(ref.profile, YD_1000, null, WIND_10MPH).trajectory.find(
 			(p) => Math.round(p.distance.In(Unit.Yard)) === 500
 		);
-		near(point.targetDrop.In(Unit.Inch), row.targetDrop.In(Unit.Inch), TOL.inch, 'drop');
+		near(point.slantHeight.In(Unit.Inch), row.slantHeight.In(Unit.Inch), TOL.inch, 'drop');
 		near(point.windage.In(Unit.Inch), row.windage.In(Unit.Inch), TOL.inch, 'windage');
 		near(point.velocity.In(Unit.FPS), row.velocity.In(Unit.FPS), TOL.fps, 'velocity');
 	});
@@ -381,13 +384,13 @@ describe('trajectory conventions', () => {
 
 	it('reports below line of sight as negative drop and negative adjustment', () => {
 		const point = at600(P308_G1, null);
-		expect(point.targetDrop.In(Unit.Inch)).toBeLessThan(0);
+		expect(point.slantHeight.In(Unit.Inch)).toBeLessThan(0);
 		expect(getElevationValue(point, 'MOA')).toBeLessThan(0);
 	});
 
 	it('records a 5 degree cant', () => {
 		const point = at600(P308_G1, null, { cantAngle: 5 });
-		near(point.targetDrop.In(Unit.Inch), -102.3, TOL.inch, 'drop');
+		near(point.slantHeight.In(Unit.Inch), -102.3, TOL.inch, 'drop');
 		near(point.windage.In(Unit.Inch), 2.01, TOL.inch, 'windage');
 	});
 
@@ -418,7 +421,7 @@ describe('imperial and metric entry of the same load', () => {
 		imperial.forEach((p, i) => {
 			const q = metric[i];
 			near(q.velocity.In(Unit.FPS), p.velocity.In(Unit.FPS), 0.001, 'velocity');
-			near(q.targetDrop.In(Unit.Inch), p.targetDrop.In(Unit.Inch), 0.001, 'drop');
+			near(q.slantHeight.In(Unit.Inch), p.slantHeight.In(Unit.Inch), 0.001, 'drop');
 			near(q.windage.In(Unit.Inch), p.windage.In(Unit.Inch), 0.001, 'windage');
 			near(q.time, p.time, 0.00001, 'time');
 		});
@@ -432,7 +435,7 @@ describe('imperial and metric entry of the same load', () => {
 		imperial.forEach((p, i) => {
 			const q = metric[i];
 			near(q.velocity.In(Unit.FPS), p.velocity.In(Unit.FPS), 1, 'velocity');
-			near(q.targetDrop.In(Unit.Inch), p.targetDrop.In(Unit.Inch), 0.4, 'drop');
+			near(q.slantHeight.In(Unit.Inch), p.slantHeight.In(Unit.Inch), 0.4, 'drop');
 			near(q.windage.In(Unit.Inch), p.windage.In(Unit.Inch), 0.1, 'windage');
 		});
 	});
@@ -513,7 +516,7 @@ describe('MPBR behaviour', () => {
 		});
 		expect(inside.length).toBeGreaterThan(10);
 		for (const p of inside) {
-			expect(Math.abs(p.targetDrop.In(Unit.Inch))).toBeLessThanOrEqual(result.halfTarget + 0.01);
+			expect(Math.abs(p.slantHeight.In(Unit.Inch))).toBeLessThanOrEqual(result.halfTarget + 0.01);
 		}
 	});
 
@@ -533,12 +536,12 @@ describe('trajectory validation baseline', () => {
 	 */
 	it.each([
 		['velocity from inches, yd', P308_G1, { distance: 600, unit: 'yd' }, 'distance', '110', 'in', 'velocity', null, 2567, 0.462, -110.091],
-		['velocity from angle in mrad, yd', P65_G7, { distance: 800, unit: 'yd' }, 'angle', '6.5', 'mrad', 'velocity', null, 2660, 0.305, -6.55],
-		['BC from inches, yd', P223_G1, { distance: 500, unit: 'yd' }, 'distance', '75', 'in', 'bc', null, 3240, 0.172, -75.425],
+		['velocity from angle in mrad, yd', P65_G7, { distance: 800, unit: 'yd' }, 'angle', '6.5', 'mrad', 'velocity', null, 2673, 0.305, -6.476],
+		['BC from inches, yd', P223_G1, { distance: 500, unit: 'yd' }, 'distance', '75', 'in', 'bc', null, 3240, 0.172, -75.374],
 		['BC from angle in MOA, yd', P308_G1, { distance: 600, unit: 'yd' }, 'angle', '17.5', 'moa', 'bc', null, 2650, 0.399, -17.542],
-		['velocity from cm, metric profile', P338_G7_METRIC, { distance: 1000, unit: 'm' }, 'distance', '750', 'cm', 'velocity', null, 943, 0.322, -747.988],
+		['velocity from cm, metric profile', P338_G7_METRIC, { distance: 1000, unit: 'm' }, 'distance', '750', 'cm', 'velocity', null, 943, 0.322, -748.014],
 		['BC from angle in mrad, metric profile', P338_G7_METRIC, { distance: 1000, unit: 'm' }, 'angle', '7.9', 'mrad', 'bc', null, 905, 0.347, -7.911],
-		['velocity in a custom atmosphere', P308_G1, { distance: 600, unit: 'yd' }, 'distance', '110', 'in', 'velocity', ATMO_HOT_ALTITUDE, 2464, 0.462, -109.965],
+		['velocity in a custom atmosphere', P308_G1, { distance: 600, unit: 'yd' }, 'distance', '110', 'in', 'velocity', ATMO_HOT_ALTITUDE, 2464, 0.462, -109.975],
 		['BC in a custom metric atmosphere', P338_G7_METRIC, { distance: 800, unit: 'm' }, 'angle', '5', 'mrad', 'bc', ATMO_COLD_METRIC, 905, 0.397, -4.994]
 	])('records %s', (_, profile, range, measureType, value, unit, solveFor, atmosphere, velocity, bc, measured) => {
 		const result = calculateTrajectoryValidation(profile, range, measureType, value, unit, solveFor, atmosphere);
@@ -547,14 +550,14 @@ describe('trajectory validation baseline', () => {
 		const point = result.validatedPoint;
 		const actual =
 			measureType === 'distance'
-				? point.targetDrop.In(unit === 'cm' ? Unit.Centimeter : Unit.Inch)
-				: point.dropAdjustment.In(unit === 'mrad' ? Unit.MRad : Unit.MOA);
+				? point.slantHeight.In(unit === 'cm' ? Unit.Centimeter : Unit.Inch)
+				: point.dropAngle.In(unit === 'mrad' ? Unit.MRad : Unit.MOA);
 		near(actual, measured, 0.01, 'validated point');
 	});
 
 	it('recovers a known velocity from the drop it produces', () => {
 		const range = { distance: 800, unit: 'yd' };
-		const drop = calculateShotPoint(P308_G1, range, null, null).targetDrop.In(Unit.Inch);
+		const drop = calculateShotPoint(P308_G1, range, null, null).slantHeight.In(Unit.Inch);
 		const wrong = { ...P308_G1, velocity: '2750' };
 		const result = calculateTrajectoryValidation(wrong, range, 'distance', Math.abs(drop), 'in', 'velocity');
 		near(result.validatedVelocity, 2650, 2, 'validated velocity');
@@ -562,7 +565,7 @@ describe('trajectory validation baseline', () => {
 
 	it('recovers a known BC from the drop it produces', () => {
 		const range = { distance: 800, unit: 'yd' };
-		const drop = calculateShotPoint(P308_G1, range, null, null).targetDrop.In(Unit.Inch);
+		const drop = calculateShotPoint(P308_G1, range, null, null).slantHeight.In(Unit.Inch);
 		const wrong = { ...P308_G1, bc: '0.52' };
 		const result = calculateTrajectoryValidation(wrong, range, 'distance', Math.abs(drop), 'in', 'bc');
 		near(result.validatedBc, 0.462, 0.002, 'validated BC');
@@ -613,7 +616,7 @@ describe('trajectory validation baseline', () => {
 /** Height of a shot relative to the line of sight, in the unit of the measure. */
 function measured(point, measureType, unit) {
 	const units = { in: Unit.Inch, cm: Unit.Centimeter, moa: Unit.MOA, mrad: Unit.MRad };
-	const value = measureType === 'distance' ? point.targetDrop : point.dropAdjustment;
+	const value = measureType === 'distance' ? point.slantHeight : point.dropAngle;
 	return value.In(units[unit]);
 }
 
@@ -642,13 +645,13 @@ describe('trajectory validation above the line of sight (#82)', () => {
 		expect(result.error).toBeUndefined();
 		expect(result.validatedVelocity).toBeGreaterThan(1200);
 		expect(result.validatedVelocity).toBeLessThan(1500);
-		near(result.validatedPoint.targetDrop.In(Unit.Inch), 3, 0.05, 'height at the solved velocity');
+		near(result.validatedPoint.slantHeight.In(Unit.Inch), 3, 0.05, 'height at the solved velocity');
 	});
 
 	it('still reads 3 in below as below, and says the bullet is above there', () => {
 		const result = solve(P223_SHORT_ZERO, yd100, 'distance', '3', 'in', 'velocity', 'below');
-		near(result.validatedVelocity, 1016, 2, 'velocity');
-		near(result.validatedPoint.targetDrop.In(Unit.Inch), -3, 0.05, 'drop at the solved velocity');
+		near(result.validatedVelocity, 1013, 2, 'velocity');
+		near(result.validatedPoint.slantHeight.In(Unit.Inch), -3, 0.05, 'drop at the solved velocity');
 		expect(result.suggestAbove).toBe(true);
 	});
 
@@ -676,13 +679,13 @@ describe('trajectory validation above the line of sight (#82)', () => {
 		expect(measured(result.validatedPoint, measureType, unit)).toBeGreaterThan(0);
 	});
 
-	it('gives dropAdjustment the sign of targetDrop on both sides of the line of sight', () => {
+	it('gives dropAngle the sign of slantHeight on both sides of the line of sight', () => {
 		const high = calculateShotPoint(P223_SHORT_ZERO, yd100, null, null);
 		const low = calculateShotPoint({ ...P223_SHORT_ZERO, velocity: '1000' }, yd100, null, null);
-		expect(high.targetDrop.In(Unit.Inch)).toBeGreaterThan(0);
-		expect(high.dropAdjustment.In(Unit.MOA)).toBeGreaterThan(0);
-		expect(low.targetDrop.In(Unit.Inch)).toBeLessThan(0);
-		expect(low.dropAdjustment.In(Unit.MOA)).toBeLessThan(0);
+		expect(high.slantHeight.In(Unit.Inch)).toBeGreaterThan(0);
+		expect(high.dropAngle.In(Unit.MOA)).toBeGreaterThan(0);
+		expect(low.slantHeight.In(Unit.Inch)).toBeLessThan(0);
+		expect(low.dropAngle.In(Unit.MOA)).toBeLessThan(0);
 	});
 
 	/** The search relies on this order, and on a short zero the zero angle moves with it. */
@@ -691,7 +694,7 @@ describe('trajectory validation above the line of sight (#82)', () => {
 		['BC', 'bc', [0.011, 0.02, 0.05, 0.1, 0.2, 0.285, 0.5, 1, 1.9]]
 	])('height at range rises with %s inside a short zero', (_, key, values) => {
 		const heights = values.map((value) =>
-			calculateShotPoint({ ...P223_SHORT_ZERO, [key]: String(value) }, yd100, null, null).targetDrop.In(Unit.Inch)
+			calculateShotPoint({ ...P223_SHORT_ZERO, [key]: String(value) }, yd100, null, null).slantHeight.In(Unit.Inch)
 		);
 		expect(heights).toEqual([...heights].sort((a, b) => a - b));
 	});
@@ -713,7 +716,7 @@ describe('trajectory validation above the line of sight (#82)', () => {
 		const plain = calculateTrajectoryValidation(P223_SHORT_ZERO, range, 'distance', '40', 'in', 'velocity');
 		const below = solve(P223_SHORT_ZERO, range, 'distance', '40', 'in', 'velocity', 'below');
 		expect(below.validatedVelocity).toBe(plain.validatedVelocity);
-		expect(below.validatedVelocity).toBe(3002);
+		expect(below.validatedVelocity).toBe(2995);
 		expect(below.suggestAbove).toBe(false);
 	});
 
@@ -764,7 +767,7 @@ describe('trajectory validation failures (#83)', () => {
 	it('finds a goal that lies between the last good shot and a failed one', () => {
 		// The ladder goes 3000, 2900, ... 300, then fails at 200, and the answer is past 300.
 		const shot = calculateShotPoint({ ...P223_SHORT_ZERO, velocity: '250' }, yd600, null, null);
-		const drop = Math.abs(shot.targetDrop.In(Unit.Inch));
+		const drop = Math.abs(shot.slantHeight.In(Unit.Inch));
 		const result = solve(P223_SHORT_ZERO, drop, 'velocity');
 		expect(calculateShotPoint({ ...P223_SHORT_ZERO, velocity: '200' }, yd600, null, null)).toBeNull();
 		near(result.validatedVelocity, 250, 1, 'velocity');
@@ -773,7 +776,7 @@ describe('trajectory validation failures (#83)', () => {
 	it('finds a goal that lies between the last good shot and the lower bound', () => {
 		// The ladder goes 0.285, 0.185, 0.085, then -0.015 is out of bounds.
 		const shot = calculateShotPoint({ ...P223_SHORT_ZERO, bc: '0.05' }, yd600, null, null);
-		const result = solve(P223_SHORT_ZERO, Math.abs(shot.targetDrop.In(Unit.Inch)), 'bc');
+		const result = solve(P223_SHORT_ZERO, Math.abs(shot.slantHeight.In(Unit.Inch)), 'bc');
 		near(result.validatedBc, 0.05, 0.001, 'BC');
 	});
 
@@ -781,7 +784,7 @@ describe('trajectory validation failures (#83)', () => {
 		// 1 fps moves the drop by over 0.1 in here, so no shot measures exactly 110.0.
 		const result = solve(P308_G1, '110', 'velocity');
 		expect(result.error).toBeUndefined();
-		near(result.validatedPoint.targetDrop.In(Unit.Inch), -110, 0.5, 'drop');
+		near(result.validatedPoint.slantHeight.In(Unit.Inch), -110, 0.5, 'drop');
 	});
 
 	it.each([
@@ -799,7 +802,7 @@ describe('trajectory validation failures (#83)', () => {
 				? { ...profile, velocity: String(result.validatedVelocity) }
 				: { ...profile, bc: String(result.validatedBc) };
 		const shot = calculateShotPoint(solved, range, null, null);
-		expect(result.validatedPoint.targetDrop.In(Unit.Inch)).toBe(shot.targetDrop.In(Unit.Inch));
+		expect(result.validatedPoint.slantHeight.In(Unit.Inch)).toBe(shot.slantHeight.In(Unit.Inch));
 		expect(result.validatedPoint.velocity.In(Unit.FPS)).toBe(shot.velocity.In(Unit.FPS));
 	});
 
@@ -866,14 +869,14 @@ describe('powder sensitivity', () => {
 		const shot = calculateShotPoint(hot, range, null, null);
 		const reference = calculateShotPoint(faster, range, null, null);
 		near(shot.velocity.In(Unit.FPS), reference.velocity.In(Unit.FPS), 0.001, 'shot velocity');
-		near(shot.targetDrop.In(Unit.Inch), reference.targetDrop.In(Unit.Inch), 0.001, 'shot drop');
+		near(shot.slantHeight.In(Unit.Inch), reference.slantHeight.In(Unit.Inch), 0.001, 'shot drop');
 
 		const rows = calculateFullTrajectory(hot, YD_1000, null, null).trajectory;
 		const fasterRows = calculateFullTrajectory(faster, YD_1000, null, null).trajectory;
 		expect(rows).toHaveLength(fasterRows.length);
 		rows.forEach((p, i) => {
 			near(p.velocity.In(Unit.FPS), fasterRows[i].velocity.In(Unit.FPS), 0.001, 'row velocity');
-			near(p.targetDrop.In(Unit.Inch), fasterRows[i].targetDrop.In(Unit.Inch), 0.001, 'row drop');
+			near(p.slantHeight.In(Unit.Inch), fasterRows[i].slantHeight.In(Unit.Inch), 0.001, 'row drop');
 		});
 	});
 
@@ -951,11 +954,11 @@ describe('humidity', () => {
 
 	/** [humidity, velocity fps, drop in] at 1000 yd. 0 %, 2 % and 100 % predate the fix (#84). */
 	const RECORDED = [
-		['0', 1355.823, -359.676],
-		['0.5', 1355.908, -359.656],
-		['1', 1355.993, -359.635],
-		['2', 1356.163, -359.593],
-		['100', 1373.025, -355.559]
+		['0', 1355.754, -359.661],
+		['0.5', 1355.84, -359.641],
+		['1', 1355.925, -359.62],
+		['2', 1356.095, -359.579],
+		['100', 1372.86, -355.569]
 	];
 
 	it.each(RECORDED)('gives the recorded result on both paths at humidity %s', (humidity, velocity, drop) => {
@@ -997,7 +1000,7 @@ describe('max apex (#85)', () => {
 	/** [name, profile, apex in yd and in, apex in m and cm] */
 	const LOADS = [
 		['the load of the issue', ZERO_200, { distance: 115, elevation: 2.2 }, { distance: 106, elevation: 5.6 }],
-		['a short zero', P223_SHORT_ZERO, { distance: 266, elevation: 17.7 }, { distance: 243, elevation: 45.1 }],
+		['a short zero', P223_SHORT_ZERO, { distance: 266, elevation: 18 }, { distance: 243, elevation: 45.7 }],
 		['a tiny arc past the zero', P223_G1, { distance: 112, elevation: 0 }, { distance: 103, elevation: 0.1 }],
 		['metric inputs', P338_G7_METRIC, { distance: 97, elevation: 0 }, { distance: 89, elevation: 0.1 }]
 	];
@@ -1014,7 +1017,7 @@ describe('max apex (#85)', () => {
 		const distanceUnit = unit === 'm' ? Unit.Meter : Unit.Yard;
 		const heightUnit = unit === 'm' ? Unit.Centimeter : Unit.Inch;
 		const rows = calculateFullTrajectory(profile, { distance, unit, step: 1 }, atmosphere, wind)
-			.chartPoints.map((p) => ({ distance: p.distance.In(distanceUnit), elevation: p.targetDrop.In(heightUnit) }))
+			.chartPoints.map((p) => ({ distance: p.distance.In(distanceUnit), elevation: p.slantHeight.In(heightUnit) }))
 			.filter((p) => p.distance <= distance);
 		return rows.reduce((top, p) => (p.elevation > top.elevation ? p : top));
 	}
@@ -1083,8 +1086,10 @@ describe('max apex (#85)', () => {
 	});
 
 	it('keeps an arc narrower than one unit', () => {
-		// Zeroed near the tangent point: near zero 111.2 yd, far zero 111.9 yd.
-		const profile = { ...P223_G1, zeroDist: 111 };
+		// Zeroed near the tangent point: near zero 111.1 yd, far zero 112.0 yd, with the 112 yd row
+		// above the line of sight. A zero of 111 gave a narrow arc on js-ballistics 2.2, which zeroed
+		// about 0.1 yd past the distance; 3.1 zeroes on it (#77), and 111 gives 111 to 112.1 yd.
+		const profile = { ...P223_G1, zeroDist: 112.05 };
 		const result = calculateFullTrajectory(profile, { distance: 400, unit: 'yd', step: 25 }, null, null);
 		expect(result.farZero - result.nearZero).toBeLessThan(1);
 		near(result.maxApex.distance, 111.5, 1, 'apex distance');
@@ -1143,7 +1148,7 @@ describe('max drop and subsonic distance (#94)', () => {
 		const rangeRow = table(distance).trajectory.at(-1);
 		near(rangeRow.distance.In(distanceUnit), distance, 1e-6, 'row at the range');
 		const rows = [...result.chartPoints, rangeRow]
-			.map((p) => ({ distance: p.distance.In(distanceUnit), drop: p.targetDrop.In(heightUnit), fps: p.velocity.In(Unit.FPS) }))
+			.map((p) => ({ distance: p.distance.In(distanceUnit), drop: p.slantHeight.In(heightUnit), fps: p.velocity.In(Unit.FPS) }))
 			.filter((p) => p.distance <= distance + 1e-6)
 			.sort((a, b) => a.distance - b.distance);
 		const lowest = rows.reduce((low, p) => (p.drop < low.drop ? p : low));
@@ -1188,11 +1193,12 @@ describe('max drop and subsonic distance (#94)', () => {
 	});
 
 	it.each([
-		[1046, null],
-		[1047, 1047],
-		[1100, 1047]
+		[1045, null],
+		[1046, 1046],
+		[1100, 1046]
 	])('gives the subsonic distance only when it is within the range: %s yd', (distance, expected) => {
-		// P308_G1 goes under the speed of sound between 1046 and 1047 yd on step 1 rows.
+		// P308_G1 goes under the speed of sound between 1045 and 1046 yd on step 1 rows (between
+		// 1046 and 1047 on js-ballistics 2.2, #77).
 		for (const step of [1, 25, 250, 1000]) {
 			expect(keyPoints(P308_G1, 'yd', step, distance).subsonicDist, `step ${step}`).toBe(expected);
 		}
@@ -1231,7 +1237,7 @@ describe('MPBR search (#86)', () => {
 		const weapon = new Weapon({ sightHeight: UNew.Inch(parseFloat(profile.opticHeight)) });
 		const dm = new DragModel({
 			bc: parseFloat(profile.bc),
-			dragTable: Table.G1,
+			dragTable: DragTables.G1,
 			weight: UNew.Grain(parseFloat(profile.bulletWeight)),
 			diameter: UNew.Inch(parseFloat(profile.bulletDiameter)),
 			length: UNew.Inch(2)
@@ -1242,7 +1248,7 @@ describe('MPBR search (#86)', () => {
 		calc.setWeaponZero(shot, UNew.Yard(zero));
 		return calc
 			.fire({ shot, trajectoryRange: UNew.Yard(range), trajectoryStep: UNew.Yard(1) })
-			.trajectory.map((p) => [p.distance.In(Unit.Yard), p.targetDrop.In(Unit.Inch)]);
+			.records.map((p) => [p.distance.In(Unit.Yard), p.slantHeight.In(Unit.Inch)]);
 	}
 
 	/** Highest point of the shot zeroed at a distance, in inches over the line of sight. */
@@ -1297,16 +1303,16 @@ describe('MPBR search (#86)', () => {
 		// Before #86, near zeros on 5 unit rows: 475 yd, 415 yd and 290 yd, with zeros of 12, 14
 		// and 21. With #86, far zeros: 498.9, 424.3 and 293.4.
 		const max = (target) => calculateMPBR(P308_G1, target, 'in').mpbrMax;
-		expect(max('30')).toBe(479.2);
-		expect(max('20')).toBe(417.7);
-		expect(max('8')).toBe(293.1);
+		expect(max('30')).toBe(482.7);
+		expect(max('20')).toBe(420.5);
+		expect(max('8')).toBe(286.4);
 	});
 
 	it('is not limited by the old 900 unit range', () => {
 		// Before #86: zero 4 and 900 yd exactly.
 		const result = calculateMPBR(P308_G1, '300', 'in');
 		expect(result.optimalZero).toBe(4);
-		expect(result.mpbrMax).toBe(1048.8);
+		expect(result.mpbrMax).toBe(1063.7);
 		const reference = bruteForceMpbr(P308_G1, 300, wholeUnits(1, 10), 1200);
 		near(result.mpbrMax, reference, 0.1, 'mpbrMax');
 	});
@@ -1323,15 +1329,16 @@ describe('MPBR search (#86)', () => {
 		// A bigger zone takes a higher arc, which comes up through the line of sight sooner.
 		const zeros = results.map((result) => result.optimalZero);
 		expect(zeros).toEqual([...zeros].sort((a, b) => b - a));
-		expect(zeros[4]).toBe(28);
+		expect(zeros[4]).toBe(29);
 		expect(zeros[6]).toBe(24);
 	});
 
 	it('takes the closest whole near zero that keeps the apex inside the zone', () => {
-		// The best arc comes up through the line of sight at 35.73 yd on 2 in, 31.16 yd on 3 in and
-		// 21.06 yd on 8 in. The solver zeroes about 0.1 yd past the distance, which lowers the arc,
-		// so 31 and 21 still fit; 35 does not. One unit closer gives a higher arc, over the top.
-		for (const [size, zero] of [['2', 36], ['3', 31], ['8', 21]]) {
+		// The best arc comes up through the line of sight between 35 and 36 yd on 2 in, 31 and 32 yd
+		// on 3 in, and 21 and 22 yd on 8 in. js-ballistics 3 zeroes on the distance (#77), so the
+		// unit under the crossing gives a higher arc, over the top, and the search takes the unit
+		// above. On 2.2, which zeroed about 0.1 yd past the distance, 31 and 21 still fitted.
+		for (const [size, zero] of [['2', 36], ['3', 32], ['8', 22]]) {
 			const result = calculateMPBR(P308_G1, size, 'in');
 			expect(result.optimalZero).toBe(zero);
 			expect(result.maxOrdinate.elevation).toBeLessThanOrEqual(result.halfTarget);
@@ -1362,7 +1369,7 @@ describe('MPBR search (#86)', () => {
 		near(full.maxApex.elevation, result.maxOrdinate.elevation, 0.05, 'apex elevation');
 		near(full.maxApex.distance, result.maxOrdinate.distance, 1, 'apex distance');
 		const exit = calculateShotPoint(saved, { distance: result.mpbrMax, unit }, null, null);
-		near(exit.targetDrop.In(Unit.Inch), -result.halfTarget, 0.05, 'height at MPBR');
+		near(exit.slantHeight.In(Unit.Inch), -result.halfTarget, 0.05, 'height at MPBR');
 	});
 
 	describe('imperial and metric', () => {
@@ -1387,7 +1394,7 @@ describe('MPBR search (#86)', () => {
 	describe('where the bullet enters the zone', () => {
 		const heightAt = (result, distance) => {
 			const saved = { ...P308_G1, zeroDist: result.optimalZero, zeroUnit: 'yd' };
-			return calculateShotPoint(saved, { distance, unit: 'yd' }, null, null).targetDrop.In(Unit.Inch);
+			return calculateShotPoint(saved, { distance, unit: 'yd' }, null, null).slantHeight.In(Unit.Inch);
 		};
 
 		it('is 0 when the muzzle is already inside', () => {
@@ -1404,7 +1411,7 @@ describe('MPBR search (#86)', () => {
 
 		it('is not on the 5 unit grid', () => {
 			// Before: 25 and 10, the last row below the zone.
-			expect(calculateMPBR(P308_G1, '1', 'in').mpbrMin).toBe(25.9);
+			expect(calculateMPBR(P308_G1, '1', 'in').mpbrMin).toBe(25.8);
 			expect(calculateMPBR(P308_G1, '2', 'in').mpbrMin).toBe(10.4);
 		});
 
@@ -1467,23 +1474,26 @@ describe('MPBR search (#86)', () => {
 
 		it('gives a result for a slow load, which used to return null', () => {
 			// Before #109: the far zero, 30 yd and 36.2 yd. The near crossing is at 2.5 yd, and 2 yd
-			// puts the apex over the top, so 3 yd costs 15 % of the best range on this load.
+			// puts the apex over the top, so 3 yd costs 15 % of the best range on this load (31.6 yd
+			// on js-ballistics 2.2, 32.6 yd on 3.1, #77).
 			const result = calculateMPBR({ ...P308_G1, velocity: '300' }, '8', 'in');
 			expect(result.optimalZero).toBe(3);
-			expect(result.mpbrMax).toBe(31.6);
+			expect(result.mpbrMax).toBe(32.6);
 		});
 
 		it.each([
 			['8'],
 			['1000'],
 			['100000']
-		])('stops within the bound on integrations on a %s in target', (target) => {
-			const integrating = vi.spyOn(EulerIntegrationEngine.prototype, '_integrate');
+		])('stops within the bound on fires and zero solves on a %s in target', (target) => {
+			// The integrations of a zero solve run inside the WebAssembly engine on js-ballistics 3
+			// (#77), out of reach of a spy, so they are bounded by its iteration limit instead.
+			const firing = vi.spyOn(Calculator.prototype, 'fire');
 			const zeroing = vi.spyOn(Calculator.prototype, 'setWeaponZero');
 			calculateMPBR(P308_G1, target, 'in');
-			// 54 fires and two zero solves of up to 60 integrations each.
-			expect(integrating.mock.calls.length).toBeLessThanOrEqual(54 + 2 * 60);
+			expect(firing.mock.calls.length).toBeLessThanOrEqual(54);
 			expect(zeroing.mock.calls.length).toBeLessThanOrEqual(2);
+			expect(ENGINE_CONFIG.maxIterations).toBe(60);
 		});
 
 		/**

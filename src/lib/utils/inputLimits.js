@@ -1,4 +1,5 @@
-import { UNew, Unit, defaultEngineConfig } from 'js-ballistics';
+import { UNew, Unit } from 'js-ballistics';
+import { ENGINE_CONFIG } from './ballisticEngine.js';
 import { readDecimal } from './decimal.js';
 
 /**
@@ -21,7 +22,7 @@ export const MIN_BC = 0.01;
 export const MAX_VELOCITY_FPS = 10000;
 
 /** Slowest muzzle velocity, in fps: the engine stops a flight below it on its first step. */
-export const MIN_VELOCITY_FPS = defaultEngineConfig.cMinimumVelocity;
+export const MIN_VELOCITY_FPS = ENGINE_CONFIG.minimumVelocity;
 
 /** Highest sight height either way, in the unit entered: 10 in, or 25.4 cm. */
 export const MAX_SIGHT_HEIGHT = { in: 10, cm: 25.4 };
@@ -353,6 +354,10 @@ export function isUsableAtmosphere(values, units) {
  * gives 78 to 118 hPa at the site and a density ratio of about -0.03 to 0. The engine then
  * never slowed the bullet: 300 and 350 hPa ran for more than 60 s (300 hPa for more than 5 min)
  * on a G7 BC 0.01, 9999 fps, 3000 yd zero. No positive density in the probes hung.
+ *
+ * Measured on js-ballistics 2.2. On 3.1 (#77) the engine builds its own atmosphere from the
+ * conditions, and the case above (10000 m, 70 °C, 100 %, 78 hPa at the site) returned at once. The
+ * guard stays: it is what the owner approved, and it changes no usable result.
  *
  * @param {Atmo} atmo
  * @returns {boolean}

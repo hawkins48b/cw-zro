@@ -84,7 +84,7 @@ describe('package.json', () => {
 	const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 
 	it('pins js-ballistics to an exact version (#126)', () => {
-		expect(pkg.dependencies['js-ballistics']).toBe('2.2.0-beta.2');
+		expect(pkg.dependencies['js-ballistics']).toBe('3.1.0');
 	});
 
 	it('keeps the build-only adapter out of dependencies (#105)', () => {

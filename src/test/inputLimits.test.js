@@ -8,7 +8,8 @@
  * were measured not to hang (3888 worst-case combinations on f40933f).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Calculator, Unit } from 'js-ballistics';
+import { Unit } from 'js-ballistics';
+import { Calculator } from '#lib/utils/ballisticEngine.js';
 import {
 	calculateShotPoint,
 	calculateFullTrajectory,

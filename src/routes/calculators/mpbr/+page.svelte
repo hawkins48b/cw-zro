@@ -74,7 +74,7 @@
 
 		const data = result.trajectory.map((p) => ({
 			x: Math.round(p.distance.In(distUnitEnum) * 10) / 10,
-			y: Math.round(p.targetDrop.In(elevUnitEnum) * 10) / 10
+			y: Math.round(p.slantHeight.In(elevUnitEnum) * 10) / 10
 		}));
 		const maxX = data.length > 0 ? data[data.length - 1].x : 0;
 

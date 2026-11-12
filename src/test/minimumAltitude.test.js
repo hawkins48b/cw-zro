@@ -6,7 +6,15 @@
  * return quickly (P308_G1: no result below about -1402 ft at 600 yd, before and after the change).
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { Calculator, TrajectoryRangeError, ZeroFindingError, UNew, Unit } from 'js-ballistics';
+import {
+	OutOfRangeError,
+	RangeError as TrajectoryRangeError,
+	SolverRuntimeError,
+	ZeroFindingError,
+	UNew,
+	Unit
+} from 'js-ballistics';
+import { Calculator } from '#lib/utils/ballisticEngine.js';
 import { calculateShotPoint, calculateFullTrajectory } from '#lib/utils/ballisticCalculator.js';
 import { calculateTrajectoryValidation } from '#lib/utils/trajectoryValidation.js';
 import { ballisticPageTrajectory } from '#lib/utils/ballisticPage.js';
@@ -85,7 +93,8 @@ describe.each(PATHS)('%s', (_, run) => {
 			expect(tooLow).toBe(true);
 		});
 
-		it('also when the zero solve fails on it (ZeroFindingError)', () => {
+		// js-ballistics 2.2 threw ZeroFindingError here; 3.1 throws SolverRuntimeError (#126).
+		it('also when the zero solve fails on it', () => {
 			vi.spyOn(console, 'error').mockImplementation(() => {});
 			const [result, tooLow] = run(P223_SHORT_ZERO, at('-1500'));
 			expect(result).toBeNull();
@@ -163,10 +172,16 @@ describe('flightStop', () => {
 		expect(isMinimumAltitudeStop(new Error('Minimum altitude reached'))).toBe(false);
 	});
 
-	it('counts a failed zero solve only when the minimum altitude cut its flights', () => {
-		const zeroError = new ZeroFindingError(1, 10, UNew.Radian(0));
+	it.each([
+		['ZeroFindingError', new ZeroFindingError(1, 10, UNew.Radian(0))],
+		['SolverRuntimeError', new SolverRuntimeError('Failed to interpolate trajectory at target distance')],
+		['OutOfRangeError', new OutOfRangeError(UNew.Yard(3000))]
+	])('counts a failed zero solve (%s) only when the minimum altitude cut its flight', (_, zeroError) => {
 		expect(endedAtMinimumAltitude(zeroError, { minimumAltitude: true })).toBe(true);
 		expect(endedAtMinimumAltitude(zeroError, { minimumAltitude: false })).toBe(false);
+	});
+
+	it('does not count a failed fire as a failed zero solve', () => {
 		expect(endedAtMinimumAltitude(null, { minimumAltitude: true })).toBe(true);
 		expect(endedAtMinimumAltitude(null, { minimumAltitude: false })).toBe(false);
 		// A cut zero solve that solved, then a fire that failed for another reason.

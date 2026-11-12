@@ -83,7 +83,7 @@ function federalTable(profile, atmosphere) {
 			{
 				velocityFps: p.velocity.In(Unit.FPS),
 				energyFtLb: p.energy.In(Unit.FootPound),
-				trajectoryIn: p.targetDrop.In(Unit.Inch),
+				trajectoryIn: p.slantHeight.In(Unit.Inch),
 				windDriftIn: p.windage.In(Unit.Inch)
 			}
 		])

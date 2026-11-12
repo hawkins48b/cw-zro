@@ -9,7 +9,7 @@ Results are estimates from a point-mass model. Read the [assumptions, limits and
 - **Production:** a push to `main` deploys the web app over FTPS. Nothing delivered since the last release is in production yet, and the last deploy stopped before uploading. See [Deployment](docs/deployment.md#current-state).
 - **`develop`:** the integration branch. It runs CI and deploys nowhere ([#69](https://github.com/hawkins48b/cw-zro/issues/69)).
 - **Desktop and mobile:** built by hand. No workflow builds them ([#79](https://github.com/hawkins48b/cw-zro/issues/79)).
-- **Held for the owner:** `js-ballistics` stays on 2.2.0-beta.2 ([#77](https://github.com/hawkins48b/cw-zro/issues/77)). ApexCharts is pinned on 8.8.1 by owner decision ([#75](https://github.com/hawkins48b/cw-zro/issues/75)).
+- **Pinned by owner decision:** `js-ballistics` on 3.1.0 ([#77](https://github.com/hawkins48b/cw-zro/issues/77)); it embeds the LGPL-3.0 engine bclibc, see [Licences](docs/data-and-privacy.md#licences). ApexCharts on 8.8.1 ([#75](https://github.com/hawkins48b/cw-zro/issues/75)).
 
 ## Quick start
 
@@ -75,7 +75,7 @@ The [docs index](docs/README.md) lists these guides and the dated delivery docum
 
 Dependabot (`.github/dependabot.yml`) checks npm and GitHub Actions every week and opens pull requests against `develop`, never `main`. Minor and patch updates are grouped into one pull request per ecosystem. Major updates come one by one.
 
-- **`js-ballistics`** always gets its own pull request. Merge it only with owner approval of the results (#77).
+- **`js-ballistics`** always gets its own pull request. Merge it only with owner approval of the results (#77), and check the bclibc version and licence it embeds.
 - **`apexcharts`** always gets its own pull request, minor and patch updates included. Its licence changed within majors, so diff `LICENSE.md` against 8.8.1 before merging, and stop for the owner if it changed (#75).
 - **`SamKirkland/FTP-Deploy-Action`** always gets its own pull request, because it runs with the FTP password. Review each update on its own.
 

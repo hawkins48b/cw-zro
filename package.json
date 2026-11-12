@@ -54,7 +54,7 @@
 		"@lucide/svelte": "^1.69.0",
 		"apexcharts": "8.8.1",
 		"electron-serve": "^3.0.1",
-		"js-ballistics": "2.2.0-beta.2",
+		"js-ballistics": "3.1.0",
 		"pdf-lib": "^1.17.1",
 		"svelte-gestures": "^5.2.2"
 	}

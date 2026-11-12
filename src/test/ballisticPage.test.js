@@ -4,7 +4,7 @@
  * throw, so they are known to stop before it; values inside are run on the real engine.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { Calculator } from 'js-ballistics';
+import { Calculator } from '#lib/utils/ballisticEngine.js';
 import { ballisticPageTrajectory, isUsableBallisticRange } from '#lib/utils/ballisticPage.js';
 import { calculateFullTrajectory } from '#lib/utils/ballisticCalculator.js';
 import { P308_G1 } from './fixtures/ballisticProfiles.js';

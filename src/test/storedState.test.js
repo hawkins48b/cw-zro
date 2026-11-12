@@ -5,7 +5,8 @@
  * wherever no result is expected, so a missing guard fails on the stub instead of running the shot.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Calculator, Unit } from 'js-ballistics';
+import { Unit } from 'js-ballistics';
+import { Calculator } from '#lib/utils/ballisticEngine.js';
 import {
 	MAX_ROTATION,
 	isRecord,
@@ -191,7 +192,7 @@ describe('a damaged Ballistic step', () => {
 		const empty = calculateFullTrajectory(P223_G1, { ...range, step: '' }, null, null);
 		const damaged = calculateFullTrajectory(P223_G1, storedRange({ ...range, step: throwsAsText }, { step: true }), null, null);
 		const typed = calculateFullTrajectory(P223_G1, { ...range, step: '25' }, null, null);
-		const rows = (r) => r.trajectory.map((p) => [p.distance.In(Unit.Yard), p.targetDrop.In(Unit.Inch)]);
+		const rows = (r) => r.trajectory.map((p) => [p.distance.In(Unit.Yard), p.slantHeight.In(Unit.Inch)]);
 		expect(rows(damaged)).toEqual(rows(empty));
 		expect(rows(damaged)).toEqual(rows(typed));
 	});

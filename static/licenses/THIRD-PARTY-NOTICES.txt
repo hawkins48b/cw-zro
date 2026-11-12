@@ -1,0 +1,32 @@
+ZRO third-party notice: bclibc
+==============================
+
+ZRO itself is released under the MIT License (see LICENSE in the source
+repository). Third-party packages keep their own licences.
+
+The ballistic calculations of ZRO run on js-ballistics 3.1.0 (ISC License,
+https://github.com/o-murphy/js-ballistics). js-ballistics embeds, as a
+compiled WebAssembly module, the bclibc ballistic solver engine:
+
+  Component: bclibc 2.0.0
+  Source:    https://github.com/ballistics-lab/bclibc
+             (tag v2.0.0)
+  Licence:   GNU Lesser General Public License, version 3 (LGPL-3.0)
+
+bclibc is shipped unmodified, as it is published inside the js-ballistics
+package. It is a separate module: ZRO calls it through js-ballistics and does
+not change or link its source.
+
+The licence texts are in this folder:
+
+  LGPL-3.0.txt  GNU Lesser General Public License, version 3
+  GPL-3.0.txt   GNU General Public License, version 3, which the LGPL-3.0
+                incorporates
+
+bclibc is provided WITHOUT ANY WARRANTY; without even the implied warranty
+of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser
+General Public License for more details.
+
+The corresponding source code of bclibc 2.0.0 is available from the
+repository above. js-ballistics builds its WebAssembly module from that
+source (see its CHANGELOG, "Built against bclibc v2.0.0").

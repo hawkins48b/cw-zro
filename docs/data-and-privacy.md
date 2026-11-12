@@ -38,9 +38,11 @@ These are the only uses of `localStorage` in `src/`, apart from the read in [`th
 | Page and code files | Web: opening the app, moving to a page that needs a new chunk | Standard browser request. No cookie, apart from the old locale cookie until it is deleted (see above) | The site's host |
 | `/pdf/rifle-dataset-*.pdf` | Creating a dope card | Fetches the blank template. No profile data is sent | The same origin: the site's host on the web, local files on desktop and mobile |
 | `_app/version.json` | When the tab regains focus, and once an hour | Standard browser request. The app does not use the result | The same origin |
-| GitHub | Only when the user opens one of the two links on the About page | Opens in a browser | github.com |
+| GitHub | Only when the user opens one of the three links on the About page (ZRO, js-ballistics, bclibc) | Opens in a browser | github.com |
 
 The host sees what any web server sees, such as IP address, requested path and user agent. What it logs and keeps is not in this repository and could not be established.
+
+The ballistic engine (bclibc, WebAssembly, [#77](https://github.com/hawkins48b/cw-zro/issues/77)) is embedded in the app's own code as text and compiled on the device. It is not downloaded from anywhere, and it makes no network call: the module imports nothing from the page.
 
 **Generated files** are built on the device. CSV exports and PDF dope cards are saved through the normal download. They contain profile names and data, so they go wherever the user sends them.
 
@@ -76,8 +78,23 @@ Calculations run on the device. But the web app has no service worker, so it nee
 
 ## Security notes
 
-- The web and desktop builds set a Content-Security-Policy that allows scripts, connections and images only from the app itself ([#104](https://github.com/hawkins48b/cw-zro/issues/104)). See [Architecture](architecture.md#content-security-policy). The mobile build sets none. What headers the web host adds was not checked.
+- The web and desktop builds set a Content-Security-Policy that allows scripts, connections and images only from the app itself ([#104](https://github.com/hawkins48b/cw-zro/issues/104)). Since [#77](https://github.com/hawkins48b/cw-zro/issues/77) its `script-src` also has `'wasm-unsafe-eval'`, so that the embedded WebAssembly engine can be compiled; it does not allow `eval()` (owner decision of 2026-11-12). See [Architecture](architecture.md#content-security-policy). The mobile build sets none. What headers the web host adds was not checked.
 - The desktop app refuses every permission request (camera, location, notifications, devices).
 - The desktop window cannot leave the app, and opens `https:` links only in the system browser. See [Architecture](architecture.md#desktop).
 - Saved values are not validated when read, apart from the chart unit of compare trajectories. See [Input guards](ballistics-model.md#input-guards).
 - The app's [privacy page](../src/routes/settings/privacy/+page.svelte) lists what is stored, that it stays until the site data is cleared or the app is uninstalled, the web host's view of requests, and the offline limits of the web version ([#102](https://github.com/hawkins48b/cw-zro/issues/102)). It follows this guide: change both together.
+
+## Licences
+
+ZRO is under the MIT licence ([#110](https://github.com/hawkins48b/cw-zro/issues/110)). Third-party packages keep their own licences.
+
+Since [#77](https://github.com/hawkins48b/cw-zro/issues/77) every build (web, desktop, mobile) ships **bclibc 2.0.0**, the ballistic engine that `js-ballistics` 3.1.0 (ISC) embeds as compiled WebAssembly. bclibc is under the **GNU Lesser General Public License, version 3** (LGPL-3.0); its source is at [ballistics-lab/bclibc](https://github.com/ballistics-lab/bclibc/tree/v2.0.0). The owner accepted that licence on 2026-11-11.
+
+| Where | What |
+|-------|------|
+| About page | A card "Includes bclibc (LGPL-3.0)", in English, French and German, with a link to the bclibc source and to the licences page |
+| `/settings/about/licenses` | The third-party notice and the full LGPL-3.0 and GPL-3.0 texts, shown in the app, so the desktop window never has to leave it |
+| `static/licenses/` | `THIRD-PARTY-NOTICES.txt`, `LGPL-3.0.txt`, `GPL-3.0.txt`, copied into every build under `/licenses/`. The LGPL-3.0 text is identical to the `LICENSE` of bclibc; the LGPL-3.0 incorporates the GPL-3.0, so both are shipped |
+
+App-store LGPL compliance: open, see [#143](https://github.com/hawkins48b/cw-zro/issues/143). `js-ballistics` does not ship a licence notice for bclibc itself; its package declares ISC only.
+

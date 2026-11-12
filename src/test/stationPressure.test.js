@@ -4,7 +4,8 @@
  * the site altitude to the engine, by the ISA ratio.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { Atmo, Calculator, UNew, Unit } from 'js-ballistics';
+import { Atmo, UNew, Unit } from 'js-ballistics';
+import { Calculator } from '#lib/utils/ballisticEngine.js';
 import { hasPositiveDensity } from '#lib/utils/inputLimits.js';
 import { calculateTrajectoryValidation } from '#lib/utils/trajectoryValidation.js';
 import {
@@ -110,7 +111,11 @@ describe('calculators use the corrected pressure', () => {
 			const sea = fn(P308_G1, RANGE, atmo(0, station), null);
 			const a = fn === calculateShotPoint ? high : high.trajectory.at(-1);
 			const b = fn === calculateShotPoint ? sea : sea.trajectory.at(-1);
-			expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+			// js-ballistics 3 (#77) reports a row's densityRatio against the standard density at the
+			// site altitude, so that field differs between the two descriptions. The app does not show
+			// it, and drag, velocity, time and height, which come from the real density, must not.
+			const flown = ({ densityRatio, ...row }) => JSON.stringify(row);
+			expect(flown(a)).toBe(flown(b));
 		}
 	});
 

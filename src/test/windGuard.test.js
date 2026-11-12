@@ -6,7 +6,9 @@
  * could hang before the engine sees it.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Calculator, UNew, Unit, Wind } from 'js-ballistics';
+import { UNew, Unit, Wind } from 'js-ballistics';
+import { Calculator } from '#lib/utils/ballisticEngine.js';
+import { windVector } from './fixtures/windVector.js';
 import { calculateShotPoint, calculateFullTrajectory } from '#lib/utils/ballisticCalculator.js';
 import { shotWinds } from '#lib/utils/shotWind.js';
 import { P308_G1, WIND_10MPH, WIND_4MPS } from './fixtures/ballisticProfiles.js';
@@ -107,10 +109,10 @@ function figures(result) {
 			p.time,
 			p.distance.In(Unit.Foot),
 			p.velocity.In(Unit.FPS),
-			p.targetDrop.In(Unit.Inch),
+			p.slantHeight.In(Unit.Inch),
 			p.windage.In(Unit.Inch),
-			p.dropAdjustment.In(Unit.MOA),
-			p.windageAdjustment.In(Unit.MOA),
+			p.dropAngle.In(Unit.MOA),
+			p.windageAngle.In(Unit.MOA),
 			p.energy.In(Unit.FootPound)
 		]),
 		summary: result.chartPoints
@@ -124,7 +126,7 @@ function flyOnlySafeWinds() {
 	const realZero = Calculator.prototype.setWeaponZero;
 	vi.spyOn(Calculator.prototype, 'setWeaponZero').mockImplementation(function (shot, distance) {
 		for (const wind of shot.winds) {
-			const { x, z } = wind.vector;
+			const { x, z } = windVector(wind);
 			const usable = Number.isFinite(x) && Number.isFinite(z);
 			if (!usable || wind.velocity.In(Unit.MPS) > SAFE_WIND_MPS) {
 				throw new Error('a wind that can hang reached the engine');

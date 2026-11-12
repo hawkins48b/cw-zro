@@ -7,7 +7,8 @@
  * spin drift on, and never on the dope cards, so they are only checked there.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Calculator, Unit } from 'js-ballistics';
+import { Unit } from 'js-ballistics';
+import { Calculator } from '#lib/utils/ballisticEngine.js';
 import {
 	calculateShotPoint,
 	calculateFullTrajectory,
@@ -408,7 +409,7 @@ describe('on the real engine, at the limits', () => {
 	it('gives the same result for a profile inside the limits as without the check', () => {
 		// Weight and diameter do not enter the drag with a given BC without spin drift, so a
 		// different weight inside the limits gives the very same drop: the check moved nothing.
-		const at = (profile) => calculateShotPoint(profile, RANGE, null, null).targetDrop.In(Unit.Inch);
+		const at = (profile) => calculateShotPoint(profile, RANGE, null, null).slantHeight.In(Unit.Inch);
 		expect(at({ ...P308_G1, bulletWeight: '2000' })).toBe(at(P308_G1));
 	});
 });

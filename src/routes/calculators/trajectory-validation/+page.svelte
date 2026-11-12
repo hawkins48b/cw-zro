@@ -126,10 +126,10 @@
 		function getYValue(point) {
 			if (mType === 'distance') {
 				const u = mUnit === 'cm' ? Unit.Centimeter : Unit.Inch;
-				return Math.round(point.targetDrop.In(u) * 10) / 10;
+				return Math.round(point.slantHeight.In(u) * 10) / 10;
 			}
 			const u = mUnit === 'mrad' ? Unit.MRad : Unit.MOA;
-			return Math.round(point.dropAdjustment.In(u) * 10) / 10;
+			return Math.round(point.dropAngle.In(u) * 10) / 10;
 		}
 
 		const initialData = (data.initial.trajectory ?? []).map((p) => ({

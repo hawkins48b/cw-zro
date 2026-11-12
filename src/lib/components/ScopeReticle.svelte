@@ -58,10 +58,10 @@
 	// should place ON the target (scope center ends up offset, bullet corrects back).
 	//
 	// js-ballistics sign conventions (matched by the page direction logic):
-	//   dropAdjustment ≤ 0  →  dial UP   (bullet is low  →  hold mark is BELOW center)
-	//   dropAdjustment > 0  →  dial DOWN  (bullet is high →  hold mark is ABOVE center)
-	//   windageAdjustment ≥ 0 → dial LEFT  (bullet drifted right → hold mark is RIGHT of center)
-	//   windageAdjustment < 0 → dial RIGHT (bullet drifted left  → hold mark is LEFT  of center)
+	//   dropAngle ≤ 0  →  dial UP   (bullet is low  →  hold mark is BELOW center)
+	//   dropAngle > 0  →  dial DOWN  (bullet is high →  hold mark is ABOVE center)
+	//   windageAngle ≥ 0 → dial LEFT  (bullet drifted right → hold mark is RIGHT of center)
+	//   windageAngle < 0 → dial RIGHT (bullet drifted left  → hold mark is LEFT  of center)
 	//
 	// Therefore:
 	//   aimX = CX - windMoa * scale   (positive windMoa = right of center)

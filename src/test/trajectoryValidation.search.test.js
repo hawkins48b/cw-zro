@@ -18,7 +18,7 @@ function flyOn(curve) {
 		const measure = curve(parseFloat(shotProfile.velocity));
 		if (measure === null) return null;
 		const value = { In: () => measure };
-		return { targetDrop: value, dropAdjustment: value, firedAt: parseFloat(shotProfile.velocity) };
+		return { slantHeight: value, dropAngle: value, firedAt: parseFloat(shotProfile.velocity) };
 	});
 }
 

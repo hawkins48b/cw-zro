@@ -4,7 +4,8 @@
  * is stubbed, and the checks count calls, because each calculator's catch would swallow a throw.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Ammo, Atmo, Calculator, DragModel, Shot, Table, UNew, Unit, Weapon } from 'js-ballistics';
+import { Ammo, Atmo, DragModel, Shot, DragTables, UNew, Unit, Weapon } from 'js-ballistics';
+import { Calculator } from '#lib/utils/ballisticEngine.js';
 import {
 	calculateShotPoint,
 	calculateFullTrajectory,
@@ -179,10 +180,22 @@ describe('NaN guards (#113)', () => {
 	});
 
 	// The real solver, not a stub: a saved rotation can hold Infinity, since JSON.parse('1e999') does.
-	it('stops an infinite cant angle, which solves to NaN', () => {
+	// On js-ballistics 2.2 it solved to NaN. On 3.1 it hangs the zero solve (#77), so the stubs below
+	// make a missing guard fail instead of hang.
+	it.each([[Infinity], [-Infinity], [NaN], ['abc']])('stops a cant angle of %s before the solve', (cantAngle) => {
 		const watch = watchFire();
-		expect(calculateShotPoint(P308_G1, RANGE, null, null, { cantAngle: Infinity })).toBeNull();
+		const solver = vi.spyOn(Calculator.prototype, 'setWeaponZero').mockImplementation(() => {
+			throw new Error('setWeaponZero reached with a cant that is not finite');
+		});
+		expect(calculateShotPoint(P308_G1, RANGE, null, null, { cantAngle })).toBeNull();
+		expect(solver).not.toHaveBeenCalled();
 		expect(watch).toEqual({ bad: 0, good: 0 });
+	});
+
+	it.each([[1e308], [-1e308], [360], ['5']])('still solves a finite cant angle of %s', (cantAngle) => {
+		const watch = watchFire();
+		expect(calculateShotPoint(P308_G1, RANGE, null, null, { cantAngle })).not.toBeNull();
+		expect(watch.good).toBe(1);
 	});
 
 	// Proves the stubs are live: without this, the checks above would also pass with a guard that
@@ -227,7 +240,7 @@ describe('NaN guards (#113)', () => {
 		const shotAt = (elevation, cantAngle) => {
 			const dm = new DragModel({
 				bc: 0.45,
-				dragTable: Table.G1,
+				dragTable: DragTables.G1,
 				weight: UNew.Grain(168),
 				diameter: UNew.Inch(0.308)
 			});

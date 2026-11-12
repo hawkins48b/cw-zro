@@ -88,7 +88,7 @@
 
 		const data = points.map((p) => ({
 			x: Math.round(p.distance.In(distUnit) * 10) / 10,
-			y: Math.round(p.targetDrop.In(dropUnit) * 10) / 10
+			y: Math.round(p.slantHeight.In(dropUnit) * 10) / 10
 		}));
 
 		const maxX = data.length > 0 ? data[data.length - 1].x : 0;
@@ -377,21 +377,21 @@
 			case 'rangeM':
 				return r1(point.distance.In(Unit.Meter));
 			case 'elevIn':
-				return r1(point.targetDrop.In(Unit.Inch));
+				return r1(point.slantHeight.In(Unit.Inch));
 			case 'elevCm':
-				return r1(point.targetDrop.In(Unit.Centimeter));
+				return r1(point.slantHeight.In(Unit.Centimeter));
 			case 'elevMOA':
-				return r1(point.dropAdjustment.In(Unit.MOA));
+				return r1(point.dropAngle.In(Unit.MOA));
 			case 'elevMRAD':
-				return r1(point.dropAdjustment.In(Unit.MRad));
+				return r1(point.dropAngle.In(Unit.MRad));
 			case 'windIn':
 				return r1(point.windage.In(Unit.Inch));
 			case 'windCm':
 				return r1(point.windage.In(Unit.Centimeter));
 			case 'windMOA':
-				return r1(point.windageAdjustment.In(Unit.MOA));
+				return r1(point.windageAngle.In(Unit.MOA));
 			case 'windMRAD':
-				return r1(point.windageAdjustment.In(Unit.MRad));
+				return r1(point.windageAngle.In(Unit.MRad));
 			case 'velFps':
 				return r0(point.velocity.In(Unit.FPS));
 			case 'velMps':

@@ -4,7 +4,8 @@
  * and edit pages. The calculators keep the stored profile, so shownProfile must not change a result.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Calculator, Unit } from 'js-ballistics';
+import { Unit } from 'js-ballistics';
+import { Calculator } from '#lib/utils/ballisticEngine.js';
 import fs, { readdirSync } from 'node:fs';
 import path, { join } from 'node:path';
 import {
@@ -505,7 +506,7 @@ describe('shownProfile', () => {
 			const range = { distance: '300', unit: 'yd' };
 			const stored = calculateShotPoint(profile, range, null, null);
 			const asShown = calculateShotPoint({ ...P223_G1, ...shownUnits }, range, null, null);
-			expect(stored.targetDrop.In(Unit.Inch)).toBe(asShown.targetDrop.In(Unit.Inch));
+			expect(stored.slantHeight.In(Unit.Inch)).toBe(asShown.slantHeight.In(Unit.Inch));
 			expect(stored.velocity.In(Unit.FPS)).toBe(asShown.velocity.In(Unit.FPS));
 		});
 	});

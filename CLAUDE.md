@@ -35,13 +35,12 @@ All scripts: [README](README.md#scripts). Setup: [docs/development.md](docs/deve
 
 `js-ballistics` is synchronous and can loop forever on bad input. **`try/catch` cannot stop it, and neither can a Vitest timeout.** Guard the values before they reach the engine. In a test, stub `setWeaponZero` to throw instead of running the hang. See [Input guards](docs/ballistics-model.md#input-guards) and [Hangs](docs/testing.md#hangs).
 
-## Held dependencies
+## Pinned dependencies
 
-Do not upgrade these, not even within a major, without an owner decision on the issue:
+Neither is held any more. Neither may move, not even within a major, without an owner decision on its issue:
 
-- **`js-ballistics`** stays on 2.2.0-beta.2, Euler engine ([#77](https://github.com/hawkins48b/cw-zro/issues/77)). 3.1.0 embeds LGPL-3.0 code and shifts results.
-
-`apexcharts` is no longer held: it is pinned on 8.8.1 by owner decision ([#75](https://github.com/hawkins48b/cw-zro/issues/75)), which accepts its licence terms. Those terms changed within majors (7.4.0, 7.7.0, 8.7.0), so update it only in its own pull request: diff its `LICENSE.md` against 8.8.1, and stop for the owner if the text changed. It brings `apex-commons` (same licence), locked at 0.10.0.
+- **`js-ballistics`** is pinned on 3.1.0 by owner decision ([#77](https://github.com/hawkins48b/cw-zro/issues/77)), which accepts the LGPL-3.0 engine it embeds (bclibc 2.0.0, WebAssembly) and its result shifts. The app runs it on RK4, `stepMultiplier` 0.5, with the 2.2 flight limits (`src/lib/utils/ballisticEngine.js`). Update it only in its own pull request, with owner approval of any result change. On each update, recheck `flightStop.js` and the stop reasons (#126), the hang probes, the CSP (`'wasm-unsafe-eval'`) and the bclibc version in `static/licenses/THIRD-PARTY-NOTICES.txt` and the messages.
+- **`apexcharts`** is pinned on 8.8.1 by owner decision ([#75](https://github.com/hawkins48b/cw-zro/issues/75)), which accepts its licence terms. Those terms changed within majors (7.4.0, 7.7.0, 8.7.0), so update it only in its own pull request: diff its `LICENSE.md` against 8.8.1, and stop for the owner if the text changed. It brings `apex-commons` (same licence), locked at 0.10.0.
 
 Both are pinned to an exact version. Use `npm ci`, and check the lockfile diff.
 

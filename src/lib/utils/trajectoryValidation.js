@@ -77,7 +77,7 @@ export function calculateTrajectoryValidation(
 
 		const rangeObj = { distance: rangeVal, unit: range.unit };
 
-		// js-ballistics gives targetDrop and dropAdjustment the same sign: negative with the bullet
+		// js-ballistics gives slantHeight and dropAngle the same sign: negative with the bullet
 		// below the line of sight (dial up), positive above it (dial down). Users enter a positive
 		// value and say which side it is on, so the sign of the goal comes from direction alone.
 		const magnitude = Math.round(Math.abs(targetVal) * 10) / 10;
@@ -87,8 +87,8 @@ export function calculateTrajectoryValidation(
 			if (!point) return null;
 			const value =
 				measureType === 'distance'
-					? point.targetDrop.In(measureUnit === 'cm' ? Unit.Centimeter : Unit.Inch)
-					: point.dropAdjustment.In(measureUnit === 'mrad' ? Unit.MRad : Unit.MOA);
+					? point.slantHeight.In(measureUnit === 'cm' ? Unit.Centimeter : Unit.Inch)
+					: point.dropAngle.In(measureUnit === 'mrad' ? Unit.MRad : Unit.MOA);
 			return Number.isFinite(value) ? Math.round(value * 10) / 10 : null;
 		}
 
@@ -120,7 +120,7 @@ export function calculateTrajectoryValidation(
 		const initialMeasure = getMeasure(initialPoint);
 		if (initialMeasure === null) return { error: 'no_solution' };
 
-		const suggestAbove = direction !== 'above' && initialPoint.targetDrop.In(Unit.Inch) > 0;
+		const suggestAbove = direction !== 'above' && initialPoint.slantHeight.In(Unit.Inch) > 0;
 		const noSolution = suggestAbove
 			? { error: 'no_solution', suggestAbove }
 			: { error: 'no_solution' };
@@ -142,7 +142,7 @@ export function calculateTrajectoryValidation(
 		recordShot(currentParam, currentMeasure);
 
 		// Binary search. The direction is the same for velocity and BC, above and below the line of
-		// sight, and for targetDrop and dropAdjustment: a higher parameter means less bullet drop
+		// sight, and for slantHeight and dropAngle: a higher parameter means less bullet drop
 		// relative to the sight line, so the signed measure rises, also inside a short zero where
 		// the zero angle moves with the parameter. Fine sweeps of the search range found no second
 		// root, only jitter from the integrator just past a long zero at low velocity, about 1 in
