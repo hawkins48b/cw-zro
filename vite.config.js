@@ -8,23 +8,29 @@ import { defineConfig } from 'vite';
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
 const isCapacitor = process.env.BUILD_TARGET === 'capacitor';
 
-// Content-Security-Policy for the web and Electron builds (#104), written as a <meta> tag
-// with the hashes of SvelteKit's inline scripts. The mobile build has none until it is
-// tested on a device. 'unsafe-inline' styles: ApexCharts, Svelte transitions and style:
+// Content-Security-Policy for every build: web and Electron (#104), and mobile (#135), written
+// as a <meta> tag with the hashes of SvelteKit's inline scripts. The app's own origin in the
+// mobile web views is https://localhost on Android (matched by 'self') and capacitor://localhost
+// on iOS, a custom scheme that 'self' may not match, so the mobile build also names it. Both
+// cover Capacitor's /_capacitor_*_ paths. Capacitor's native bridge needs no source: iOS adds it
+// as a user script, and Android as a document-start script (or, on older WebViews, as an inline
+// <script> right after <head>, before this <meta>, and a <meta> policy does not apply to what
+// comes before it). 'unsafe-inline' styles: ApexCharts, Svelte transitions and style:
 // directives set inline styles. data: and blob: images: ApexCharts and the chart exports.
 // 'wasm-unsafe-eval' (#77, owner decision of 2026-11-12): js-ballistics 3 compiles its WebAssembly engine
 // (bclibc), embedded in the bundle, with WebAssembly.instantiate, which a script-src without it
 // refuses, and every calculator then fails. It allows compiling WebAssembly only, not eval() or
 // new Function(). The app loads and sends nothing outside its own origin (docs/data-and-privacy.md).
+const appOrigins = isCapacitor ? ['self', 'capacitor://localhost'] : ['self'];
 const csp = {
 	mode: 'hash',
 	directives: {
-		'default-src': ['self'],
-		'script-src': ['self', 'wasm-unsafe-eval'],
-		'style-src': ['self', 'unsafe-inline'],
-		'img-src': ['self', 'data:', 'blob:'],
-		'font-src': ['self', 'data:'],
-		'connect-src': ['self'],
+		'default-src': appOrigins,
+		'script-src': [...appOrigins, 'wasm-unsafe-eval'],
+		'style-src': [...appOrigins, 'unsafe-inline'],
+		'img-src': [...appOrigins, 'data:', 'blob:'],
+		'font-src': [...appOrigins, 'data:'],
+		'connect-src': appOrigins,
 		'object-src': ['none'],
 		'base-uri': ['self'],
 		'form-action': ['none']
@@ -48,13 +54,14 @@ export default defineConfig({
 			adapter: adapter({
 				fallback: 'index.html'
 			}),
+			csp,
 			...(isCapacitor
 				? {
 						output: {
 							bundleStrategy: 'single'
 						}
 					}
-				: { csp })
+				: {})
 		})
 	],
 	test: {

@@ -194,7 +194,7 @@ The macOS app carries only the ad-hoc signature that the `resetAdHocDarwinSignat
 Mobile apps are not built in CI, by owner decision ([#79](https://github.com/hawkins48b/cw-zro/issues/79)):
 
 - `android/` and `ios/` stay git-ignored, so the native projects are not in the repository. See [Development](development.md#mobile-build).
-- Store builds wait for LGPL compliance of the engine ([#143](https://github.com/hawkins48b/cw-zro/issues/143)) and a Content-Security-Policy for the mobile build ([#135](https://github.com/hawkins48b/cw-zro/issues/135)).
+- Store builds wait for LGPL compliance of the engine ([#143](https://github.com/hawkins48b/cw-zro/issues/143)) and a device check of the mobile build's Content-Security-Policy ([#135](https://github.com/hawkins48b/cw-zro/issues/135)).
 
 ## Known gaps
 

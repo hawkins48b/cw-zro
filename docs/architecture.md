@@ -173,7 +173,9 @@ Hardening ([#104](https://github.com/hawkins48b/cw-zro/issues/104)):
 
 ## Content-Security-Policy
 
-The web and desktop builds carry a `<meta>` Content-Security-Policy, written by SvelteKit (`kit.csp`, hash mode). The mobile build has none until it is tested on a device.
+Every build carries a `<meta>` Content-Security-Policy, written by SvelteKit (`kit.csp`, hash mode): web and desktop since [#104](https://github.com/hawkins48b/cw-zro/issues/104), mobile since [#135](https://github.com/hawkins48b/cw-zro/issues/135).
+
+In the mobile web views the app's own origin is `https://localhost` on Android, which `'self'` matches, and `capacitor://localhost` on iOS. That is a custom scheme `'self'` may not match, so the mobile build also lists `capacitor://localhost` in every directive below that has `'self'`, except `base-uri`. Both origins cover Capacitor's `/_capacitor_file_` and `/_capacitor_http_interceptor_` paths. Capacitor's native bridge needs no source: iOS adds it as a user script and Android as a document-start script (`addDocumentStartJavaScript`), which the policy does not cover. On older Android WebViews it is instead an inline `<script>` right after `<head>`, before the policy `<meta>`, which does not apply to anything before it. The bridge has no `eval`. Only a device or emulator run shows whether the web views need more (see the issue).
 
 | Directive | Value | Why |
 |-----------|-------|-----|

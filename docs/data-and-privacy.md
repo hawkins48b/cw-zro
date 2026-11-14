@@ -78,7 +78,7 @@ Calculations run on the device. But the web app has no service worker, so it nee
 
 ## Security notes
 
-- The web and desktop builds set a Content-Security-Policy that allows scripts, connections and images only from the app itself ([#104](https://github.com/hawkins48b/cw-zro/issues/104)). Since [#77](https://github.com/hawkins48b/cw-zro/issues/77) its `script-src` also has `'wasm-unsafe-eval'`, so that the embedded WebAssembly engine can be compiled; it does not allow `eval()` (owner decision of 2026-11-12). See [Architecture](architecture.md#content-security-policy). The mobile build sets none. What headers the web host adds was not checked.
+- The web and desktop builds set a Content-Security-Policy that allows scripts, connections and images only from the app itself ([#104](https://github.com/hawkins48b/cw-zro/issues/104)). Since [#77](https://github.com/hawkins48b/cw-zro/issues/77) its `script-src` also has `'wasm-unsafe-eval'`, so that the embedded WebAssembly engine can be compiled; it does not allow `eval()` (owner decision of 2026-11-12). See [Architecture](architecture.md#content-security-policy). The mobile build sets the same policy since [#135](https://github.com/hawkins48b/cw-zro/issues/135), plus `capacitor://localhost`, the app's origin on iOS. It is not yet checked on a device. What headers the web host adds was not checked.
 - The desktop app refuses every permission request (camera, location, notifications, devices).
 - The desktop window cannot leave the app, and opens `https:` links only in the system browser. See [Architecture](architecture.md#desktop).
 - Saved values are not validated when read, apart from the chart unit of compare trajectories. See [Input guards](ballistics-model.md#input-guards).
