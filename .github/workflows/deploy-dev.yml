@@ -1,0 +1,33 @@
+name: Deploy Dev
+
+# Deploys develop to the dev site, with the DEV_FTP_* secrets of the dev
+# environment. Until they exist the deploy job warns and uploads nothing.
+# See docs/deployment.md#set-up-the-dev-site.
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Queued runs are replaced by newer ones and a running deploy is never
+# cancelled. The ref keeps a dispatch from another branch, which deploys
+# nothing, from replacing a queued develop run.
+concurrency:
+  group: deploy-dev-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  # deploy-ftp.yml reads DEV_FTP_* only, never the production FTP_* secrets.
+  deploy:
+    needs: ci
+    if: github.ref == 'refs/heads/develop'
+    uses: ./.github/workflows/deploy-ftp.yml
+    with:
+      environment: dev
+    secrets: inherit

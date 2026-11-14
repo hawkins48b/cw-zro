@@ -20,7 +20,7 @@ All scripts: [README](README.md#scripts). Setup: [docs/development.md](docs/deve
 ## Branches
 
 - **Never push to `main`: every push deploys to production.** Nothing in the settings stops it.
-- Work on a feature branch off `develop`. `develop` runs CI and deploys nowhere ([#69](https://github.com/hawkins48b/cw-zro/issues/69)).
+- Work on a feature branch off `develop`. A push to `develop` runs CI and deploys to the dev site, once its secrets exist ([#69](https://github.com/hawkins48b/cw-zro/issues/69)). Until then it deploys nothing.
 - Releases are an owner decision. See [docs/deployment.md](docs/deployment.md).
 
 ## Calculated results

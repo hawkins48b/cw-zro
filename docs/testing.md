@@ -111,7 +111,7 @@ So a test for a hang must not run the hang:
 
 ## CI
 
-[`ci.yml`](../.github/workflows/ci.yml) runs on every pull request and on pushes to `develop`, and [`deploy-prod.yml`](../.github/workflows/deploy-prod.yml) calls it on `main`.
+[`ci.yml`](../.github/workflows/ci.yml) runs on every pull request. [`deploy-dev.yml`](../.github/workflows/deploy-dev.yml) calls it on pushes to `develop`, and [`deploy-prod.yml`](../.github/workflows/deploy-prod.yml) on `main`.
 
 | Job | Steps |
 |-----|-------|

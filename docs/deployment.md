@@ -1,6 +1,6 @@
 # Deployment
 
-This guide describes the state on 2026-11-05.
+This guide describes the state on 2026-11-14.
 
 ## Current state
 
@@ -8,7 +8,8 @@ This guide describes the state on 2026-11-05.
 |--------|-------|
 | Production web | Last successful deploy: 2026-03-03. **Nothing delivered since then is live** |
 | `main` | Holds a release from 2026-11-04 whose deploy failed at the FTP step |
-| `develop` | 11 commits ahead of `main`. Runs CI, deploys nowhere |
+| `develop` | 44 commits ahead of `main` on 2026-11-14. Runs CI, then deploys to the dev site once its secrets exist. Until then the deploy job warns and uploads nothing |
+| Dev web | Not set up: no host and no `DEV_FTP_*` secrets yet. See [Set up the dev site](#set-up-the-dev-site) |
 | Desktop | A `v*` tag builds unsigned installers and publishes a GitHub release ([`release.yml`](../.github/workflows/release.yml)). No tag pushed yet, so the workflow has not run. Linux AppImage verified by hand, Windows and macOS not run |
 | Mobile | Not in CI. `android/` and `ios/` are git-ignored, by owner decision ([#79](https://github.com/hawkins48b/cw-zro/issues/79)) |
 
@@ -19,12 +20,12 @@ This guide describes the state on 2026-11-05.
 | Branch | Purpose | Runs | Deploys |
 |--------|---------|------|---------|
 | `task/...` or other feature branch | Work on one issue, branched off `develop` | CI on a pull request | Nothing |
-| `develop` | Integration | CI on every push | Nothing yet ([#69](https://github.com/hawkins48b/cw-zro/issues/69)) |
+| `develop` | Integration | CI, then the dev deploy, on every push | The **dev site**, once its secrets exist ([#69](https://github.com/hawkins48b/cw-zro/issues/69)) |
 | `main` | Production | CI, then the deploy | **Production** |
 | Tag `vX.Y.Z` on `main` | Desktop release | CI, then the desktop builds | A GitHub release with the installers |
 
 1. Branch off `develop`.
-2. Merge into `develop` when CI passes.
+2. Merge into `develop` when CI passes. The dev site then shows it.
 3. Merge `develop` into `main` only when the owner asks for a release.
 
 **Never push to `main` for anything else: every push deploys to production.** Nothing in the repository settings prevents it yet ([#87](https://github.com/hawkins48b/cw-zro/issues/87)).
@@ -35,10 +36,10 @@ A `Closes #N` line closes the issue when it reaches `main`, even if the deploy f
 
 | Environment | Used by | State |
 |-------------|---------|-------|
-| `prod` | The `deploy` job | No branch restriction or reviewers |
-| `dev` | Nothing | Exists on GitHub. Its host and secrets are open ([#69](https://github.com/hawkins48b/cw-zro/issues/69)) |
+| `prod` | The `deploy` job of Deploy Prod | No branch restriction or reviewers |
+| `dev` | The `deploy` job of Deploy Dev | No branch restriction or reviewers. Its `DEV_FTP_*` secrets do not exist yet |
 
-There is no staging site, so a release cannot be checked on a real host first.
+The dev site is a separate site on the same host, with its own folder and its own FTP user. It gets the same build, `.htaccess` included, so it can show a `develop` change on a real host before a release. It is only as close to production as its host settings are.
 
 ## Secrets
 
@@ -46,24 +47,49 @@ Only names are listed here. Values are in GitHub settings, and they never go in 
 
 | Name | Where | Use |
 |------|-------|-----|
-| `FTP_HOST` | Repository secret | Server name. Must match the name on the server certificate |
-| `FTP_USER` | Repository secret | FTP user |
-| `FTP_PWD` | Repository secret | FTP password |
+| `FTP_HOST` | Repository secret | Production server name. Must match the name on the server certificate |
+| `FTP_USER` | Repository secret | Production FTP user |
+| `FTP_PWD` | Repository secret | Production FTP password |
+| `DEV_FTP_HOST` | `dev` environment secret | Dev server name. Must match the name on the server certificate. Not set yet |
+| `DEV_FTP_USER` | `dev` environment secret | Dev FTP user, limited to the dev folder. Not set yet |
+| `DEV_FTP_PWD` | `dev` environment secret | Dev FTP password. Not set yet |
 | `SSH_PWD`, `SSH_USER`, `SERVER_HOST`, `SERVER_PATH` | `prod` and `dev` environments | Unused by any workflow. To remove ([#87](https://github.com/hawkins48b/cw-zro/issues/87)) |
 
-The app itself has no secrets and no runtime configuration. `build/` contains no environment values.
+The dev secrets have their own names on purpose. A job in an environment sees the repository secrets too, and an environment secret only replaces a repository secret of the same name. A dev job that read `FTP_*` would, without dev values, get the production ones and ship `develop` to production. The dev deploy reads only `DEV_FTP_*`, with no fallback to `FTP_*`.
+
+The app itself has no secrets and no runtime configuration. `build/` contains no environment values, so dev and production get the same files.
 
 ## How a deploy runs
 
-[`deploy-prod.yml`](../.github/workflows/deploy-prod.yml) runs on a push to `main`, or by hand from the Actions tab.
+| Workflow | Runs on | Deploys from | Environment | Secrets | Without secrets |
+|----------|---------|--------------|-------------|---------|-----------------|
+| [`deploy-prod.yml`](../.github/workflows/deploy-prod.yml) | Push to `main`, or by hand | `refs/heads/main` only | `prod` | `FTP_*` | Fails |
+| [`deploy-dev.yml`](../.github/workflows/deploy-dev.yml) | Push to `develop`, or by hand | `refs/heads/develop` only | `dev` | `DEV_FTP_*` | Warns, uploads nothing, ends green |
 
-1. The `ci` job calls [`ci.yml`](../.github/workflows/ci.yml): tests, build and audit. The build is uploaded as an artifact, kept for 1 day.
-2. The `deploy` job needs `ci`, and runs only on `refs/heads/main`. Started from another branch, the workflow runs CI and skips the deploy.
-3. The `deploy` job downloads the artifact and sends it by FTPS with strict certificate checks. It has no checkout and no npm, so no dependency code runs beside the FTP password, and production gets exactly the tested build.
+Both run the same steps:
 
-A failed audit blocks a deploy, even with no change to the dependencies. See [Audit](../README.md#audit).
+1. The `ci` job calls [`ci.yml`](../.github/workflows/ci.yml): tests, build and audit. The build is uploaded as an artifact, kept for 1 day. `ci.yml` has no push trigger of its own, so it runs once per push.
+2. The `deploy` job needs `ci`, and runs only on its branch. Started by hand from another branch, the workflow runs CI and skips the deploy.
+3. The `deploy` job calls [`deploy-ftp.yml`](../.github/workflows/deploy-ftp.yml) with `secrets: inherit`. Its only input, `environment`, is `prod` or `dev`. It picks the GitHub environment and the secret names. `prod` must run on `main` and `dev` on `develop`; anything else fails, whichever workflow calls it.
+4. A first step checks that the three secrets are set. For `dev`, it also fails if `DEV_FTP_USER` is the production `FTP_USER` (case ignored) or `DEV_FTP_PWD` is the production `FTP_PWD`, so the dev deploy cannot log in as the production account. `secrets: inherit` lets the dev job read the production secrets for this check. Only the two pinned actions run beside them.
+5. It downloads the artifact and sends it by FTPS with strict certificate checks, from `build/` to the FTP root (`/`). It has no checkout and no npm, so no dependency code runs beside the FTP password, and the site gets exactly the tested build.
 
-A running deploy is never cancelled, and a newer run replaces a queued one.
+A failed audit blocks both deploys, even with no change to the dependencies. See [Audit](../README.md#audit).
+
+Each workflow has its own concurrency group per ref. A running deploy is never cancelled, and a newer run replaces a queued one. A dev deploy does not wait for a production deploy.
+
+### Set up the dev site
+
+Owner steps. Until all three secrets exist, every push to `develop` shows a warning on the Deploy Dev run and deploys nothing.
+
+1. On Hostpoint, create the dev subdomain and its own folder, outside the production web root.
+2. Create an FTP user limited to that folder. Its FTP root must be the dev web root: the deploy writes to `/`.
+3. In GitHub, Settings, Environments, `dev`, add the environment secrets `DEV_FTP_HOST`, `DEV_FTP_USER` and `DEV_FTP_PWD`. Not repository secrets.
+4. `DEV_FTP_HOST` must be the name on the server certificate, or the strict TLS check stops the deploy before login (as happened to `FTP_HOST`, [#66](https://github.com/hawkins48b/cw-zro/issues/66)).
+5. Optional: in the `dev` environment, limit deployment branches to `develop`.
+6. Re-run the last Deploy Dev run, or push to `develop`, and open the dev site, including an inner URL such as `/profiles`.
+
+The dev site gets the same [`.htaccess`](../static/.htaccess) as production, so the same `AllowOverride` check applies ([Deep links](#deep-links-on-the-web-host)). It also sends the same `robots.txt`, so search engines may index the dev site unless the host blocks them. Nothing in the build tells dev and production apart.
 
 ## Before the next release
 
@@ -133,7 +159,7 @@ The web release above does not need a tag. A desktop release does. Only when the
 
 The builds need `ci` and `check`, so a failing test, audit or check stops the release before anything is published.
 
-The workflow refuses a tag on a commit that is not on `main`, such as a commit of `develop` or a feature branch. This stops mistakes, but it is not a control: GitHub runs the `release.yml` of the tagged commit, so anyone who can push a tag can tag a branch commit whose workflow skips the check. A tag ruleset on `refs/tags/v*` would make it one. That is an owner setting, like the branch protection in [#87](https://github.com/hawkins48b/cw-zro/issues/87). `ci.yml` and `deploy-prod.yml` only run on branches, so a tag push does not deploy the web app again.
+The workflow refuses a tag on a commit that is not on `main`, such as a commit of `develop` or a feature branch. This stops mistakes, but it is not a control: GitHub runs the `release.yml` of the tagged commit, so anyone who can push a tag can tag a branch commit whose workflow skips the check. A tag ruleset on `refs/tags/v*` would make it one. That is an owner setting, like the branch protection in [#87](https://github.com/hawkins48b/cw-zro/issues/87). `ci.yml`, `deploy-prod.yml` and `deploy-dev.yml` only run on branches, so a tag push does not deploy the web app again.
 
 Runs for the same tag share one concurrency group. A running release is never cancelled. GitHub keeps only one pending run per group, so a newer run replaces a pending one. `gh release create` fails if the release exists. It uploads to a draft and publishes at the end: if an upload fails, delete the draft release on GitHub, then re-run the failed jobs. To replace a published release, delete it and its tag, fix the problem, and tag again with a new version.
 
@@ -195,7 +221,9 @@ Mobile apps are not built in CI, by owner decision ([#79](https://github.com/haw
 
 ### Dev deployment
 
-**[#69](https://github.com/hawkins48b/cw-zro/issues/69), open.** The branch flow is agreed. The `dev` deployment, its host and its own FTP secrets are not done.
+**[#69](https://github.com/hawkins48b/cw-zro/issues/69).** Deploy Dev exists, but it has not uploaded anything: the dev site and its `DEV_FTP_*` secrets are owner steps ([Set up the dev site](#set-up-the-dev-site)). Not seen on GitHub yet: the warning run without secrets, and a real dev upload.
+
+- The guard against the production account compares the FTP user and password. If [#87](https://github.com/hawkins48b/cw-zro/issues/87) moves `FTP_*` into the `prod` environment, the dev job no longer sees them and the guard does nothing.
 
 ### Desktop and mobile releases
 

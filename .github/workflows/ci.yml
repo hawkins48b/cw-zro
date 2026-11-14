@@ -1,12 +1,9 @@
 name: CI
 
-# No push trigger for main: deploy-prod.yml calls this workflow there, so a
-# trigger here would run it twice.
+# No push trigger: deploy-prod.yml calls this workflow on main and
+# deploy-dev.yml on develop, so a trigger here would run it twice.
 on:
   pull_request:
-  push:
-    branches:
-      - develop
   workflow_call:
 
 permissions:
@@ -36,7 +33,7 @@ jobs:
       - name: Build
         run: npm run build
 
-      # deploy-prod.yml ships this artifact, so npm never runs in the job that
+      # deploy-ftp.yml ships this artifact, so npm never runs in the job that
       # holds the FTP secrets.
       - name: Upload build
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
