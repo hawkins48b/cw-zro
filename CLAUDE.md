@@ -7,7 +7,7 @@ Start with [README.md](README.md). Do not repeat the guides here: link to them.
 ## Commands
 
 ```bash
-npm ci                 # Node 22.22.2 or later on the 22 line. Not npm install
+npm ci                 # Node 26 (any 26.x). Not npm install
 npm run dev            # Port 5173
 npm run test:run       # Before handing work over
 npm run build          # Before handing work over

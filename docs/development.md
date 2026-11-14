@@ -4,13 +4,15 @@
 
 | Tool | Version | Why |
 |------|---------|-----|
-| Node | 22.22.2 or later on the 22 line | `.nvmrc` says `22`. `jsdom` 31 is the highest floor among the dependencies |
-| npm | 10.9.9 was used | Comes with Node 22 |
+| Node | 26 (any 26.x) | `.nvmrc` says `26`, the active LTS. Checked on 26.13.1 |
+| npm | 11.20.0 was used | Comes with Node 26.13.1 |
 | Git | Any | |
 
-`.npmrc` sets `engine-strict=true`, so an older Node stops `npm ci` with `EBADENGINE`. `.nvmrc` holds the major version only: CI installs the latest 22.x, and `nvm use` takes whichever 22.x you have, so check it with `node -v`.
+`.npmrc` sets `engine-strict=true`, so a Node version a dependency does not accept stops `npm ci` with `EBADENGINE`. `.nvmrc` holds the major version only: CI installs the latest 26.x, and `nvm use` takes whichever 26.x you have, so check it with `node -v`.
 
-The other minimums are lower: SvelteKit needs 22.17, Vite and Vitest 22.12, Capacitor 22.0. `jsdom` also accepts `^24.15.0` and `>=26.0.0`, but only 22 runs in CI.
+Every dependency accepts any 26.x. The dependencies would also still run on Node 22.22.2 or later, the floor set by `jsdom` 31 (SvelteKit needs 22.17, Vite and Vitest 22.12, Capacitor 22.0), but only 26 runs in CI. Vitest 5 does not accept Node 25.
+
+npm 11 warns during `npm ci` that `electron-winstaller` has an install script "not yet covered by allowScripts". It still runs: it copies the bundled 7-Zip binary for the host CPU architecture inside its `vendor/` folder (used to build the Windows installer) and downloads nothing. Nothing needs approving today.
 
 ## Setup
 
