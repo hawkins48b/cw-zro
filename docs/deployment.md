@@ -9,8 +9,8 @@ This guide describes the state on 2026-11-05.
 | Production web | Last successful deploy: 2026-03-03. **Nothing delivered since then is live** |
 | `main` | Holds a release from 2026-11-04 whose deploy failed at the FTP step |
 | `develop` | 11 commits ahead of `main`. Runs CI, deploys nowhere |
-| Desktop | Built by hand. Linux AppImage verified, Windows and macOS not |
-| Mobile | No build in the repository or in CI |
+| Desktop | A `v*` tag builds unsigned installers and publishes a GitHub release ([`release.yml`](../.github/workflows/release.yml)). No tag pushed yet, so the workflow has not run. Linux AppImage verified by hand, Windows and macOS not run |
+| Mobile | Not in CI. `android/` and `ios/` are git-ignored, by owner decision ([#79](https://github.com/hawkins48b/cw-zro/issues/79)) |
 
 **The next deploy will fail unless `FTP_HOST` is fixed.** The last run stopped at the TLS check because the secret did not match the name on the server certificate. It stopped before login, so no credentials were sent and nothing was uploaded. The secret list shows that `FTP_HOST` has not changed since 2026-03-03. See [Before the next release](#before-the-next-release).
 
@@ -21,6 +21,7 @@ This guide describes the state on 2026-11-05.
 | `task/...` or other feature branch | Work on one issue, branched off `develop` | CI on a pull request | Nothing |
 | `develop` | Integration | CI on every push | Nothing yet ([#69](https://github.com/hawkins48b/cw-zro/issues/69)) |
 | `main` | Production | CI, then the deploy | **Production** |
+| Tag `vX.Y.Z` on `main` | Desktop release | CI, then the desktop builds | A GitHub release with the installers |
 
 1. Branch off `develop`.
 2. Merge into `develop` when CI passes.
@@ -103,7 +104,71 @@ Then:
 2. Check that Dependabot pull requests start, target `develop` and run CI ([#78](https://github.com/hawkins48b/cw-zro/issues/78)). It reads its configuration from `main` only, so it does nothing until a release.
 3. Reopen any issue that a `Closes` line closed too early.
 
-There is no rollback step: build artifacts are kept for 1 day, and a deploy always ships the current `main`. To go back, merge a revert on `develop` and release it. `package.json` stays at 2.0.0, and releases have no tags.
+There is no rollback step: build artifacts are kept for 1 day, and a deploy always ships the current `main`. To go back, merge a revert on `develop` and release it.
+
+## Desktop release
+
+The web release above does not need a tag. A desktop release does. Only when the owner asks:
+
+1. On `develop`, set `version` in `package.json` to the new version, for example `2.1.0`, and run `npm install --package-lock-only` so `package-lock.json` matches. Merge it like any change.
+2. Release `develop` to `main` as above. This also deploys the web app.
+3. Tag the release commit on `main` and push the tag:
+
+   ```bash
+   git fetch origin
+   git tag v2.1.0 origin/main
+   git push origin v2.1.0
+   ```
+
+4. Watch the Release run in the Actions tab, then check the release page.
+
+[`release.yml`](../.github/workflows/release.yml) runs on a push of a tag that starts with `v`:
+
+| Job | What it does |
+|-----|--------------|
+| `ci` | Calls [`ci.yml`](../.github/workflows/ci.yml): tests, build, audit |
+| `check` | Fails unless the tag is `v` + the `version` in `package.json`, and the tagged commit is on `main` |
+| `build` | On `ubuntu-latest`, `windows-latest` and `macos-latest`: `npm ci`, `npm run build` (the web build, not `build:mobile`), then electron-builder with `--publish never`. No secrets, no npm cache, `CSC_IDENTITY_AUTO_DISCOVERY=false`. Uploads the installers as artifacts, kept 7 days |
+| `release` | The only job with `contents: write`. No checkout and no npm. Downloads the installers, fails unless they are exactly the four files listed below for this version, writes `SHA256SUMS.txt` and runs `gh release create` with `GITHUB_TOKEN` |
+
+The builds need `ci` and `check`, so a failing test, audit or check stops the release before anything is published.
+
+The workflow refuses a tag on a commit that is not on `main`, such as a commit of `develop` or a feature branch. This stops mistakes, but it is not a control: GitHub runs the `release.yml` of the tagged commit, so anyone who can push a tag can tag a branch commit whose workflow skips the check. A tag ruleset on `refs/tags/v*` would make it one. That is an owner setting, like the branch protection in [#87](https://github.com/hawkins48b/cw-zro/issues/87). `ci.yml` and `deploy-prod.yml` only run on branches, so a tag push does not deploy the web app again.
+
+Runs for the same tag share one concurrency group. A running release is never cancelled. GitHub keeps only one pending run per group, so a newer run replaces a pending one. `gh release create` fails if the release exists. It uploads to a draft and publishes at the end: if an upload fails, delete the draft release on GitHub, then re-run the failed jobs. To replace a published release, delete it and its tag, fix the problem, and tag again with a new version.
+
+The release holds:
+
+| File | Platform |
+|------|----------|
+| `ZRO-X.Y.Z-win-x64.exe` | Windows, NSIS installer |
+| `ZRO-X.Y.Z-mac-arm64.dmg` | macOS, Apple silicon |
+| `ZRO-X.Y.Z-mac-x64.dmg` | macOS, Intel. Built on the Apple silicon runner |
+| `ZRO-X.Y.Z-linux-x86_64.AppImage` | Linux |
+| `SHA256SUMS.txt` | SHA-256 of each file above |
+
+The names come from `artifactName` in [`electron-builder.json`](../electron-builder.json). macOS gets two dmgs rather than one universal app: no merge step, and each download is half the size.
+
+### Unsigned installers
+
+By owner decision ([#79](https://github.com/hawkins48b/cw-zro/issues/79)), the installers are not signed and not notarized. The release notes say so. Users see a warning on the first start:
+
+| Platform | Warning | How to start it |
+|----------|---------|-----------------|
+| Windows | SmartScreen: "Windows protected your PC" | "More info", then "Run anyway" |
+| macOS | Gatekeeper: the app "cannot be opened" or "is damaged" | Try to open it once, then System Settings, Privacy & Security, "Open Anyway". If macOS says the app is damaged: `xattr -dr com.apple.quarantine /Applications/ZRO.app` |
+| Linux | None. The AppImage must be executable | `chmod +x ZRO-*.AppImage` |
+
+Users should first compare the file with `SHA256SUMS.txt` (`sha256sum`, `shasum -a 256` on macOS, `Get-FileHash` on Windows). The checksums come from the same release, so they catch a broken download, not a replaced release.
+
+The macOS app carries only the ad-hoc signature that the `resetAdHocDarwinSignature` fuse writes, which Apple silicon needs to run it at all. Signing can be added later with repository secrets for electron-builder (`CSC_LINK`, `CSC_KEY_PASSWORD`, and for notarization `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`). None exist today. Signing material never goes in the repository.
+
+### Mobile
+
+Mobile apps are not built in CI, by owner decision ([#79](https://github.com/hawkins48b/cw-zro/issues/79)):
+
+- `android/` and `ios/` stay git-ignored, so the native projects are not in the repository. See [Development](development.md#mobile-build).
+- Store builds wait for LGPL compliance of the engine ([#143](https://github.com/hawkins48b/cw-zro/issues/143)) and a Content-Security-Policy for the mobile build ([#135](https://github.com/hawkins48b/cw-zro/issues/135)).
 
 ## Known gaps
 
@@ -134,12 +199,11 @@ There is no rollback step: build artifacts are kept for 1 day, and a deploy alwa
 
 ### Desktop and mobile releases
 
-**[#79](https://github.com/hawkins48b/cw-zro/issues/79), open.** No workflow builds or publishes them.
+**[#79](https://github.com/hawkins48b/cw-zro/issues/79), open.** See [Desktop release](#desktop-release).
 
-- Desktop packages are built by hand with `npm run electron:build`. The Linux AppImage was built and run. Windows and macOS packages have not been built.
-- There is no code signing, no auto-update and no versioned release.
-- `android/` and `ios/` are git-ignored, so mobile apps cannot be rebuilt from the repository alone. See [Development](development.md#mobile-build).
-- Which platforms to ship, how signing works and whether to commit the native projects are owner decisions.
+- No tag has been pushed, so the Release workflow, and the Windows and macOS builds, have not run. Only the Linux AppImage has been built and run, by hand.
+- The installers are not signed, and there is no auto-update.
+- Mobile apps are not built in CI and cannot be rebuilt from the repository alone ([Mobile](#mobile)).
 
 ### Dependency decisions
 

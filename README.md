@@ -8,7 +8,8 @@ Results are estimates from a point-mass model. Read the [assumptions, limits and
 
 - **Production:** a push to `main` deploys the web app over FTPS. Nothing delivered since the last release is in production yet, and the last deploy stopped before uploading. See [Deployment](docs/deployment.md#current-state).
 - **`develop`:** the integration branch. It runs CI and deploys nowhere ([#69](https://github.com/hawkins48b/cw-zro/issues/69)).
-- **Desktop and mobile:** built by hand. No workflow builds them ([#79](https://github.com/hawkins48b/cw-zro/issues/79)).
+- **Desktop:** a version tag on `main` builds unsigned installers for Windows, macOS and Linux and publishes them as a GitHub release. No tag has been pushed yet. See [Desktop release](docs/deployment.md#desktop-release).
+- **Mobile:** built by hand, not in CI ([#79](https://github.com/hawkins48b/cw-zro/issues/79)). See [Mobile](docs/deployment.md#mobile).
 - **Pinned by owner decision:** `js-ballistics` on 3.1.0 ([#77](https://github.com/hawkins48b/cw-zro/issues/77)); it embeds the LGPL-3.0 engine bclibc, see [Licences](docs/data-and-privacy.md#licences). ApexCharts on 8.8.1 ([#75](https://github.com/hawkins48b/cw-zro/issues/75)).
 
 ## Quick start

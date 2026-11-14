@@ -77,7 +77,7 @@ npm run preview
 
 ## Mobile build
 
-`android/` and `ios/` are git-ignored and do not exist after a clone, so create them once. This repository has no signing setup, and no delivery document records a run on a device or emulator ([#79](https://github.com/hawkins48b/cw-zro/issues/79)).
+`android/` and `ios/` are git-ignored and do not exist after a clone, so create them once. This repository has no signing setup, and no delivery document records a run on a device or emulator ([#79](https://github.com/hawkins48b/cw-zro/issues/79)). They stay out of the repository and out of CI by owner decision: see [Mobile](deployment.md#mobile).
 
 ```bash
 npm run build:mobile
@@ -102,11 +102,11 @@ The first `electron .` after a fresh install downloads the Electron binary.
 
 | Platform | Package | State |
 |----------|---------|-------|
-| Linux | `ZRO-2.0.0.AppImage` | Built and run |
-| Windows | NSIS installer | Not built. On Linux the build stops at wine |
-| macOS | dmg | Not built |
+| Linux | `ZRO-2.0.0-linux-x86_64.AppImage` | Built and run |
+| Windows | `ZRO-2.0.0-win-x64.exe`, NSIS installer | Not built. On Linux the build stops at wine |
+| macOS | `ZRO-2.0.0-mac-arm64.dmg` and `ZRO-2.0.0-mac-x64.dmg` | Not built |
 
-electron-builder targets the platform it runs on. Packages are not signed, and there is no auto-update. Electron 45 needs macOS 13 or later and drops 32-bit Windows and armv7l. [The Electron delivery](2026-11-05-76-electron.md) has the details. Fuses, permissions, the menu and the sandbox are in [Architecture](architecture.md#desktop) ([#104](https://github.com/hawkins48b/cw-zro/issues/104)).
+electron-builder targets the platform it runs on. A version tag builds all three in CI and publishes them: see [Desktop release](deployment.md#desktop-release). Packages are not signed, and there is no auto-update. Electron 45 needs macOS 13 or later and drops 32-bit Windows and armv7l. [The Electron delivery](2026-11-05-76-electron.md) has the details. Fuses, permissions, the menu and the sandbox are in [Architecture](architecture.md#desktop) ([#104](https://github.com/hawkins48b/cw-zro/issues/104)).
 
 The fuses make a packaged app ignore `--inspect` and `ELECTRON_RUN_AS_NODE`, and it has no developer tools. Debug with `npm run electron:dev`, which keeps them.
 
