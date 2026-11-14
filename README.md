@@ -13,7 +13,7 @@ Results are estimates from a point-mass model. Read the [assumptions, limits and
 
 ## Quick start
 
-You need Node 26 (`.nvmrc` says 26, the active LTS; `.npmrc` makes npm refuse a Node version a dependency does not accept). Work happens on `develop`, not on the default branch.
+You need Node 26 (`.nvmrc` says 26, the active LTS; `package.json` requires it and `.npmrc` makes npm refuse an older version). Work happens on `develop`, not on the default branch.
 
 ```bash
 git clone https://github.com/hawkins48b/cw-zro.git

@@ -8,9 +8,9 @@
 | npm | 11.20.0 was used | Comes with Node 26.13.1 |
 | Git | Any | |
 
-`.npmrc` sets `engine-strict=true`, so a Node version a dependency does not accept stops `npm ci` with `EBADENGINE`. `.nvmrc` holds the major version only: CI installs the latest 26.x, and `nvm use` takes whichever 26.x you have, so check it with `node -v`.
+`package.json` requires Node 26 or later (`engines.node`), and `.npmrc` sets `engine-strict=true`, so an older Node stops `npm ci` with `EBADENGINE`. `.nvmrc` holds the major version only: CI installs the latest 26.x, and `nvm use` takes whichever 26.x you have, so check it with `node -v`.
 
-Every dependency accepts any 26.x. The dependencies would also still run on Node 22.22.2 or later, the floor set by `jsdom` 31 (SvelteKit needs 22.17, Vite and Vitest 22.12, Capacitor 22.0), but only 26 runs in CI. Vitest 5 does not accept Node 25.
+Every dependency accepts any 26.x. Their own floors are lower (`jsdom` 31 22.22.2, SvelteKit 22.17, Vite and Vitest 22.12, Capacitor 22.0), but `engines.node` refuses anything before 26, the only version CI runs. Vitest 5 does not accept Node 25.
 
 npm 11 warns during `npm ci` that `electron-winstaller` has an install script "not yet covered by allowScripts". It still runs: it copies the bundled 7-Zip binary for the host CPU architecture inside its `vendor/` folder (used to build the Windows installer) and downloads nothing. Nothing needs approving today.
 
@@ -116,7 +116,7 @@ The fuses make a packaged app ignore `--inspect` and `ELECTRON_RUN_AS_NODE`, and
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `EBADENGINE` on install | Node older than 22.22.2 | Update Node |
+| `EBADENGINE` on install | Node older than 26 | `nvm install` (reads `.nvmrc`) |
 | `vite preview` shows a blank page, then crashes with `ENOENT` | It was left running across a rebuild | Restart it |
 | `android platform has not been added yet` | `android/` does not exist | Run `npx cap add android` |
 | Web preview behaves like the mobile bundle | `build:mobile` was the last build | Run `npm run build` |
