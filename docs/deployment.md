@@ -28,7 +28,7 @@ This guide describes the state on 2026-11-14.
 2. Merge into `develop` when CI passes. The dev site then shows it.
 3. Merge `develop` into `main` only when the owner asks for a release.
 
-**Never push to `main` for anything else: every push deploys to production.** Nothing in the repository settings prevents it yet ([#87](https://github.com/hawkins48b/cw-zro/issues/87)).
+**Never push to `main` for anything else: every push deploys to production.** Nothing in the repository settings prevents it: on 2026-11-15 the owner decided not to protect `main` ([#87](https://github.com/hawkins48b/cw-zro/issues/87)).
 
 A `Closes #N` line closes the issue when it reaches `main`, even if the deploy fails. That happened to #66 and #68, which had to be reopened.
 
@@ -47,15 +47,14 @@ Only names are listed here. Values are in GitHub settings, and they never go in 
 
 | Name | Where | Use |
 |------|-------|-----|
-| `FTP_HOST` | Repository secret | Production server name. Must match the name on the server certificate |
-| `FTP_USER` | Repository secret | Production FTP user |
-| `FTP_PWD` | Repository secret | Production FTP password |
+| `FTP_HOST` | `prod` environment secret | Production server name. Must match the name on the server certificate |
+| `FTP_USER` | `prod` environment secret | Production FTP user |
+| `FTP_PWD` | `prod` environment secret | Production FTP password |
 | `DEV_FTP_HOST` | `dev` environment secret | Dev server name. Must match the name on the server certificate. Not set yet |
 | `DEV_FTP_USER` | `dev` environment secret | Dev FTP user, limited to the dev folder. Not set yet |
 | `DEV_FTP_PWD` | `dev` environment secret | Dev FTP password. Not set yet |
-| `SSH_PWD`, `SSH_USER`, `SERVER_HOST`, `SERVER_PATH` | `prod` and `dev` environments | Unused by any workflow. To remove ([#87](https://github.com/hawkins48b/cw-zro/issues/87)) |
 
-The dev secrets have their own names on purpose. A job in an environment sees the repository secrets too, and an environment secret only replaces a repository secret of the same name. A dev job that read `FTP_*` would, without dev values, get the production ones and ship `develop` to production. The dev deploy reads only `DEV_FTP_*`, with no fallback to `FTP_*`.
+There are no repository secrets. Since [#87](https://github.com/hawkins48b/cw-zro/issues/87) (2026-11-14) the production `FTP_*` secrets exist only in the `prod` environment, so only a job in `prod` can read them, and the dev job cannot. `prod` has no deployment branch rule (owner decision, [#87](https://github.com/hawkins48b/cw-zro/issues/87)), so a workflow on any branch can still declare `environment: prod` and read them. The dev secrets still keep their own names: if `FTP_*` ever came back as repository secrets, a dev job that read `FTP_*` would get the production ones and ship `develop` to production. The dev deploy reads only `DEV_FTP_*`, with no fallback to `FTP_*`. Never add deploy secrets as repository secrets.
 
 The app itself has no secrets and no runtime configuration. `build/` contains no environment values, so dev and production get the same files.
 
@@ -71,7 +70,7 @@ Both run the same steps:
 1. The `ci` job calls [`ci.yml`](../.github/workflows/ci.yml): tests, build and audit. The build is uploaded as an artifact, kept for 1 day. `ci.yml` has no push trigger of its own, so it runs once per push.
 2. The `deploy` job needs `ci`, and runs only on its branch. Started by hand from another branch, the workflow runs CI and skips the deploy.
 3. The `deploy` job calls [`deploy-ftp.yml`](../.github/workflows/deploy-ftp.yml) with `secrets: inherit`. Its only input, `environment`, is `prod` or `dev`. It picks the GitHub environment and the secret names. `prod` must run on `main` and `dev` on `develop`; anything else fails, whichever workflow calls it.
-4. A first step checks that the three secrets are set. For `dev`, it also fails if `DEV_FTP_USER` is the production `FTP_USER` (case ignored) or `DEV_FTP_PWD` is the production `FTP_PWD`, so the dev deploy cannot log in as the production account. `secrets: inherit` lets the dev job read the production secrets for this check. Only the two pinned actions run beside them.
+4. A first step checks that the three secrets are set. It does not compare the dev account with the production one: the dev job cannot see the production secrets, and the owner chose on 2026-11-14 to drop that guard ([#87](https://github.com/hawkins48b/cw-zro/issues/87)). Entering the production FTP user as `DEV_FTP_USER` would deploy `develop` to production, so check it when setting up the dev site.
 5. It downloads the artifact and sends it by FTPS with strict certificate checks, from `build/` to the FTP root (`/`). It has no checkout and no npm, so no dependency code runs beside the FTP password, and the site gets exactly the tested build.
 
 A failed audit blocks both deploys, even with no change to the dependencies. See [Audit](../README.md#audit).
@@ -84,7 +83,7 @@ Owner steps. Until all three secrets exist, every push to `develop` shows a warn
 
 1. On Hostpoint, create the dev subdomain and its own folder, outside the production web root.
 2. Create an FTP user limited to that folder. Its FTP root must be the dev web root: the deploy writes to `/`.
-3. In GitHub, Settings, Environments, `dev`, add the environment secrets `DEV_FTP_HOST`, `DEV_FTP_USER` and `DEV_FTP_PWD`. Not repository secrets.
+3. In GitHub, Settings, Environments, `dev`, add the environment secrets `DEV_FTP_HOST`, `DEV_FTP_USER` and `DEV_FTP_PWD`. Not repository secrets. They must be the dev account from step 2, never the production FTP user: nothing in the workflow checks this any more.
 4. `DEV_FTP_HOST` must be the name on the server certificate, or the strict TLS check stops the deploy before login (as happened to `FTP_HOST`, [#66](https://github.com/hawkins48b/cw-zro/issues/66)).
 5. Optional: in the `dev` environment, limit deployment branches to `develop`.
 6. Re-run the last Deploy Dev run, or push to `develop`, and open the dev site, including an inner URL such as `/profiles`.
@@ -209,7 +208,7 @@ Mobile apps are not built in CI, by owner decision ([#79](https://github.com/haw
 
 ### Repository settings
 
-**[#87](https://github.com/hawkins48b/cw-zro/issues/87), open.** `main` is not protected, `prod` has no branch rule, and the FTP secrets are repository secrets. The `if` on the deploy job lives in the workflow file, so a branch can change it. Only settings can enforce this, and only the owner can change them. `hawkins48b` is the only collaborator today, which limits the risk.
+**[#87](https://github.com/hawkins48b/cw-zro/issues/87), closed.** The FTP secrets are `prod` environment secrets and the unused SSH secrets are gone (2026-11-14). The owner decided on 2026-11-15 not to protect `main` and not to restrict `prod` or `dev` to a branch. The `if` on the deploy job lives in the workflow file, so a branch can change it. Only settings can enforce this, and only the owner can change them. `hawkins48b` is the only collaborator today, which limits the risk.
 
 ### CI proof
 
@@ -222,8 +221,6 @@ Mobile apps are not built in CI, by owner decision ([#79](https://github.com/haw
 ### Dev deployment
 
 **[#69](https://github.com/hawkins48b/cw-zro/issues/69).** Deploy Dev exists, but it has not uploaded anything: the dev site and its `DEV_FTP_*` secrets are owner steps ([Set up the dev site](#set-up-the-dev-site)). Not seen on GitHub yet: the warning run without secrets, and a real dev upload.
-
-- The guard against the production account compares the FTP user and password. If [#87](https://github.com/hawkins48b/cw-zro/issues/87) moves `FTP_*` into the `prod` environment, the dev job no longer sees them and the guard does nothing.
 
 ### Desktop and mobile releases
 

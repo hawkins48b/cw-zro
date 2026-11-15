@@ -37,9 +37,6 @@ jobs:
           DEPLOY_USER: ${{ secrets[format('{0}FTP_USER', env.SECRET_PREFIX)] }}
           # Only whether it is set: the password stays out of this step.
           DEPLOY_PWD_SET: ${{ secrets[format('{0}FTP_PWD', env.SECRET_PREFIX)] != '' }}
-          PROD_USER: ${{ secrets.FTP_USER }}
-          # Only whether the dev password is the production one.
-          SAME_PWD: ${{ secrets.DEV_FTP_PWD != '' && secrets.DEV_FTP_PWD == secrets.FTP_PWD }}
           # The caller's ref: prod only from main, dev only from develop,
           # whatever workflow calls this one.
           REF: ${{ github.ref }}
@@ -58,19 +55,7 @@ jobs:
               echo "deploy=false" >> "$GITHUB_OUTPUT"
               exit 0
             fi
-            echo "::error::The secrets FTP_HOST, FTP_USER and FTP_PWD are not all set."
-            exit 1
-          fi
-
-          # The dev FTP user must not be the production account, whatever
-          # name DEV_FTP_HOST gives the server.
-          if [ "$TARGET" = dev ] && [ -n "$PROD_USER" ] \
-            && [ "$(printf '%s' "$DEPLOY_USER" | tr '[:upper:]' '[:lower:]')" = "$(printf '%s' "$PROD_USER" | tr '[:upper:]' '[:lower:]')" ]; then
-            echo "::error::DEV_FTP_USER is the production FTP user. Use an FTP user limited to the dev folder."
-            exit 1
-          fi
-          if [ "$TARGET" = dev ] && [ "$SAME_PWD" = 'true' ]; then
-            echo "::error::DEV_FTP_PWD is the production FTP password. Use an FTP user limited to the dev folder."
+            echo "::error::The secrets FTP_HOST, FTP_USER and FTP_PWD are not all set in the prod environment."
             exit 1
           fi
 
