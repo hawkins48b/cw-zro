@@ -6,6 +6,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { calculateShotPoint } from '#lib/utils/ballisticCalculator.js';
 import { calculateTrajectoryValidation } from '#lib/utils/trajectoryValidation.js';
+import { MAX_BC } from '#lib/utils/inputLimits.js';
 
 vi.mock('#lib/utils/ballisticCalculator.js', () => ({ calculateShotPoint: vi.fn() }));
 
@@ -75,6 +76,23 @@ describe('trajectory validation search', () => {
 		expect(result.error).toBeUndefined();
 		expect(result.validatedPoint.firedAt).toBe(result.validatedVelocity);
 		expect(Number.isInteger(result.validatedVelocity)).toBe(true);
+	});
+
+	it('never fires a BC above MAX_BC (#147), and finds none past it', () => {
+		// The measure rises with BC and meets the goal of 50 only at BC 2.5, past the ceiling.
+		const fired = [];
+		calculateShotPoint.mockImplementation((shotProfile) => {
+			const bc = parseFloat(shotProfile.bc);
+			fired.push(bc);
+			const value = { In: () => (bc - 2) * 100 };
+			return { slantHeight: value, dropAngle: value, firedAt: bc };
+		});
+		const result = calculateTrajectoryValidation(
+			{ ...profile, bc: '1.5' }, range, 'distance', '50', 'in', 'bc', null, 'above'
+		);
+		expect(result.error).toBe('no_solution');
+		expect(fired.length).toBeGreaterThan(1);
+		expect(Math.max(...fired)).toBeLessThanOrEqual(MAX_BC);
 	});
 
 	it('gives up after a bounded number of shots', () => {

@@ -161,9 +161,7 @@
 			case 'above_zero_max':
 				return m.validation_range_above_zero({ max, unit });
 			case 'range':
-				return m.validation_range({ min, max, unit });
-			case 'min':
-				return m.validation_min({ min });
+				return unit ? m.validation_range({ min, max, unit }) : m.validation_range_no_unit({ min, max });
 			default:
 				return m.validation_range_below_max({ min, max, unit });
 		}

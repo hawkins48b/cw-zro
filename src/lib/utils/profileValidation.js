@@ -5,6 +5,7 @@
 import { normalizeDecimal, parseDecimal } from './decimal.js';
 import {
 	MAX_DISTANCE,
+	MAX_BC,
 	MAX_VELOCITY_FPS,
 	MIN_BC,
 	MIN_VELOCITY_FPS,
@@ -57,14 +58,13 @@ const VELOCITY_SHOWN = {
 
 /**
  * The limits of a numeric profile field with one, for its error message, in the unit chosen in the
- * form. Null for a field without limits beyond being positive.
+ * form. Null for a field without limits beyond being positive. A BC has no unit, so it has none.
  *
  * | kind            | Allowed              | Fields                                         |
  * |-----------------|----------------------|------------------------------------------------|
  * | 'above_zero_max'| over 0, up to max    | opticHeight                                    |
  * | 'range'         | min to max           | zeroDist, bulletWeight, bulletDiameter,        |
- * |                 |                      | barrelTwist, bulletLength (#125)               |
- * | 'min'           | min or more          | bc                                             |
+ * |                 |                      | barrelTwist, bulletLength (#125), bc (#147)    |
  * | 'min_below_max' | min to under max     | velocity                                       |
  *
  * @param {string} key
@@ -85,7 +85,7 @@ export function profileFieldLimits(key, form) {
 				unit: form.zeroUnit === 'm' ? 'm' : 'yd'
 			};
 		case 'bc':
-			return { kind: 'min', min: MIN_BC };
+			return { kind: 'range', min: MIN_BC, max: MAX_BC };
 		case 'velocity': {
 			const unit = form.velocityUnit === 'mps' ? 'mps' : 'fps';
 			return { kind: 'min_below_max', ...VELOCITY_SHOWN[unit], unit };
@@ -122,7 +122,7 @@ function isWithinLimits(key, value, form) {
 		case 'zeroDist':
 			return value >= MIN_ZERO_DISTANCE && value <= MAX_DISTANCE;
 		case 'bc':
-			return value >= MIN_BC;
+			return value >= MIN_BC && value <= MAX_BC;
 		case 'velocity': {
 			const fps = velocityInFps(value, form.velocityUnit);
 			return fps >= MIN_VELOCITY_FPS && fps < MAX_VELOCITY_FPS;

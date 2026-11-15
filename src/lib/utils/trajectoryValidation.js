@@ -1,7 +1,7 @@
 import { Unit } from 'js-ballistics';
 import { calculateShotPoint } from './ballisticCalculator.js';
 import { readDecimal } from './decimal.js';
-import { MAX_DISTANCE, MIN_BC } from './inputLimits.js';
+import { MAX_BC, MAX_DISTANCE, MIN_BC } from './inputLimits.js';
 
 /**
  * Most shots one search may fire. A full walk across the velocity range is 100 shots and each
@@ -99,7 +99,7 @@ export function calculateTrajectoryValidation(
 		const minStep = isVelocity ? 1 : 0.001;
 		// The velocity bound is in the profile's unit. calculateShotPoint also stops anything from
 		// 10000 fps up (MAX_VELOCITY_FPS), so an m/s search fails there, as on a bound.
-		const maxParam = isVelocity ? 10000 : 2.0;
+		const maxParam = isVelocity ? 10000 : MAX_BC;
 		const minParam = isVelocity ? 0 : MIN_BC;
 
 		/** Fire at a parameter value. Null when it is out of bounds or the shot fails. */

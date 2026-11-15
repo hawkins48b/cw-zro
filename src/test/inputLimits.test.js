@@ -22,13 +22,15 @@ import { downloadDopeCard } from '#lib/utils/dopeCardDownload.js';
 import { shotWinds } from '#lib/utils/shotWind.js';
 import {
 	MIN_BC,
+	MAX_BC,
 	MAX_VELOCITY_FPS,
 	MAX_SIGHT_HEIGHT,
 	MAX_DISTANCE,
 	TEMPERATURE_LIMITS,
 	PRESSURE_LIMITS,
 	velocityInFps,
-	isUsableVelocityFps
+	isUsableVelocityFps,
+	isUsableBc
 } from '#lib/utils/inputLimits.js';
 import { P308_G1, P308_G1_METRIC_EXACT } from './fixtures/ballisticProfiles.js';
 
@@ -110,13 +112,21 @@ const BC_REJECTED = [
 	['Infinity', 'Infinity'],
 	['a stored overflow', stored('1e999')],
 	['hex, which parseFloat reads as 0', '0x10'],
-	['empty', '']
+	['empty', ''],
+	['just over the ceiling (#147)', '2.0001'],
+	['just over the ceiling with a comma', '2,0001'],
+	['2.5', '2.5'],
+	['1e9', '1e9'],
+	['a stored number over the ceiling', 2.0001]
 ];
 const BC_ACCEPTED = [
 	['the floor', '0.01'],
 	['the floor with a comma', '0,01'],
 	['a stored number at the floor', MIN_BC],
-	['a G1 match bullet', '0.462']
+	['a G1 match bullet', '0.462'],
+	['the ceiling (#147)', '2'],
+	['the ceiling with a comma', '2,0'],
+	['a stored number at the ceiling', MAX_BC]
 ];
 
 const VELOCITY_REJECTED = [
@@ -181,7 +191,7 @@ afterEach(() => {
 });
 
 describe.each(PROFILE_PATHS)('%s', (_, run) => {
-	describe('BC (#119)', () => {
+	describe('BC (#119, #147)', () => {
 		it.each(BC_REJECTED)('gives no result for %s, before the engine', async (__, bc) => {
 			expect(noResult(await run({ ...P308_G1, bc }))).toBe(true);
 			expect(reached()).toBe(false);
@@ -189,6 +199,13 @@ describe.each(PROFILE_PATHS)('%s', (_, run) => {
 
 		it.each(BC_ACCEPTED)('reaches the engine with %s', async (__, bc) => {
 			await run({ ...P308_G1, bc });
+			expect(reached()).toBe(true);
+		});
+
+		it('takes the same limits on a G7 BC', async () => {
+			expect(noResult(await run({ ...P308_G1, bcType: 'G7', bc: '2.0001' }))).toBe(true);
+			expect(reached()).toBe(false);
+			await run({ ...P308_G1, bcType: 'G7', bc: '2' });
 			expect(reached()).toBe(true);
 		});
 	});
@@ -339,11 +356,24 @@ describe('a saved profile holding a value out of its limits (#89, #119)', () => 
 describe('limits', () => {
 	it('are the values the owner chose', () => {
 		expect(MIN_BC).toBe(0.01);
+		expect(MAX_BC).toBe(2);
 		expect(MAX_VELOCITY_FPS).toBe(10000);
 		expect(MAX_SIGHT_HEIGHT).toEqual({ in: 10, cm: 25.4 });
 		expect(MAX_DISTANCE).toBe(3000);
 		expect(TEMPERATURE_LIMITS).toEqual({ c: { min: -90, max: 70 }, f: { min: -130, max: 158 } });
 		expect(PRESSURE_LIMITS).toEqual({ hpa: { min: 300, max: 1200 }, inhg: { min: 8.86, max: 35.4 } });
+	});
+
+	it.each([
+		[0.01, true],
+		[0.0099, false],
+		[2, true],
+		[2.0001, false],
+		[2 + 2 * Number.EPSILON, false], // the next double after 2
+		[Infinity, false],
+		[NaN, false]
+	])('take a BC of %s: %s (#147: 0.01 to 2, both included)', (bc, usable) => {
+		expect(isUsableBc(bc)).toBe(usable);
 	});
 
 	it('convert m/s as the form shows them: 15.24 is in, 3048 is out', () => {

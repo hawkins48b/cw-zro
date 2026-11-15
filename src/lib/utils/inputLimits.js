@@ -4,7 +4,7 @@ import { readDecimal } from './decimal.js';
 
 /**
  * Limits of the values the engine is given, shared by the profile form and every calculation path
- * (#89, #90, #92, #93, #119, #125; owner decisions of 2026-11-10).
+ * (#89, #90, #92, #93, #119, #125; owner decisions of 2026-11-10; #147, 2026-11-15).
  *
  * js-ballistics runs synchronously and can stay in its loop for good far outside normal values,
  * which neither try/catch nor a timeout can stop, so the calculators check these before they call
@@ -17,6 +17,12 @@ import { readDecimal } from './decimal.js';
 
 /** Lowest BC, G1 or G7. A BC of 0.00001 ran until killed. */
 export const MIN_BC = 0.01;
+
+/**
+ * Highest BC, G1 or G7, included (#147; owner decision of 2026-11-15). No real bullet comes near
+ * it, and it is the top of the BC range the probes above covered.
+ */
+export const MAX_BC = 2;
 
 /** Muzzle velocity must be under this, in fps, in whichever unit it was entered. */
 export const MAX_VELOCITY_FPS = 10000;
@@ -72,12 +78,12 @@ export const ALTITUDE_LIMITS = { m: { min: -1000, max: 10000 }, ft: { min: -3281
 const within = (value, { min, max }) => value >= min && value <= max;
 
 /**
- * Whether a BC can be given to the engine.
+ * Whether a BC can be given to the engine: from MIN_BC to MAX_BC, both included.
  * @param {number} bc
  * @returns {boolean}
  */
 export function isUsableBc(bc) {
-	return Number.isFinite(bc) && bc >= MIN_BC;
+	return Number.isFinite(bc) && bc >= MIN_BC && bc <= MAX_BC;
 }
 
 /**

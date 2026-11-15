@@ -220,8 +220,8 @@
 	"validation_required": "Required",
 	"validation_positive_number": "Must be a positive number",
 	"validation_range": "Enter a number from {min} to {max} {unit}",
+	"validation_range_no_unit": "Enter a number from {min} to {max}",
 	"validation_range_above_zero": "Enter a number above 0 and up to {max} {unit}",
-	"validation_min": "Enter a number of at least {min}",
 	"validation_range_below_max": "Enter a number from {min} to under {max} {unit}",
 
 	"settings_dark_mode": "Dark Mode",

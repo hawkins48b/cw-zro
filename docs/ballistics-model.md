@@ -214,7 +214,7 @@ Limits:
 
 The library runs synchronously. **Far outside normal values it can stay in its loop for good, and neither `try/catch` nor a timeout can stop that.** So guards have to run before the engine is called. These are the guards in place.
 
-The limits were set by the owner on 2026-11-10 ([#89](https://github.com/hawkins48b/cw-zro/issues/89), [#90](https://github.com/hawkins48b/cw-zro/issues/90), [#91](https://github.com/hawkins48b/cw-zro/issues/91), [#92](https://github.com/hawkins48b/cw-zro/issues/92), [#93](https://github.com/hawkins48b/cw-zro/issues/93), [#114](https://github.com/hawkins48b/cw-zro/issues/114), [#119](https://github.com/hawkins48b/cw-zro/issues/119), [#125](https://github.com/hawkins48b/cw-zro/issues/125)). They live in [`inputLimits.js`](../src/lib/utils/inputLimits.js) and [`zeroDistance.js`](../src/lib/utils/zeroDistance.js), and the form and every path read them from there. Measured on f40933f before the change, 3888 worst-case combinations inside them (G1 and G7, BC 0.01 to 2, 60 to 9999 fps, sight height -10 to 10 in, zero 1 to 3000, both ends of temperature and pressure, no wind and 223 mph at 0° and 90°, the engine's angles) gave no hang through `calculateShotPoint` and `calculateFullTrajectory`. The slowest took 2.2 s, on a 3000 zero. The dope cards, MPBR and validation were not part of that run.
+The limits were set by the owner on 2026-11-10 ([#89](https://github.com/hawkins48b/cw-zro/issues/89), [#90](https://github.com/hawkins48b/cw-zro/issues/90), [#91](https://github.com/hawkins48b/cw-zro/issues/91), [#92](https://github.com/hawkins48b/cw-zro/issues/92), [#93](https://github.com/hawkins48b/cw-zro/issues/93), [#114](https://github.com/hawkins48b/cw-zro/issues/114), [#119](https://github.com/hawkins48b/cw-zro/issues/119), [#125](https://github.com/hawkins48b/cw-zro/issues/125)), and the highest BC on 2026-11-15 ([#147](https://github.com/hawkins48b/cw-zro/issues/147)). They live in [`inputLimits.js`](../src/lib/utils/inputLimits.js) and [`zeroDistance.js`](../src/lib/utils/zeroDistance.js), and the form and every path read them from there. Measured on f40933f before the change, 3888 worst-case combinations inside them (G1 and G7, BC 0.01 to 2, 60 to 9999 fps, sight height -10 to 10 in, zero 1 to 3000, both ends of temperature and pressure, no wind and 223 mph at 0° and 90°, the engine's angles) gave no hang through `calculateShotPoint` and `calculateFullTrajectory`. The slowest took 2.2 s, on a 3000 zero. The dope cards, MPBR and validation were not part of that run.
 
 **Rechecked on js-ballistics 3.1.0 with RK4 for [#77](https://github.com/hawkins48b/cw-zro/issues/77)**, each case in a worker stopped after 20 or 30 s:
 
@@ -226,7 +226,7 @@ The limits were set by the owner on 2026-11-10 ([#89](https://github.com/hawkins
 
 | Limit | Value, in the unit entered |
 |-------|----------------------------|
-| BC | At least 0.01 (`MIN_BC`) |
+| BC | 0.01 (`MIN_BC`) to 2 (`MAX_BC`), both included, G1 or G7. 2 is the top of the probed range; no real bullet comes near it |
 | Muzzle velocity | At least 50 fps, under 10000 fps, also when entered in m/s (15.24 to under 3048 m/s) |
 | Sight height | At most 10 in or 25.4 cm either way |
 | Range | Above 0, at most 3000 yd or m |
@@ -251,7 +251,7 @@ All ends are included. The gram and foot ends are the owner's rounded values, no
 | `calculateShotPoint` | Cant finite (`Number.isFinite`), checked before the zero solve. On 3.1 an infinite or NaN cant hangs the solve ([#77](https://github.com/hawkins48b/cw-zro/issues/77)). The Scope View only passes a stored rotation within ±90° (`storedRotation`) | No result |
 | `calculateShotPoint`, `calculateFullTrajectory` | Range within the limit. Step at least 1, 25 when empty, and at most the range: a larger or infinite step is read as the range (full trajectory, `tableStep`, [#133](https://github.com/hawkins48b/cw-zro/issues/133)) | No result |
 | Ballistic page, step | At least 1 and at most the range, at least 1 for a range under 1 (`tableStepLimit`). Text and NaN count as under 1, an infinite step as over the range ([#130](https://github.com/hawkins48b/cw-zro/issues/130), [#133](https://github.com/hawkins48b/cw-zro/issues/133)) | A message under the box. The table uses `tableStep`: 1, or the range |
-| All five paths | BC at least 0.01 (`isUsableBc`) | No result. A dope card is not saved |
+| All five paths | BC from 0.01 to 2 (`isUsableBc`) | No result. A dope card is not saved |
 | All five paths | Entered velocity finite and under 10000 fps, and velocity at the current temperature finite, at least 50 and under 10000 fps (`hasFlyableVelocity`). MPBR and the dope cards use no powder sensitivity | No result. A dope card is not saved |
 | All five paths | Optic height finite and within 10 in or 25.4 cm either way (`isUsableSightHeight`) | No result. A dope card is not saved |
 | All five paths | Bullet weight and diameter within the limits above (`hasUsableBullet`) ([#125](https://github.com/hawkins48b/cw-zro/issues/125)) | No result. A dope card is not saved |
@@ -274,7 +274,7 @@ All ends are included. The gram and foot ends are the owner's rounded values, no
 | `calculateMPBR` | Barrel elevation up to 0.5 rad, flight up to 20000 units, at most 54 fires and 2 zero solves (each up to 60 iterations, run twice when the first start fails) | No result. A shot reaching the limit is never reported as a capped distance |
 | MPBR page | A suggested zero above 3000. Since #109 the zero is a near crossing, at most 111 units on the measured cases, so this no longer happens on them | Shown, but not offered for saving, with a message |
 | `calculateTrajectoryValidation` | Range at least 100 and at most 3000, beyond the zero, value not 0, velocity and BC above 0 | No result, or an error message for the range |
-| `calculateTrajectoryValidation` | Velocity between 0 and 10000 in the profile's unit, BC between 0.01 and 2. Each shot goes through `calculateShotPoint`, so its limits apply too | Shot skipped |
+| `calculateTrajectoryValidation` | Velocity between 0 and 10000 in the profile's unit, BC between 0.01 and 2 (`MIN_BC`, `MAX_BC`), both ends excluded: a profile BC of exactly 0.01 or 2 gives no solution when solving for BC. Each shot goes through `calculateShotPoint`, so its limits apply too | Shot skipped |
 | `calculateTrajectoryValidation` | At most 200 shots and 5 seconds, checked before each shot | No solution, or a timeout message when time ended a search that could still move |
 | Dope card zero search | Zero elevation at most 0.6 rad | Near and far stay blank |
 

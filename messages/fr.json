@@ -220,8 +220,8 @@
 	"validation_required": "Obligatoire",
 	"validation_positive_number": "Doit être un nombre positif",
 	"validation_range": "Saisissez un nombre de {min} à {max} {unit}",
+	"validation_range_no_unit": "Saisissez un nombre de {min} à {max}",
 	"validation_range_above_zero": "Saisissez un nombre supérieur à 0 et jusqu'à {max} {unit}",
-	"validation_min": "Saisissez un nombre d'au moins {min}",
 	"validation_range_below_max": "Saisissez un nombre de {min} à moins de {max} {unit}",
 
 	"settings_dark_mode": "Mode sombre",

@@ -363,11 +363,11 @@ describe('validateProfile — limits', () => {
 		expect(errorFor({ zeroDist, zeroUnit: 'm' }, 'zeroDist')).toBe('out_of_range');
 	});
 
-	it.each([['0.01'], ['0,01'], ['2.5']])('accepts a BC of %s', (bc) => {
+	it.each([['0.01'], ['0,01'], ['2'], ['2,0'], ['1.999']])('accepts a BC of %s (#147: up to 2)', (bc) => {
 		expect(errorFor({ bc }, 'bc')).toBeUndefined();
 	});
 
-	it.each([['0.0099'], ['0.001'], ['1e-9']])('rejects a BC of %s', (bc) => {
+	it.each([['0.0099'], ['0.001'], ['1e-9'], ['2.0001'], ['2,0001'], ['2.5'], ['1e9']])('rejects a BC of %s', (bc) => {
 		expect(errorFor({ bc }, 'bc')).toBe('out_of_range');
 	});
 
@@ -402,7 +402,8 @@ describe('profileFieldLimits', () => {
 		['opticHeight', { opticHeightUnit: 'cm' }, { kind: 'above_zero_max', max: 25.4, unit: 'cm' }],
 		['zeroDist', { zeroUnit: 'yd' }, { kind: 'range', min: 1, max: 3000, unit: 'yd' }],
 		['zeroDist', { zeroUnit: 'm' }, { kind: 'range', min: 1, max: 3000, unit: 'm' }],
-		['bc', {}, { kind: 'min', min: 0.01 }],
+		['bc', {}, { kind: 'range', min: 0.01, max: 2 }],
+		['bc', { bcType: 'G7' }, { kind: 'range', min: 0.01, max: 2 }],
 		['velocity', { velocityUnit: 'fps' }, { kind: 'min_below_max', min: 50, max: 10000, unit: 'fps' }],
 		['velocity', { velocityUnit: 'mps' }, { kind: 'min_below_max', min: 15.24, max: 3048, unit: 'mps' }]
 	])('states the limits of %s with %j', (key, units, expected) => {
