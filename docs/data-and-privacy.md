@@ -94,7 +94,18 @@ Since [#77](https://github.com/hawkins48b/cw-zro/issues/77) every build (web, de
 |-------|------|
 | About page | A card "Includes bclibc (LGPL-3.0)", in English, French and German, with a link to the bclibc source and to the licences page |
 | `/settings/about/licenses` | The third-party notice and the full LGPL-3.0 and GPL-3.0 texts, shown in the app, so the desktop window never has to leave it |
-| `static/licenses/` | `THIRD-PARTY-NOTICES.txt`, `LGPL-3.0.txt`, `GPL-3.0.txt`, copied into every build under `/licenses/`. The LGPL-3.0 text is identical to the `LICENSE` of bclibc; the LGPL-3.0 incorporates the GPL-3.0, so both are shipped |
+| `static/licenses/` | `THIRD-PARTY-NOTICES.txt` (bclibc, the link to the ZRO source and how to replace bclibc, since #143), `LGPL-3.0.txt`, `GPL-3.0.txt`, copied into every build under `/licenses/`. The LGPL-3.0 text is identical to the `LICENSE` of bclibc; the LGPL-3.0 incorporates the GPL-3.0, so both are shipped |
 
-App-store LGPL compliance: open, see [#143](https://github.com/hawkins48b/cw-zro/issues/143). `js-ballistics` does not ship a licence notice for bclibc itself; its package declares ISC only.
+`js-ballistics` does not ship a licence notice for bclibc itself; its package declares ISC only.
+
+### App-store builds
+
+Owner decision of 2026-11-15 ([#143](https://github.com/hawkins48b/cw-zro/issues/143)): the notice and the public source are enough. The LGPL-3.0 lets users run ZRO with a modified bclibc. The MIT source of ZRO, public at [hawkins48b/cw-zro](https://github.com/hawkins48b/cw-zro), is the "Corresponding Application Code" of LGPL-3.0 section 4(d)(0): with it, anyone can rebuild the app with their own bclibc. The steps are in [Replacing the bclibc engine](development.md#replacing-the-bclibc-engine), and the notice points to them.
+
+| Store | Required |
+|-------|----------|
+| Google Play (Android) | The notice (with the links to the ZRO and bclibc source), the licence texts and the in-app licences page, which every build already has |
+| App Store (iOS) | The same, plus a custom licence agreement in App Store Connect instead of Apple's standard EULA. The standard EULA adds usage restrictions that the GPL-3.0 (section 10) forbids, and the LGPL-3.0 incorporates the GPL-3.0 |
+
+Not done yet: the text of the iOS licence agreement, an owner step before the first iOS submission. Store builds also still wait for the device check of the mobile Content-Security-Policy ([#135](https://github.com/hawkins48b/cw-zro/issues/135)). The rebuild steps were checked with wasi-sdk only, not with zig or on a device: see the table under [Replacing the bclibc engine](development.md#replacing-the-bclibc-engine).
 

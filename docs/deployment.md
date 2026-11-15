@@ -193,7 +193,15 @@ The macOS app carries only the ad-hoc signature that the `resetAdHocDarwinSignat
 Mobile apps are not built in CI, by owner decision ([#79](https://github.com/hawkins48b/cw-zro/issues/79)):
 
 - `android/` and `ios/` stay git-ignored, so the native projects are not in the repository. See [Development](development.md#mobile-build).
-- Store builds wait for LGPL compliance of the engine ([#143](https://github.com/hawkins48b/cw-zro/issues/143)) and a device check of the mobile build's Content-Security-Policy ([#135](https://github.com/hawkins48b/cw-zro/issues/135)).
+- Store builds wait for a device check of the mobile build's Content-Security-Policy ([#135](https://github.com/hawkins48b/cw-zro/issues/135)).
+- What the LGPL-3.0 of the engine (bclibc) asks of a store build was settled by the owner on 2026-11-15 ([#143](https://github.com/hawkins48b/cw-zro/issues/143)). See [Licences](data-and-privacy.md#licences).
+
+| Store | Required |
+|-------|----------|
+| Google Play (Android) | Nothing more than every build already has: the notice with the link to the ZRO source and the bclibc source, the licence texts, and the in-app licences page |
+| App Store (iOS) | The same, plus a custom licence agreement set in App Store Connect instead of Apple's standard EULA. The standard EULA adds usage restrictions that the GPL-3.0 (section 10), which the LGPL-3.0 incorporates, forbids |
+
+The text of the custom licence agreement is not written yet. It is an owner step in App Store Connect, before the first iOS submission.
 
 ## Known gaps
 
@@ -234,5 +242,5 @@ Mobile apps are not built in CI, by owner decision ([#79](https://github.com/haw
 
 Both libraries with licence questions are pinned by owner decision.
 
-- `js-ballistics` is on 3.1.0 by owner decision of 2026-11-11 ([#77](https://github.com/hawkins48b/cw-zro/issues/77)), which accepts the LGPL-3.0 engine it embeds (bclibc) and the result shifts. Every build ships the notice and licence texts ([Licences](data-and-privacy.md#licences)). App-store LGPL compliance: open, see [#143](https://github.com/hawkins48b/cw-zro/issues/143).
+- `js-ballistics` is on 3.1.0 by owner decision of 2026-11-11 ([#77](https://github.com/hawkins48b/cw-zro/issues/77)), which accepts the LGPL-3.0 engine it embeds (bclibc) and the result shifts. Every build ships the notice and licence texts ([Licences](data-and-privacy.md#licences)). What the LGPL asks of the store builds is settled ([#143](https://github.com/hawkins48b/cw-zro/issues/143), see [Mobile](#mobile)).
 - ApexCharts is on 8.8.1 by owner decision of 2026-11-11 ([#75](https://github.com/hawkins48b/cw-zro/issues/75)), which accepts its current licence terms. Its `LICENSE.md` is the same in 8.7.0, 8.8.0 and 8.8.1. Its new dependency `apex-commons` 0.10.0 carries the same licence text under its own name.

@@ -112,6 +112,57 @@ The fuses make a packaged app ignore `--inspect` and `ELECTRON_RUN_AS_NODE`, and
 
 `electron-serve` must stay in `dependencies`. As a devDependency, the packaged app crashes on start although the build reports success.
 
+## Replacing the bclibc engine
+
+The ballistic engine, bclibc 2.0.0 (LGPL-3.0), is compiled to WebAssembly and embedded as base64 in `node_modules/js-ballistics/dist/index.js`. The LGPL lets users run ZRO with a modified bclibc. These steps rebuild js-ballistics 3.1.0 with your own bclibc, then ZRO with that js-ballistics. See [Licences](data-and-privacy.md#licences).
+
+Extra tools: `make`, CMake, Yarn 1, and one WebAssembly toolchain: zig (what the published package uses) or [wasi-sdk](https://github.com/WebAssembly/wasi-sdk/releases) 34.
+
+1. Get js-ballistics at the pinned version. Its submodule `lib/bclibc` is bclibc at tag `v2.0.0` (commit `bc6b18f`).
+
+   ```bash
+   git clone --recursive --branch v3.1.0 https://github.com/o-murphy/js-ballistics.git
+   cd js-ballistics
+   git rev-parse HEAD   # must print b71066fd5b80f1ee9b790a6b35a89bfd28a16315
+   ```
+
+2. Change the bclibc source in `lib/bclibc`.
+3. Build js-ballistics. `make build` compiles bclibc to a WebAssembly module, embeds it in `build/bclibc.js` (`scripts/embed-wasm.mjs`), then bundles `dist/` with tsup.
+
+   ```bash
+   yarn install --frozen-lockfile
+   uv run --no-project --with ziglang make build                          # zig, as its release workflow does
+   make build WASM_TOOLCHAIN=wasi-sdk WASI_SDK_PATH=/path/to/wasi-sdk-34.0  # or wasi-sdk
+   npm pack                                                               # writes js-ballistics-3.1.0.tgz
+   ```
+
+   The js-ballistics release workflow does not pin `ziglang`, so `uv` takes the newest one. For a build you can repeat, pin it: `--with ziglang==<version>`.
+
+4. In a ZRO checkout, install the pinned dependencies, then replace js-ballistics with your package. `--no-save` leaves `package.json` and the lockfile alone, so the exact pin, and its test, stay as they are.
+
+   ```bash
+   npm ci
+   npm install --no-save /path/to/js-ballistics-3.1.0.tgz
+   npm run test:run
+   ```
+
+5. Build ZRO as usual: `npm run build` (web), `npm run build:mobile` then the [Mobile build](#mobile-build) steps (Android, iOS), or `npm run electron:build` ([Desktop build](#desktop-build)).
+
+The next `npm ci` puts the published js-ballistics back. To keep your package, set `"js-ballistics": "file:/path/to/js-ballistics-3.1.0.tgz"` in `package.json` and run `npm install`. The test `pins js-ballistics to an exact version` then fails, as it should.
+
+What was checked on 2026-11-15 ([#143](https://github.com/hawkins48b/cw-zro/issues/143)), with an unmodified bclibc, Node 22, CMake 3.31.6, wasi-sdk 34.0 and Yarn 1.22.22:
+
+| Step | State |
+|------|-------|
+| js-ballistics `v3.1.0` points `lib/bclibc` at bclibc `v2.0.0` | Checked |
+| `make build` with wasi-sdk | Built. The module is 1,013,692 bytes, against about 84 KB with zig, so the bundle is larger |
+| `make build` with zig | Not verified: zig was not reachable from the build machine |
+| `npm install --no-save` of the package, then `npm run test:run` | All tests pass, baselines included. `package.json` and the lockfile do not change |
+| `npm run build` and `npm run build:mobile` | Both pass. The mobile bundle embeds the rebuilt module, not the published one |
+| `npm run electron:build`, Android Studio, Xcode | Not run with a rebuilt engine |
+
+A modified engine can change every calculated result. The tests compare against recorded baselines, so a failing test shows the shift.
+
 ## Common problems
 
 | Symptom | Cause | Fix |
