@@ -8,42 +8,10 @@ import {
 } from '#lib/utils/storedProfiles.js';
 import { localStore } from './localStore.svelte.js';
 
-const DEFAULT_PROFILE = {
-	name: 'Example Colt M4',
-	barrelTwist: '',
-	barrelTwistUnit: 'in',
-	opticName: 'Aimpoint CompM2',
-	opticHeight: '3.5',
-	opticHeightUnit: 'in',
-	zeroDist: 25,
-	zeroUnit: 'yd',
-	bulletBrand: 'M193',
-	bulletDiameter: '0.223',
-	bulletDiameterUnit: 'in',
-	bulletWeight: '55',
-	bulletWeightUnit: 'gr',
-	bcType: 'G1',
-	bc: '0.285',
-	bulletLength: '',
-	bulletLengthUnit: 'in',
-	velocity: '3000',
-	velocityUnit: 'fps',
-	temperature: '59',
-	temperatureUnit: 'f',
-	tempModifier: '',
-	spinDrift: false,
-	tempSensitivity: false,
-	reticleType: 'red-dot',
-	elevationClickValue: '0.5',
-	elevationClickUnit: 'MOA',
-	windageClickValue: '0.5',
-	windageClickUnit: 'MOA',
-	clickLink: true,
-	ammo: 'M193 55\u202fgr',
-	optic: 'Aimpoint CompM2'
-};
-
-const store = localStore('zro-profiles', () => [{ ...DEFAULT_PROFILE, id: crypto.randomUUID() }]);
+// No profile is stored on first launch (#150): a missing key reads as no profiles and stays missing
+// (seed off), so the splash opens the Welcome screen. The sample profile it offers is in
+// sampleProfile.js. Lists stored before #150, the old seeded example included, are kept as they are.
+const store = localStore('zro-profiles', () => [], { seed: false });
 
 /** The usable stored profiles (#120): storage can hold any JSON value. */
 const readList = () => normalizeProfiles(store.value);

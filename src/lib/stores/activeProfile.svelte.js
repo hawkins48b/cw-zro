@@ -4,7 +4,8 @@ import { profiles } from './profiles.svelte.js';
 
 // profiles is imported first, so it has rewritten a stored id renumbered for links (#134) before
 // this store reads it.
-const store = localStore('zro-active-profile', () => profiles.list[0]?.id ?? null);
+// Not seeded (#150): a first run that leaves the Welcome or the setup writes nothing to storage.
+const store = localStore('zro-active-profile', () => profiles.list[0]?.id ?? null, { seed: false });
 
 export const activeProfile = {
 	get id() {

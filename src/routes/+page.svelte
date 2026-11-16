@@ -3,6 +3,8 @@
 	import { localizeHref } from '#lib/paraglide/runtime.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { onMount } from 'svelte';
+	import { profiles } from '#lib/stores/profiles.svelte.js';
+	import { startPath } from '#lib/utils/firstRun.js';
 
 	let visible = $state(true);
 	let fading = $state(false);
@@ -21,7 +23,8 @@
 			fading = true;
 			setTimeout(() => {
 				visible = false;
-				goto(localizeHref('/scope-view'), { replace: true });
+				// First run (no usable profile, #150): the Welcome screen; otherwise Scope View.
+				goto(localizeHref(startPath(profiles.list)), { replace: true });
 			}, 400);
 		}, 2500);
 

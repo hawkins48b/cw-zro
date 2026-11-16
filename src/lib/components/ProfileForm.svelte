@@ -17,11 +17,9 @@
 	import {
 		validateProfile,
 		isValid,
-		buildAmmoString,
-		profileFieldLimits,
-		normalizedNumbers
+		buildProfileData,
+		profileFieldLimits
 	} from '#lib/utils/profileValidation.js';
-	import { parseDecimal } from '#lib/utils/decimal.js';
 	import { MAX_NAME_LENGTH } from '#lib/utils/storedProfiles.js';
 	import { formatLimit } from '#lib/utils/format.js';
 	import { ammoSelection } from '#lib/stores/ammoSelection.svelte.js';
@@ -183,20 +181,7 @@
 		}
 		errors = {};
 		// A comma is stored as a decimal point (#117): Number('1,5') would be NaN.
-		const data = {
-			...form,
-			...normalizedNumbers(form),
-			zeroDist: parseDecimal(form.zeroDist) ?? 0,
-			spinDrift,
-			tempSensitivity,
-			ammo: buildAmmoString(form.bulletBrand, form.bulletWeight, form.bulletWeightUnit),
-			optic: form.opticName || '—'
-		};
-		if (data.clickLink) {
-			data.windageClickValue = data.elevationClickValue;
-			data.windageClickUnit = data.elevationClickUnit;
-		}
-		onSave(data);
+		onSave(buildProfileData(form, spinDrift, tempSensitivity));
 	}
 </script>
 

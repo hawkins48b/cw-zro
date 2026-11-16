@@ -16,6 +16,10 @@
 	 * @prop {string}  inputmode  - inputmode attribute (default: 'decimal').
 	 * @prop {string}  hint       - Optional helper text displayed below the input.
 	 * @prop {string}  invalid    - Error message to display (overrides hint when non-empty).
+	 * @prop {string}  id         - Optional id of the input; a generated one is used otherwise.
+	 *
+	 * The label is a <label for> the input, the hint or error is its aria-describedby, and an error
+	 * sets aria-invalid (#150). The unit chips say which unit is chosen with aria-pressed.
 	 */
 	let {
 		label = '',
@@ -27,13 +31,18 @@
 		suffix = null,
 		inputmode = 'decimal',
 		hint = null,
-		invalid = ''
+		invalid = '',
+		id = undefined
 	} = $props();
+
+	const uid = $props.id();
+	let inputId = $derived(id ?? `${uid}-input`);
+	let noteId = $derived(`${inputId}-note`);
 </script>
 
 <div class="space-y-1.5">
 	{#if label}
-		<span class="text-sm font-medium block">{label}</span>
+		<label for={inputId} class="text-sm font-medium block">{label}</label>
 	{/if}
 
 	<!--
@@ -47,8 +56,11 @@
 
 		<input
 			class="flex-1 min-w-0 bg-transparent border-none outline-none shadow-none p-0"
+			id={inputId}
 			type="text"
 			{inputmode}
+			aria-describedby={invalid || hint ? noteId : undefined}
+			aria-invalid={invalid ? 'true' : undefined}
 			bind:value
 			{placeholder}
 		/>
@@ -65,6 +77,7 @@
 						class="chip text-xs {unit === opt.value
 							? 'preset-filled-primary-500'
 							: 'preset-tonal-surface'}"
+						aria-pressed={unit === opt.value}
 						onclick={() => (unit = opt.value)}
 					>
 						{opt.label}
@@ -75,8 +88,8 @@
 	</div>
 
 	{#if invalid}
-		<p class="text-xs text-error-500">{invalid}</p>
+		<p id={noteId} class="text-xs text-error-500">{invalid}</p>
 	{:else if hint}
-		<p class="text-xs text-surface-600-400">{hint}</p>
+		<p id={noteId} class="text-xs text-surface-600-400">{hint}</p>
 	{/if}
 </div>

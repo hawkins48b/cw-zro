@@ -377,6 +377,35 @@ describe('zro-profiles', () => {
 	});
 });
 
+describe('zro-profiles on first launch (#150)', () => {
+	it('stores no profile for a missing key, and writes nothing until one is added', async () => {
+		vi.resetModules();
+		storage.values = {};
+		const { profiles } = await import('#lib/stores/profiles.svelte.js');
+		const { activeProfile } = await import('#lib/stores/activeProfile.svelte.js');
+		expect(profiles.list).toEqual([]);
+		expect(activeProfile.profile).toBeNull();
+		expect(activeProfile.id).toBeNull();
+		expect('zro-profiles' in storage.values).toBe(false);
+		expect('zro-active-profile' in storage.values).toBe(false);
+		const id = profiles.add({ ...GOOD_PROFILE, id: undefined });
+		activeProfile.setActive(id);
+		expect(storage.values['zro-profiles']).toEqual([{ ...GOOD_PROFILE, id }]);
+		expect(activeProfile.profile.id).toBe(id);
+	});
+
+	it('keeps a list stored before #150, the seeded example included, and an empty one', async () => {
+		const { SAMPLE_PROFILE } = await import('#lib/utils/sampleProfile.js');
+		const seeded = [{ ...SAMPLE_PROFILE, id: 'old-uuid' }];
+		let { profiles } = await load('#lib/stores/profiles.svelte.js', { 'zro-profiles': seeded });
+		expect(profiles.list).toEqual(seeded);
+		expect(storage.values['zro-profiles']).toBe(seeded);
+		({ profiles } = await load('#lib/stores/profiles.svelte.js', { 'zro-profiles': [] }));
+		expect(profiles.list).toEqual([]);
+		expect(storage.values['zro-profiles']).toEqual([]);
+	});
+});
+
 describe('zro-profiles ids read as text (#131)', () => {
 	const load_ = async (value, active) => {
 		const { profiles } = await load('#lib/stores/profiles.svelte.js', { 'zro-profiles': value, 'zro-active-profile': active });

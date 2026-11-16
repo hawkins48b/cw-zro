@@ -36,6 +36,10 @@
 	// The path without its /fr or /de prefix, so a nav item is active in every language.
 	let currentPath = $derived(deLocalizeHref(page.url.pathname));
 
+	// First-run screens (#150) are full screen: no header, rail, sidebar or tab bar.
+	const bareRoutes = ['/welcome', '/setup'];
+	let bare = $derived(bareRoutes.includes(currentPath.replace(/\/$/, '') || '/'));
+
 	function isActive(href) {
 		const path = currentPath;
 		if (href === '/scope-view') return path === '/scope-view' || path === '/';
@@ -88,6 +92,11 @@
 </svelte:head>
 
 <div class="h-dvh flex flex-col" style="padding-top: var(--safe-area-top); padding-bottom: var(--safe-area-bottom);">
+	{#if bare}
+	<main class="flex-1 min-h-0">
+		{@render children()}
+	</main>
+	{:else}
 	<div class="flex-1 flex overflow-hidden">
 		<!-- Tablet rail (sm to lg): logo, labelled items, theme button -->
 		<nav
@@ -213,4 +222,5 @@
 			</a>
 		{/each}
 	</nav>
+	{/if}
 </div>

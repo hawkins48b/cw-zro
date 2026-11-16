@@ -56,7 +56,9 @@ Configuration is in [`vite.config.js`](../vite.config.js). There is no `svelte.c
 
 | Route | Page |
 |-------|------|
-| `/` | Start page |
+| `/` | Start page (splash): goes on to `/welcome` when there is no usable profile, else to `/scope-view` ([#150](https://github.com/hawkins48b/cw-zro/issues/150), [`startPath`](../src/lib/utils/firstRun.js)) |
+| `/welcome` | First-run Welcome screen, without navigation. Opened while a profile exists, it goes on to `/scope-view` |
+| `/setup` | Guided profile setup in three steps, without navigation. Saves through the profile form's validation and builder ([`setupProfileData`](../src/lib/utils/profileValidation.js)); nothing is stored before the last step |
 | `/scope-view` | Scope view |
 | `/calculators` | Calculator list |
 | `/calculators/ballistic` | Trajectory table and charts |

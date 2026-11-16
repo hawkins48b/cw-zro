@@ -258,3 +258,45 @@ export function buildAmmoString(brand, weight, weightUnit) {
 	const weightStr = weight?.trim() ? `${weight.trim()}\u202f${weightUnit}` : '';
 	return [brand?.trim(), weightStr].filter(Boolean).join(' ') || '—';
 }
+
+/**
+ * The profile as stored from a valid profile form (#150): the form's fields, the numbers as
+ * normalizedNumbers gives them (a comma becomes a decimal point, #117), the zero distance as a
+ * number, the two switches, and the ammo and optic text the lists show. With linked clicks the
+ * windage is the elevation. ProfileForm and the guided setup both store this. Validate the form
+ * with validateProfile first: this builds, it does not check.
+ *
+ * @param {object}  form
+ * @param {boolean} spinDrift
+ * @param {boolean} tempSensitivity
+ * @returns {object}
+ */
+export function buildProfileData(form, spinDrift, tempSensitivity) {
+	const data = {
+		...form,
+		...normalizedNumbers(form),
+		zeroDist: parseDecimal(form.zeroDist) ?? 0,
+		spinDrift,
+		tempSensitivity,
+		ammo: buildAmmoString(form.bulletBrand, form.bulletWeight, form.bulletWeightUnit),
+		optic: form.opticName || '—'
+	};
+	if (data.clickLink) {
+		data.windageClickValue = data.elevationClickValue;
+		data.windageClickUnit = data.elevationClickUnit;
+	}
+	return data;
+}
+
+/**
+ * The profile the guided setup stores (#150), or null when its form is not valid. It is checked as
+ * the profile form checks a new profile: validateProfile with spin drift and temperature
+ * sensitivity off, which the guided setup does not ask for. Then built as ProfileForm builds it.
+ *
+ * @param {object} form - the guided setup's form, values as typed
+ * @returns {object | null}
+ */
+export function setupProfileData(form) {
+	if (!isValid(validateProfile(form, false, false))) return null;
+	return buildProfileData(form, false, false);
+}
