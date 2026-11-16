@@ -2,7 +2,9 @@ import { readFileSync } from 'fs';
 import { describe, expect, it, vi } from 'vitest';
 import { APP_SCHEME } from '../../electron/navigation.js';
 import {
+	BEST_MATCH,
 	FETCH_TIMEOUT_MS,
+	ICON_CH1,
 	GEOLOCATION_OPTIONS,
 	POSITION_WAIT_MS,
 	WEATHER_ENDPOINT,
@@ -16,6 +18,7 @@ import {
 	roundCoordinate,
 	siteAltitude,
 	weatherErrorCode,
+	weatherModel,
 	weatherPatch,
 	weatherTime,
 	weatherUrl
@@ -35,6 +38,56 @@ function answer(current = {}, extra = {}) {
 		...extra
 	};
 }
+
+// Answers of the live API with models=meteoswiss_icon_ch1,best_match and the hourly fields for one
+// hour (probed 2026-11-16 23:00 UTC, #154), trimmed of generationtime_ms, timezone and offsets.
+
+/** Bern (46.95, 7.45), inside the ICON-CH1 area: `current` holds ICON-CH1's values, `hourly` both models. */
+const BERN = Object.freeze({
+	latitude: 46.951687,
+	longitude: 7.4505615,
+	elevation: 511.0,
+	current_units: { time: 'iso8601', interval: 'seconds', temperature_2m: '°C', relative_humidity_2m: '%', pressure_msl: 'hPa' },
+	current: { time: '2026-11-16T23:00', interval: 900, temperature_2m: 8.1, relative_humidity_2m: 88, pressure_msl: 1009.0 },
+	hourly_units: {
+		time: 'iso8601',
+		temperature_2m_meteoswiss_icon_ch1: '°C',
+		relative_humidity_2m_meteoswiss_icon_ch1: '%',
+		pressure_msl_meteoswiss_icon_ch1: 'hPa',
+		temperature_2m_best_match: '°C',
+		relative_humidity_2m_best_match: '%',
+		pressure_msl_best_match: 'hPa'
+	},
+	hourly: {
+		time: ['2026-11-16T23:00'],
+		temperature_2m_meteoswiss_icon_ch1: [8.1],
+		relative_humidity_2m_meteoswiss_icon_ch1: [88],
+		pressure_msl_meteoswiss_icon_ch1: [1009.0],
+		temperature_2m_best_match: [8.6],
+		relative_humidity_2m_best_match: [84],
+		pressure_msl_best_match: [1008.8]
+	}
+});
+
+/** Berlin (52.52, 13.40), outside it: ICON-CH1 is dropped, and the hourly keys are plain. */
+const BERLIN = Object.freeze({
+	latitude: 52.506966,
+	longitude: 13.39165,
+	elevation: 30.0,
+	current_units: { time: 'iso8601', interval: 'seconds', temperature_2m: '°C', relative_humidity_2m: '%', pressure_msl: 'hPa' },
+	current: { time: '2026-11-16T23:00', interval: 900, temperature_2m: 7.9, relative_humidity_2m: 73, pressure_msl: 999.9 },
+	hourly_units: { time: 'iso8601', temperature_2m: '°C', relative_humidity_2m: '%', pressure_msl: 'hPa' },
+	hourly: { time: ['2026-11-16T23:00'], temperature_2m: [7.9], relative_humidity_2m: [73], pressure_msl: [999.9] }
+});
+
+/** Bern's answer with this `hourly` block instead (undefined drops it). */
+const bernWithHourly = (hourly) => ({ ...BERN, hourly });
+
+/** Bern's ICON-CH1 hourly arrays with one of them replaced. */
+const ch1Hourly = (patch) => ({ ...BERN.hourly, ...patch });
+
+/** What the live API answers with ICON-CH1 alone outside its area (HTTP 400). */
+const ERROR_ANSWER = Object.freeze({ error: true, reason: 'No data is available for this location' });
 
 const okResponse = (body) => ({ ok: true, status: 200, json: async () => body });
 
@@ -83,19 +136,25 @@ describe('roundCoordinate', () => {
 });
 
 describe('weatherUrl', () => {
-	it('sends only the rounded latitude and longitude and the three fields', () => {
+	it('sends only the rounded latitude and longitude and fixed parameters: fields, models, one hour', () => {
 		const url = new URL(weatherUrl(46.227612, 7.359444));
 		expect(url.origin + url.pathname).toBe(WEATHER_ENDPOINT);
-		expect([...url.searchParams.keys()]).toEqual(['latitude', 'longitude', 'current']);
+		expect([...url.searchParams.keys()]).toEqual(['latitude', 'longitude', 'current', 'hourly', 'models', 'forecast_hours']);
 		expect(url.searchParams.get('latitude')).toBe('46.23');
 		expect(url.searchParams.get('longitude')).toBe('7.36');
 		expect(url.searchParams.get('current')).toBe('temperature_2m,relative_humidity_2m,pressure_msl');
+		expect(url.searchParams.get('hourly')).toBe('temperature_2m,relative_humidity_2m,pressure_msl');
+		expect(url.searchParams.get('models')).toBe('meteoswiss_icon_ch1,best_match');
+		expect(url.searchParams.get('forecast_hours')).toBe('1');
 		expect(url.hash).toBe('');
 	});
 
 	it('writes exactly 2 decimals, with no -0', () => {
 		expect(weatherUrl(-0.001, -0.004)).toBe(
-			'https://api.open-meteo.com/v1/forecast?latitude=0.00&longitude=0.00&current=temperature_2m,relative_humidity_2m,pressure_msl'
+			'https://api.open-meteo.com/v1/forecast?latitude=0.00&longitude=0.00' +
+				'&current=temperature_2m,relative_humidity_2m,pressure_msl' +
+				'&hourly=temperature_2m,relative_humidity_2m,pressure_msl' +
+				'&models=meteoswiss_icon_ch1,best_match&forecast_hours=1'
 		);
 		expect(weatherUrl(-33.8, 151)).toContain('latitude=-33.80&longitude=151.00&');
 	});
@@ -282,6 +341,45 @@ describe('readWeather', () => {
 	});
 });
 
+describe('weatherModel', () => {
+	it('names ICON-CH1 from an answer inside its area (Bern)', () => {
+		expect(weatherModel(BERN)).toBe(ICON_CH1);
+		expect(ICON_CH1).toBe('meteoswiss_icon_ch1');
+	});
+
+	it('names the default from an answer outside it (Berlin)', () => {
+		expect(weatherModel(BERLIN)).toBe(BEST_MATCH);
+		expect(BEST_MATCH).toBe('best_match');
+	});
+
+	it('names the default, without throwing, for a missing or odd hourly block', () => {
+		for (const hourly of [undefined, null, 'x', 1, [], {}, { time: ['2026-11-16T23:00'] }]) {
+			expect(weatherModel(bernWithHourly(hourly))).toBe(BEST_MATCH);
+		}
+		for (const json of [undefined, null, 'text', 42, [], {}, ERROR_ANSWER]) {
+			expect(weatherModel(json)).toBe(BEST_MATCH);
+		}
+	});
+
+	it('needs all three ICON-CH1 arrays, each starting with a finite number', () => {
+		for (const field of ['temperature_2m', 'relative_humidity_2m', 'pressure_msl']) {
+			const key = `${field}_meteoswiss_icon_ch1`;
+			for (const bad of [undefined, null, [], [null], [NaN], [Infinity], ['8.1'], [[8.1]], 8.1, { 0: 8.1 }]) {
+				expect(weatherModel(bernWithHourly(ch1Hourly({ [key]: bad })))).toBe(BEST_MATCH);
+			}
+			const { [key]: _dropped, ...rest } = BERN.hourly;
+			expect(weatherModel(bernWithHourly(rest))).toBe(BEST_MATCH);
+		}
+		// Only the first value counts: later hours (not asked for) do not matter.
+		expect(weatherModel(bernWithHourly(ch1Hourly({ temperature_2m_meteoswiss_icon_ch1: [8.1, null] })))).toBe(ICON_CH1);
+	});
+
+	it('reads the values from current whichever model is named', () => {
+		expect(readWeather(BERN)).toEqual({ temperature: 8.1, humidity: 88, pressure: 1009, elevation: 511 });
+		expect(readWeather(BERLIN)).toEqual({ temperature: 7.9, humidity: 73, pressure: 999.9, elevation: 30 });
+	});
+});
+
 describe('siteAltitude', () => {
 	it('uses the GPS altitude when it is a finite number', () => {
 		expect(siteAltitude(498.7, 512)).toEqual({ altitude: 498.7, source: 'gps' });
@@ -360,7 +458,51 @@ describe('readCurrentWeather', () => {
 		const fetch = vi.fn(async () => okResponse(answer()));
 		const result = await readCurrentWeather({ geolocation, fetch });
 		expect(fetch.mock.calls[0][0]).toBe(weatherUrl(46.23, 7.36));
-		expect(result).toEqual({ weather: { temperature: 8.4, humidity: 71, pressure: 1018.6, elevation: 512 }, altitude: 498.7, altitudeSource: 'gps' });
+		expect(result).toEqual({
+			weather: { temperature: 8.4, humidity: 71, pressure: 1018.6, elevation: 512 },
+			altitude: 498.7,
+			altitudeSource: 'gps',
+			model: BEST_MATCH
+		});
+	});
+
+	it('names ICON-CH1 from a Bern-shaped answer, and the default from a Berlin-shaped one', async () => {
+		const bern = await readCurrentWeather({ geolocation: geolocationWith(), fetch: async () => okResponse(BERN) });
+		expect(bern).toEqual({
+			weather: { temperature: 8.1, humidity: 88, pressure: 1009, elevation: 511 },
+			altitude: 511,
+			altitudeSource: 'elevation',
+			model: ICON_CH1
+		});
+		const berlin = await readCurrentWeather({ geolocation: geolocationWith(), fetch: async () => okResponse(BERLIN) });
+		expect(berlin).toMatchObject({ weather: { temperature: 7.9, humidity: 73, pressure: 999.9 }, model: BEST_MATCH });
+	});
+
+	it('still reads the values with a missing, null or non-finite hourly block, as the default', async () => {
+		for (const json of [
+			bernWithHourly(undefined),
+			bernWithHourly(null),
+			bernWithHourly('x'),
+			bernWithHourly(ch1Hourly({ pressure_msl_meteoswiss_icon_ch1: [null] })),
+			bernWithHourly(ch1Hourly({ temperature_2m_meteoswiss_icon_ch1: [NaN] })),
+			bernWithHourly(ch1Hourly({ relative_humidity_2m_meteoswiss_icon_ch1: 'x' }))
+		]) {
+			const result = await readCurrentWeather({ geolocation: geolocationWith(), fetch: async () => okResponse(json) });
+			expect(result).toMatchObject({ weather: { temperature: 8.1, humidity: 88, pressure: 1009 }, model: BEST_MATCH });
+		}
+	});
+
+	it('fails on an error answer, whatever its HTTP status: invalid with a 200, network with the 400', async () => {
+		await expectCode(readCurrentWeather({ geolocation: geolocationWith(), fetch: async () => okResponse(ERROR_ANSWER) }), 'invalid');
+		await expectCode(
+			readCurrentWeather({
+				geolocation: geolocationWith(),
+				fetch: async () => ({ ok: false, status: 400, json: async () => ERROR_ANSWER })
+			}),
+			'network'
+		);
+		// The error answer cannot pass as ICON-CH1 values either.
+		await expectCode(() => readWeather({ ...ERROR_ANSWER, hourly: BERN.hourly }), 'invalid');
 	});
 
 	it("uses Open-Meteo's elevation without a GPS altitude", async () => {
@@ -456,7 +598,7 @@ describe('weatherTime', () => {
 });
 
 describe('createWeatherFill', () => {
-	const reading = { weather: { temperature: 8.4, humidity: 71, pressure: 1018.6, elevation: 512 }, altitude: 498.7 };
+	const reading = { weather: { temperature: 8.4, humidity: 71, pressure: 1018.6, elevation: 512 }, altitude: 498.7, model: BEST_MATCH };
 	const metric = { mode: 'accurate', altitudeUnit: 'm', pressureUnit: 'hpa', temperatureUnit: 'c' };
 
 	function setup({ read = vi.fn(async () => reading), atmosphere = { ...metric } } = {}) {
@@ -493,8 +635,22 @@ describe('createWeatherFill', () => {
 		await fill.request();
 		expect(apply).toHaveBeenCalledOnce();
 		expect(apply.mock.calls[0][0]).toEqual({ mode: 'accurate', pressureRef: 'qnh', altitude: '499', pressure: '1018.6', temperature: '8.4', humidity: '71' });
-		expect(statuses).toEqual([{ state: 'loading' }, { state: 'done', time: '14:05' }]);
+		expect(statuses).toEqual([{ state: 'loading' }, { state: 'done', time: '14:05', model: BEST_MATCH }]);
 		expect(state.atmosphere.mode).toBe('accurate');
+	});
+
+	it('reports the model that filled the values, and the default for anything else', async () => {
+		for (const [model, expected] of [
+			[ICON_CH1, ICON_CH1],
+			[BEST_MATCH, BEST_MATCH],
+			[undefined, BEST_MATCH],
+			['icon_seamless', BEST_MATCH]
+		]) {
+			const { fill, apply, statuses } = setup({ read: vi.fn(async () => ({ ...reading, model })) });
+			await fill.request();
+			expect(apply).toHaveBeenCalledOnce();
+			expect(statuses.at(-1)).toEqual({ state: 'done', time: '14:05', model: expected });
+		}
 	});
 
 	it('leaves the boxes unchanged on every error, with its code', async () => {

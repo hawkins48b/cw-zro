@@ -18,6 +18,9 @@ import {
  * runs before the tap; nothing is cached or stored here (the filled boxes are stored by the page's
  * own atmosphere store, as typed values are). See docs/data-and-privacy.md.
  *
+ * Since #154 the same request asks for MeteoSwiss ICON-CH1 inside its area and Open-Meteo's default
+ * models elsewhere; weatherModel tells the card which one answered, for the attribution.
+ *
  * Errors are WeatherError with one of four codes, which the atmosphere card shows:
  * - 'denied': the user or the platform refused the location.
  * - 'unavailable': no geolocation, no position in time, or a position that is not a coordinate.
@@ -31,6 +34,26 @@ export const WEATHER_ENDPOINT = 'https://api.open-meteo.com/v1/forecast';
 
 /** The current values asked for, in Open-Meteo's default units: °C, %, hPa. */
 export const WEATHER_FIELDS = 'temperature_2m,relative_humidity_2m,pressure_msl';
+
+/**
+ * The models asked for (#154, owner decision of 2026-11-16): MeteoSwiss ICON-CH1 first, then
+ * Open-Meteo's default ("best match"). With both, `current` holds plain keys whose values are
+ * ICON-CH1's inside its area (Switzerland and around) and the default's elsewhere.
+ */
+export const WEATHER_MODELS = 'meteoswiss_icon_ch1,best_match';
+
+/** Open-Meteo's name of the MeteoSwiss model, the suffix of its `hourly` keys. */
+export const ICON_CH1 = 'meteoswiss_icon_ch1';
+
+/** Open-Meteo's name of its default model choice. */
+export const BEST_MATCH = 'best_match';
+
+/**
+ * The same three fields asked hourly, for the first forecast hour only: not used for any value, only
+ * to tell which model answered. ICON-CH1 keys there end in `_meteoswiss_icon_ch1` when that model has
+ * the point; outside its area they are plain.
+ */
+const MODEL_FORECAST_HOURS = 1;
 
 /** Units Open-Meteo gives for those fields by default. Another unit in the answer is rejected. */
 const EXPECTED_UNITS = { temperature_2m: '°C', relative_humidity_2m: '%', pressure_msl: 'hPa' };
@@ -92,7 +115,8 @@ export function roundCoordinate(value, limit) {
 }
 
 /**
- * The request URL: the rounded latitude and longitude and the three fields, nothing else.
+ * The request URL: the rounded latitude and longitude, and fixed parameters (the three fields
+ * current and for the first hour, the models), nothing else.
  * @param {number} latitude
  * @param {number} longitude
  * @returns {string}
@@ -105,7 +129,10 @@ export function weatherUrl(latitude, longitude) {
 	const query = [
 		`latitude=${lat.toFixed(COORDINATE_DECIMALS)}`,
 		`longitude=${lon.toFixed(COORDINATE_DECIMALS)}`,
-		`current=${WEATHER_FIELDS}`
+		`current=${WEATHER_FIELDS}`,
+		`hourly=${WEATHER_FIELDS}`,
+		`models=${WEATHER_MODELS}`,
+		`forecast_hours=${MODEL_FORECAST_HOURS}`
 	].join('&');
 	return `${WEATHER_ENDPOINT}?${query}`;
 }
@@ -257,6 +284,25 @@ export function readWeather(json) {
 }
 
 /**
+ * The model that filled the values: ICON_CH1 when the `hourly` block has
+ * `temperature_2m_meteoswiss_icon_ch1`, `relative_humidity_2m_meteoswiss_icon_ch1` and
+ * `pressure_msl_meteoswiss_icon_ch1` arrays whose first value is a finite number (owner decision),
+ * else BEST_MATCH. Never throws: a missing or odd `hourly` block only means the default.
+ *
+ * @param {unknown} json
+ * @returns {typeof ICON_CH1 | typeof BEST_MATCH}
+ */
+export function weatherModel(json) {
+	const hourly = json && typeof json === 'object' ? json.hourly : undefined;
+	if (!hourly || typeof hourly !== 'object') return BEST_MATCH;
+	for (const field of WEATHER_FIELDS.split(',')) {
+		const values = hourly[`${field}_${ICON_CH1}`];
+		if (!Array.isArray(values) || !isFiniteNumber(values[0])) return BEST_MATCH;
+	}
+	return ICON_CH1;
+}
+
+/**
  * The site altitude in metres (owner decision): the device's GPS altitude when it is a finite number
  * within the altitude limits, else Open-Meteo's ground elevation. GPS altitude is usually height
  * above the WGS84 ellipsoid, not above sea level, and is not corrected.
@@ -323,12 +369,12 @@ export function weatherPatch(weather, altitude, units) {
 
 /**
  * Position, then weather: the metric values and the site altitude, not yet in the boxes' units, so
- * that the page converts with the units shown when the answer arrives.
+ * that the page converts with the units shown when the answer arrives, and the model that answered.
  *
  * @param {{ geolocation?: Geolocation, fetch?: typeof fetch, signal?: AbortSignal,
  *   setTimer?: typeof setTimeout, clearTimer?: typeof clearTimeout }} deps
  * @returns {Promise<{ weather: ReturnType<typeof readWeather>, altitude: number,
- *   altitudeSource: 'gps'|'elevation' }>}
+ *   altitudeSource: 'gps'|'elevation', model: typeof ICON_CH1 | typeof BEST_MATCH }>}
  */
 export async function readCurrentWeather({ geolocation, fetch: fetchFn, signal, setTimer, clearTimer } = {}) {
 	const position = await currentPosition(geolocation, { setTimer, clearTimer });
@@ -341,7 +387,7 @@ export async function readCurrentWeather({ geolocation, fetch: fetchFn, signal, 
 	});
 	const weather = readWeather(json);
 	const { altitude, source } = siteAltitude(position.altitude, weather.elevation);
-	return { weather, altitude, altitudeSource: source };
+	return { weather, altitude, altitudeSource: source, model: weatherModel(json) };
 }
 
 /** Electron's app scheme (electron/navigation.js, APP_SCHEME), as location.protocol gives it. */
@@ -386,7 +432,8 @@ export function weatherTime(date, locale) {
  *   read: (deps: { signal: AbortSignal }) => ReturnType<typeof readCurrentWeather>,
  *   getAtmosphere: () => { mode: string, altitudeUnit?: string, pressureUnit?: string, temperatureUnit?: string },
  *   apply: (patch: ReturnType<typeof weatherPatch>) => void,
- *   onstatus: (status: { state: 'idle'|'loading'|'done'|'error', error?: string, time?: string }) => void,
+ *   onstatus: (status: { state: 'idle'|'loading'|'done'|'error', error?: string, time?: string,
+ *     model?: typeof ICON_CH1 | typeof BEST_MATCH }) => void,
  *   now?: () => Date,
  *   formatTime?: (date: Date) => string
  * }} deps
@@ -420,7 +467,7 @@ export function createWeatherFill({ read, getAtmosphere, apply, onstatus, now = 
 			controller = new AbortController();
 			set({ state: 'loading' });
 			try {
-				const { weather, altitude } = await read({ signal: controller.signal });
+				const { weather, altitude, model } = await read({ signal: controller.signal });
 				if (id !== run) return;
 				const atmosphere = getAtmosphere();
 				if (atmosphere?.mode !== 'accurate') {
@@ -428,7 +475,7 @@ export function createWeatherFill({ read, getAtmosphere, apply, onstatus, now = 
 					return;
 				}
 				apply(weatherPatch(weather, altitude, atmosphere));
-				set({ state: 'done', time: formatTime(now()) });
+				set({ state: 'done', time: formatTime(now()), model: model === ICON_CH1 ? ICON_CH1 : BEST_MATCH });
 			} catch (error) {
 				if (id !== run) return;
 				set({ state: 'error', error: weatherErrorCode(error) });

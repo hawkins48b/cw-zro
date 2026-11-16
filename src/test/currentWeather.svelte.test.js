@@ -27,6 +27,33 @@ const ANSWER = {
 	current: { temperature_2m: 8.4, relative_humidity_2m: 71, pressure_msl: 1018.6 }
 };
 
+// Live-API shapes (#154, probed 2026-11-16) for models=meteoswiss_icon_ch1,best_match: inside the
+// ICON-CH1 area the hourly keys carry the model suffix; outside they are plain.
+const UNITS = { temperature_2m: '°C', relative_humidity_2m: '%', pressure_msl: 'hPa' };
+const BERN = {
+	elevation: 511,
+	current_units: UNITS,
+	current: { temperature_2m: 8.1, relative_humidity_2m: 88, pressure_msl: 1009.0 },
+	hourly: {
+		time: ['2026-11-16T23:00'],
+		temperature_2m_meteoswiss_icon_ch1: [8.1],
+		relative_humidity_2m_meteoswiss_icon_ch1: [88],
+		pressure_msl_meteoswiss_icon_ch1: [1009.0],
+		temperature_2m_best_match: [8.6],
+		relative_humidity_2m_best_match: [84],
+		pressure_msl_best_match: [1008.8]
+	}
+};
+const BERLIN = {
+	elevation: 30,
+	current_units: UNITS,
+	current: { temperature_2m: 7.9, relative_humidity_2m: 73, pressure_msl: 999.9 },
+	hourly: { time: ['2026-11-16T23:00'], temperature_2m: [7.9], relative_humidity_2m: [73], pressure_msl: [999.9] }
+};
+const ERROR_ANSWER = { error: true, reason: 'No data is available for this location' };
+
+const METEOSWISS = 'a[href="https://www.meteoswiss.admin.ch/"]';
+
 const BUTTON = 'Use current weather here';
 
 let fetchSpy;
@@ -122,6 +149,22 @@ describe('ScopeAtmosphereCard', () => {
 		expect(target.textContent).toContain('Filled from current weather at 14:05');
 		const link = target.querySelector('a[href="https://open-meteo.com/"]');
 		expect(link.target).toBe('_blank');
+		expect(target.querySelector(METEOSWISS)).toBeNull();
+		expect(target.textContent).not.toContain('MeteoSwiss');
+	});
+
+	it('credits MeteoSwiss and names ICON-CH1 after an ICON-CH1 fill, next to Open-Meteo', () => {
+		render(Card, props({ weatherAvailable: true, weatherStatus: { state: 'done', time: '14:05', model: 'meteoswiss_icon_ch1' } }));
+		const line = target.querySelector('a[href="https://open-meteo.com/"]').parentElement;
+		expect(line.textContent.replace(/\s+/g, ' ')).toContain(
+			'Weather data: Open-Meteo.com (opens in a new window), Source: MeteoSwiss (ICON-CH1 model) (opens in a new window)'
+		);
+		const link = target.querySelector(METEOSWISS);
+		expect(link.target).toBe('_blank');
+		expect(link.rel).toBe('noopener noreferrer');
+		unmount(component);
+		render(Card, props({ weatherAvailable: true, weatherStatus: { state: 'done', time: '14:05', model: 'best_match' } }));
+		expect(target.querySelector(METEOSWISS)).toBeNull();
 	});
 });
 
@@ -159,8 +202,13 @@ for (const [name, path, key] of [
 			expect(geolocation.getCurrentPosition).toHaveBeenCalledOnce();
 			expect(fetchSpy).toHaveBeenCalledOnce();
 			expect(fetchSpy.mock.calls[0][0]).toBe(
-				`${WEATHER_ENDPOINT}?latitude=46.23&longitude=7.36&current=temperature_2m,relative_humidity_2m,pressure_msl`
+				`${WEATHER_ENDPOINT}?latitude=46.23&longitude=7.36` +
+					'&current=temperature_2m,relative_humidity_2m,pressure_msl' +
+					'&hourly=temperature_2m,relative_humidity_2m,pressure_msl' +
+					'&models=meteoswiss_icon_ch1,best_match&forecast_hours=1'
 			);
+			// An answer without an hourly block is the default model: no MeteoSwiss credit.
+			expect(target.querySelector(METEOSWISS)).toBeNull();
 			expect(stored(key)).toMatchObject({
 				mode: 'accurate',
 				pressureRef: 'qnh',
@@ -176,6 +224,48 @@ for (const [name, path, key] of [
 			expect([...target.querySelectorAll('input')].map((i) => i.value)).toEqual(
 				expect.arrayContaining(['1018.6', '499', '8.4', '71'])
 			);
+		});
+
+		it('credits MeteoSwiss ICON-CH1 for a Bern-shaped answer', async () => {
+			window.fetch = vi.fn(async () => ({ ok: true, json: async () => BERN }));
+			render(Page);
+			buttonsNamed(BUTTON)[0].click();
+			await vi.waitFor(() => expect(target.textContent).toContain('Filled from current weather at'));
+			expect(target.querySelector(METEOSWISS)).not.toBeNull();
+			expect(target.textContent).toContain('Source: MeteoSwiss (ICON-CH1 model)');
+			expect(stored(key)).toMatchObject({ pressure: '1009', temperature: '8.1', humidity: '88', altitude: '499' });
+		});
+
+		it('names only Open-Meteo for a Berlin-shaped answer', async () => {
+			window.fetch = vi.fn(async () => ({ ok: true, json: async () => BERLIN }));
+			render(Page);
+			buttonsNamed(BUTTON)[0].click();
+			await vi.waitFor(() => expect(target.textContent).toContain('Filled from current weather at'));
+			expect(target.querySelector('a[href="https://open-meteo.com/"]')).not.toBeNull();
+			expect(target.querySelector(METEOSWISS)).toBeNull();
+			expect(stored(key)).toMatchObject({ pressure: '999.9', temperature: '7.9', humidity: '73' });
+		});
+
+		it('still fills, as the default, when the ICON-CH1 hourly values are null or odd', async () => {
+			const hourly = { ...BERN.hourly, pressure_msl_meteoswiss_icon_ch1: [null], temperature_2m_meteoswiss_icon_ch1: 'x' };
+			window.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ ...BERN, hourly }) }));
+			render(Page);
+			buttonsNamed(BUTTON)[0].click();
+			await vi.waitFor(() => expect(target.textContent).toContain('Filled from current weather at'));
+			expect(target.querySelector(METEOSWISS)).toBeNull();
+			expect(stored(key)).toMatchObject({ pressure: '1009', temperature: '8.1', humidity: '88' });
+		});
+
+		it('leaves the boxes unchanged on an error answer', async () => {
+			window.fetch = vi.fn(async () => ({ ok: true, json: async () => ERROR_ANSWER }));
+			render(Page);
+			buttonsNamed(BUTTON)[0].click();
+			await vi.waitFor(() => expect(target.textContent).toContain('The weather service gave no usable values'));
+			expect(stored(key)).toMatchObject(METRIC_ACCURATE);
+			window.fetch = vi.fn(async () => ({ ok: false, status: 400, json: async () => ERROR_ANSWER }));
+			buttonsNamed(BUTTON)[0].click();
+			await vi.waitFor(() => expect(target.textContent).toContain('The weather service could not be reached'));
+			expect(stored(key)).toMatchObject(METRIC_ACCURATE);
 		});
 
 		it('leaves the boxes unchanged and shows why when the location is refused', async () => {

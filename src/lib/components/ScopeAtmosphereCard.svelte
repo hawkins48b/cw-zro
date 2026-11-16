@@ -42,8 +42,9 @@
 	 * @prop {boolean} weatherAvailable - Show the button (web and mobile; false on the desktop build).
 	 * @prop {{ state: 'idle'|'loading'|'done'|'error',
 	 *          error?: 'denied'|'unavailable'|'network'|'invalid',
-	 *          time?: string }} weatherStatus
+	 *          time?: string, model?: 'meteoswiss_icon_ch1'|'best_match' }} weatherStatus
 	 *   time: when the fields were filled, already formatted for the locale ('14:05'), for state 'done'.
+	 *   model: which model filled them (#154); 'meteoswiss_icon_ch1' also credits MeteoSwiss.
 	 *   On 'error' the page leaves the fields unchanged.
 	 * @prop {() => void} [onweather] - Called on a tap of the button. The page fills the fields through
 	 *   its own setAtmosphere, the same way as onchange.
@@ -414,6 +415,7 @@
 					{#if weatherStatus?.state === 'done'}
 						<p class="rounded-base preset-tonal-primary px-2.5 py-2 text-xs leading-relaxed">
 							{m.scope_view_current_weather_done({ time: weatherStatus.time ?? '' })}
+							<!-- After an ICON-CH1 fill, MeteoSwiss is credited too: its open data needs a source credit (#154). -->
 							<span class="block mt-0.5 text-surface-600-400">
 								{m.scope_view_current_weather_attribution()}
 								<a
@@ -424,7 +426,16 @@
 								>
 									Open-Meteo.com<ExternalLink class="size-3" aria-hidden="true" />
 									<span class="sr-only">{m.scope_view_current_weather_new_window()}</span>
-								</a>
+								</a>{#if weatherStatus.model === 'meteoswiss_icon_ch1'}, <a
+										href="https://www.meteoswiss.admin.ch/"
+										target="_blank"
+										rel="noopener noreferrer"
+										class="inline-flex items-center gap-0.5 underline underline-offset-2 hover:text-primary-700-300 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary-500"
+									>
+										{m.scope_view_current_weather_model_icon_ch1()}<ExternalLink class="size-3" aria-hidden="true" />
+										<span class="sr-only">{m.scope_view_current_weather_new_window()}</span>
+									</a>
+								{/if}
 							</span>
 						</p>
 					{/if}
