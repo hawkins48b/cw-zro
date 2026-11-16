@@ -63,9 +63,14 @@
 		/>
 	</div>
 
-	<!-- Dial beside the fields from 320 px of card width, above them on a narrow tablet column. -->
-	<div class="flex flex-col gap-3 @xs:flex-row @xs:items-center @xs:gap-3.5">
-		<WindDial {direction} class="size-28 shrink-0 self-center" onchange={(value) => onchange({ direction: value })} />
+	<!-- Large dial above the fields on phones and narrow columns (#155), beside them from 448 px of
+		card width. -->
+	<div class="flex flex-col gap-3 @md:flex-row @md:items-center @md:gap-4">
+		<WindDial
+			{direction}
+			class="w-full max-w-60 aspect-square shrink-0 self-center @md:size-48"
+			onchange={(value) => onchange({ direction: value })}
+		/>
 
 		<div class="flex-1 min-w-0 space-y-2">
 			<!-- Speed -->

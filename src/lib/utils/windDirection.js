@@ -46,3 +46,33 @@ export function clockHour(degrees) {
 	const hour = Math.round(turned / 30) % 12;
 	return hour === 0 ? 12 : hour;
 }
+
+/** Spacing of the wind dial's touch points, in degrees (#155): 24 points, two per clock hour. */
+export const DIAL_SNAP_DEGREES = 15;
+
+/**
+ * Inner edge of the wind dial's snapping rim, as a fraction of the dial radius (#155). The touch
+ * points sit at 0.86; a tap or drag from here outwards snaps to the nearest point, so a finger
+ * does not have to hit the point itself. Inside it the dial sets whole degrees.
+ */
+export const DIAL_SNAP_RIM = 0.7;
+
+/**
+ * The direction set by a tap or drag on the wind dial (#155), in whole degrees, in [0, 360).
+ * The offset is from the dial centre in screen pixels (y down); 0° is straight up, clockwise.
+ * Display input only: the result goes into the direction box like a typed value.
+ *
+ * @param {number} dx - Pointer x minus centre x.
+ * @param {number} dy - Pointer y minus centre y.
+ * @param {number} radius - Dial radius in pixels, > 0.
+ * @returns {number}
+ */
+export function dialDirection(dx, dy, radius) {
+	// The centre has no direction (atan2(0, -0) would give 180°).
+	if (dx === 0 && dy === 0) return 0;
+	let angle = Math.atan2(dx, -dy) * (180 / Math.PI);
+	if (angle < 0) angle += 360;
+	const onRim = Math.hypot(dx, dy) >= DIAL_SNAP_RIM * radius;
+	const step = onRim ? DIAL_SNAP_DEGREES : 1;
+	return (Math.round(angle / step) * step) % 360;
+}
