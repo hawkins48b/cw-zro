@@ -20,7 +20,12 @@ const isCapacitor = process.env.BUILD_TARGET === 'capacitor';
 // 'wasm-unsafe-eval' (#77, owner decision of 2026-11-12): js-ballistics 3 compiles its WebAssembly engine
 // (bclibc), embedded in the bundle, with WebAssembly.instantiate, which a script-src without it
 // refuses, and every calculator then fails. It allows compiling WebAssembly only, not eval() or
-// new Function(). The app loads and sends nothing outside its own origin (docs/data-and-privacy.md).
+// new Function(). The app loads nothing from outside its own origin. It sends one request outside
+// it: the current weather (#152, owner decision of 2026-11-16), to Open-Meteo, only on a tap of
+// "Use current weather here", with the position rounded to about 1 km (docs/data-and-privacy.md).
+// Electron shares the web build, so its policy names the host too; the desktop app hides the button
+// and refuses the location anyway.
+const WEATHER_ORIGIN = 'https://api.open-meteo.com';
 const appOrigins = isCapacitor ? ['self', 'capacitor://localhost'] : ['self'];
 const csp = {
 	mode: 'hash',
@@ -30,7 +35,7 @@ const csp = {
 		'style-src': [...appOrigins, 'unsafe-inline'],
 		'img-src': [...appOrigins, 'data:', 'blob:'],
 		'font-src': [...appOrigins, 'data:'],
-		'connect-src': appOrigins,
+		'connect-src': [...appOrigins, WEATHER_ORIGIN],
 		'object-src': ['none'],
 		'base-uri': ['self'],
 		'form-action': ['none']
@@ -65,8 +70,20 @@ export default defineConfig({
 		})
 	],
 	test: {
-		include: ['src/**/*.test.js'],
 		environment: 'jsdom',
-		globals: true
+		globals: true,
+		projects: [
+			{
+				extends: true,
+				test: { name: 'unit', include: ['src/**/*.test.js'], exclude: ['src/**/*.svelte.test.js'] }
+			},
+			{
+				// Components mounted in jsdom (#152): Svelte's client build, which the browser
+				// condition selects. Only these files, so no other test resolves a package differently.
+				extends: true,
+				resolve: { conditions: ['browser'] },
+				test: { name: 'components', include: ['src/**/*.svelte.test.js'] }
+			}
+		]
 	}
 });

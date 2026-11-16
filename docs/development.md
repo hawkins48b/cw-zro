@@ -89,6 +89,17 @@ npm run cap:android    # For iOS: npm run cap:ios
 
 You also need Android Studio, or Xcode on macOS, as Capacitor requires. The Android steps above were run up to `cap:sync`. Opening the project, building it and every iOS step were not.
 
+### Location permission for the current weather
+
+"Use current weather here" ([#152](https://github.com/hawkins48b/cw-zro/issues/152)) calls `navigator.geolocation` in the web view. The native projects are generated, so add these by hand after `cap add`, or the web view refuses the location and the card says location access is off:
+
+| Platform | File | Add |
+|----------|------|-----|
+| Android | `android/app/src/main/AndroidManifest.xml`, in `<manifest>` | `<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />` and `<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />` |
+| iOS | `ios/App/App/Info.plist` | `NSLocationWhenInUseUsageDescription`, a short reason shown in the system prompt, for example "ZRO uses your location, rounded to about 1 km, to get the current weather when you ask for it." |
+
+As Capacitor's web view is described, Android asks for these permissions at run time when the page calls geolocation and the manifest lists them, and iOS shows the system prompt with the text above (WKWebView may ask a second time for the page). Neither was checked on a device or emulator: the native projects are not in the repository and no device was available here. The Play Store data-safety form and the App Store privacy details will probably need to list approximate location, sent to Open-Meteo on request: an owner step before a store submission.
+
 `build:mobile` sets its variable in POSIX shell form, so it needs a POSIX shell. It has not been tried on Windows.
 
 ## Desktop build

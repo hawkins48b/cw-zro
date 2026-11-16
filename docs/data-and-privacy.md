@@ -1,6 +1,6 @@
 # Data and privacy
 
-ZRO has no backend and no accounts. The app's code sends nothing the user enters anywhere. This guide says what is stored, where, and what leaves the device, and how each statement was checked.
+ZRO has no backend and no accounts. The app's code sends nothing the user enters anywhere. The one exception is the optional current weather ([#152](https://github.com/hawkins48b/cw-zro/issues/152)): on a tap, it sends the device's position, rounded to about 1 km, to Open-Meteo. This guide says what is stored, where, and what leaves the device, and how each statement was checked.
 
 ## What is stored
 
@@ -10,8 +10,8 @@ Data stays in the browser's `localStorage`, or the same store in the Electron an
 |-----|---------|-------|
 | `zro-profiles` | Profiles: names, rifle and optic names, ammunition, zero, ballistic data, click values. Not written on first launch: since [#150](https://github.com/hawkins48b/cw-zro/issues/150) it appears with the first profile saved (guided setup, sample profile or profile form) | [`profiles`](../src/lib/stores/profiles.svelte.js) |
 | `zro-active-profile` | ID of the active profile. Not written on first launch either (#150): it appears when a profile is made active | [`activeProfile`](../src/lib/stores/activeProfile.svelte.js) |
-| `zro-ballistic` | Ballistic calculator: range and step, atmosphere (with its mode, weather and pressure reference, #151), wind, display options (annotations, table columns, velocity unit, chart shown) | [`ballistic`](../src/lib/stores/ballistic.svelte.js) |
-| `zro-scope-view` | Scope view: range, angle, atmosphere (with its mode, weather and pressure reference, #148), wind, rotation, Dial or Hold | [`scopeView`](../src/lib/stores/scopeView.svelte.js) |
+| `zro-ballistic` | Ballistic calculator: range and step, atmosphere (with its mode, weather and pressure reference, #151; filled boxes of the current weather, #152), wind, display options (annotations, table columns, velocity unit, chart shown) | [`ballistic`](../src/lib/stores/ballistic.svelte.js) |
+| `zro-scope-view` | Scope view: range, angle, atmosphere (with its mode, weather and pressure reference, #148; filled boxes of the current weather, #152), wind, rotation, Dial or Hold | [`scopeView`](../src/lib/stores/scopeView.svelte.js) |
 | `zro-traj-validation` | Trajectory validation inputs | [`trajectoryValidation`](../src/lib/stores/trajectoryValidation.svelte.js) |
 | `zro-compare-traj` | Compared profiles, range, chart unit | [`compareTrajectories`](../src/lib/stores/compareTrajectories.svelte.js) |
 | `zro-mpbr` | MPBR target size | [`mpbr`](../src/lib/stores/mpbr.svelte.js) |
@@ -39,10 +39,27 @@ These are the only uses of `localStorage` in `src/`, apart from the read in [`th
 | `/pdf/rifle-dataset-*.pdf` | Creating a dope card | Fetches the blank template. No profile data is sent | The same origin: the site's host on the web, local files on desktop and mobile |
 | `_app/version.json` | When the tab regains focus, and once an hour | Standard browser request. The app does not use the result | The same origin |
 | GitHub | Only when the user opens one of the three links on the About page (ZRO, js-ballistics, bclibc) | Opens in a browser | github.com |
+| Current weather ([#152](https://github.com/hawkins48b/cw-zro/issues/152)) | Web and mobile only: each tap of "Use current weather here" in the Accurate atmosphere of the Scope View or the Ballistic page, after the user allowed the location. Never on load, never in the background, never on desktop | One `GET https://api.open-meteo.com/v1/forecast?latitude=<lat>&longitude=<lon>&current=temperature_2m,relative_humidity_2m,pressure_msl`, latitude and longitude rounded to 2 decimals. No cookie (`credentials: 'omit'`), no referrer (`referrerPolicy: 'no-referrer'`), no HTTP cache (`cache: 'no-store'`). No profile, no other value, no device altitude. The browser adds its usual headers (user agent, language) and, because the request goes to another site, `Origin`: the app's address (the web site, or `https://localhost` / `capacitor://localhost` on mobile). Open-Meteo sees the IP address | api.open-meteo.com |
+| open-meteo.com | Only when the user opens the attribution link shown after a fill | Opens in a browser | open-meteo.com |
 
 The host sees what any web server sees, such as IP address, requested path and user agent. What it logs and keeps is not in this repository and could not be established.
 
 The ballistic engine (bclibc, WebAssembly, [#77](https://github.com/hawkins48b/cw-zro/issues/77)) is embedded in the app's own code as text and compiled on the device. It is not downloaded from anywhere, and it makes no network call: the module imports nothing from the page.
+
+**Current weather** ([#152](https://github.com/hawkins48b/cw-zro/issues/152), owner decisions of 2026-11-16). The code is in [`currentWeather.js`](../src/lib/utils/currentWeather.js); see [Current weather](architecture.md#current-weather).
+
+| Point | What the code does |
+|-------|-------------------|
+| When | Only on a tap of the button. The pages load the helper, but it calls neither geolocation nor `fetch` before the tap (tested in `currentWeather.svelte.test.js`). One request per tap; taps while it runs are ignored |
+| Location | `navigator.geolocation.getCurrentPosition`, high accuracy, a fix up to 5 minutes old. The exact position stays in memory for the request, then is dropped. It is never stored |
+| Sent | Latitude and longitude rounded to 2 decimals: at most about 0.56 km off in latitude, less in longitude away from the equator. Nothing else from the app |
+| Altitude | The device's GPS altitude when it gives one, else Open-Meteo's ground elevation of the point. The GPS altitude is not sent. It is usually height above the WGS84 ellipsoid, not above sea level, so it can be tens of metres off; it is not corrected (owner decision) |
+| Stored | Only the four filled boxes, with the pressure reference set to QNH, in the page's own key (`zro-scope-view` or `zro-ballistic`), as typed values are. No position, no answer, no time. No cache |
+| Failure | Refused location, no fix, no connection, an HTTP error, a 10 s timeout or a bad answer: nothing changes, and a message says why |
+| Desktop | The button is hidden (app scheme or Electron user agent), and the desktop app refuses every permission, location included |
+| Licence | Open-Meteo's data is under CC BY 4.0. The card shows "Weather data: Open-Meteo.com" with a link after each fill |
+
+What Open-Meteo logs and keeps is in its own terms, not in this repository; it was not checked. Its key-less API is for non-commercial use.
 
 **Generated files** are built on the device. CSV exports, PDF dope cards and profile exports are saved through the normal download. They contain profile names and data, so they go wherever the user sends them.
 
@@ -62,7 +79,7 @@ The file name keeps letters (accented ones too), digits, `_` and `-` from the pr
 - No analytics, tracking, advertising or crash reporting
 - No remote fonts, images or scripts
 - No account, login or server-side storage
-- No geolocation, camera or contacts access in the code, and the desktop app refuses those permissions
+- No camera or contacts access in the code. Geolocation only on a tap of "Use current weather here" (#152), on web and mobile; the desktop app hides the button and refuses every permission
 - No auto-update in the desktop app (`publish: null`)
 
 ## How this was checked
@@ -73,6 +90,7 @@ Checked on 2026-11-05 by reading the code:
 - **Storage:** searched for `localStorage`, `sessionStorage`, `indexedDB`, `document.cookie`, `caches` and `serviceWorker`, in `src/` and in the generated Paraglide runtime.
 - **Build output:** listed every URL in `build/`. They are XML namespaces, library error links, code comments, placeholder hosts for URL parsing, the two GitHub links, and the `pdf-lib` project link. None of those is requested by the code above.
 - **Capacitor:** no plugin is imported in `src/`.
+- **Rechecked on 2026-11-16** for [#152](https://github.com/hawkins48b/cw-zro/issues/152): searched `src/` for `fetch`, `geolocation`, `XMLHttpRequest`, `sendBeacon`, `WebSocket` and `EventSource`. The new calls are `fetch` and `getCurrentPosition` in `currentWeather.js` only, reached only from the button's handler; the PDF `fetch` calls are unchanged. The built `index.html` of `npm run build` and `npm run build:mobile` has `https://api.open-meteo.com` in `connect-src` only. The specs check the URL holds only the rounded coordinates and the three fields, the `fetch` options, and that opening either page makes no call.
 - **Rechecked on 2026-11-12** for [#75](https://github.com/hawkins48b/cw-zro/issues/75), ApexCharts 8.8.1: its chunk has two `fetch` calls, used only to embed fonts in chart exports, which the app never starts (no toolbar), and one new URL, `https://apexcharts.com/pricing`, printed in a console warning only when a paid feature is used. The app uses none. In Chromium, the four chart pages of a production build logged no Content-Security-Policy violation, so no script, style, image, font or `fetch` request went to another host there.
 - **Rechecked on 2026-11-10** for [#96](https://github.com/hawkins48b/cw-zro/issues/96) and [#102](https://github.com/hawkins48b/cw-zro/issues/102): the `localStorage` keys in `src/lib/stores/` and `storedLocale.js`, and the generated runtime, where `TREE_SHAKE_COOKIE_STRATEGY_USED` is now `false`, so its cookie code never runs. `document.cookie` is only written by `clearLegacyLocaleCookie`, to delete the old cookie.
 
@@ -80,20 +98,21 @@ Checked on 2026-11-05 by reading the code:
 
 - Traffic was not captured from a running app, in any target.
 - What the Electron runtime, Chromium or the mobile web views do on their own.
+- The current weather in a running app: no browser, emulator or device was used for #152, so the permission prompts, the request and the CORS answer of Open-Meteo were not seen. The Android and iOS location permissions must be added to the generated projects by hand ([Mobile build](development.md#location-permission-for-the-current-weather)).
 - The generated `android/` and `ios/` projects, which are not in the repository.
 - What Google Play or the App Store collect. The privacy page says they may collect usage statistics.
 
 ## Offline use
 
-Calculations run on the device. But the web app has no service worker, so it needs a connection to load. Charts and dope cards load code on demand, so they can fail on the web if the connection drops after the first load. The desktop and mobile apps contain their files. The privacy page says this since [#102](https://github.com/hawkins48b/cw-zro/issues/102).
+Calculations run on the device. The current weather needs a connection on every target; without one, the boxes stay as they were and the card says the service could not be reached. The web app has no service worker, so it needs a connection to load. Charts and dope cards load code on demand, so they can fail on the web if the connection drops after the first load. The desktop and mobile apps contain their files. The privacy page says this since [#102](https://github.com/hawkins48b/cw-zro/issues/102).
 
 ## Security notes
 
-- The web and desktop builds set a Content-Security-Policy that allows scripts, connections and images only from the app itself ([#104](https://github.com/hawkins48b/cw-zro/issues/104)). Since [#77](https://github.com/hawkins48b/cw-zro/issues/77) its `script-src` also has `'wasm-unsafe-eval'`, so that the embedded WebAssembly engine can be compiled; it does not allow `eval()` (owner decision of 2026-11-12). See [Architecture](architecture.md#content-security-policy). The mobile build sets the same policy since [#135](https://github.com/hawkins48b/cw-zro/issues/135), plus `capacitor://localhost`, the app's origin on iOS. It is not yet checked on a device. What headers the web host adds was not checked.
+- The web and desktop builds set a Content-Security-Policy that allows scripts, connections and images only from the app itself ([#104](https://github.com/hawkins48b/cw-zro/issues/104)), plus connections to `https://api.open-meteo.com` for the current weather since [#152](https://github.com/hawkins48b/cw-zro/issues/152). Since [#77](https://github.com/hawkins48b/cw-zro/issues/77) its `script-src` also has `'wasm-unsafe-eval'`, so that the embedded WebAssembly engine can be compiled; it does not allow `eval()` (owner decision of 2026-11-12). See [Architecture](architecture.md#content-security-policy). The mobile build sets the same policy since [#135](https://github.com/hawkins48b/cw-zro/issues/135), plus `capacitor://localhost`, the app's origin on iOS. It is not yet checked on a device. What headers the web host adds was not checked.
 - The desktop app refuses every permission request (camera, location, notifications, devices).
 - The desktop window cannot leave the app, and opens `https:` links only in the system browser. See [Architecture](architecture.md#desktop).
 - Saved values are not validated when read, apart from the chart unit of compare trajectories. See [Input guards](ballistics-model.md#input-guards).
-- The app's [privacy page](../src/routes/settings/privacy/+page.svelte) lists what is stored, that it stays until the site data is cleared or the app is uninstalled, the web host's view of requests, and the offline limits of the web version ([#102](https://github.com/hawkins48b/cw-zro/issues/102)). It follows this guide: change both together.
+- The app's [privacy page](../src/routes/settings/privacy/+page.svelte) lists what is stored, that it stays until the site data is cleared or the app is uninstalled, the web host's view of requests, and the offline limits of the web version ([#102](https://github.com/hawkins48b/cw-zro/issues/102)), and since [#152](https://github.com/hawkins48b/cw-zro/issues/152) what the current weather sends and when. It follows this guide: change both together.
 
 ## Licences
 

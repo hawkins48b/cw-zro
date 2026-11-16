@@ -132,7 +132,7 @@ Since [#148](https://github.com/hawkins48b/cw-zro/issues/148) the Scope View pag
 | [`DistanceInput`](../src/lib/components/DistanceInput.svelte) | Target distance card: + / − per digit (1 to `MAX_DISTANCE`), typed entry, yd / m |
 | [`ScopeResult`](../src/lib/components/ScopeResult.svelte) | Result card with Dial / Hold; Hold renders the `hold` snippet, which the page fills with [`ScopeReticle`](../src/lib/components/ScopeReticle.svelte) |
 | [`ScopeWindCard`](../src/lib/components/ScopeWindCard.svelte) | Wind presets, speed, dial, ± 5°, o'clock hint. Presets come from [`windPreset.js`](../src/lib/utils/windPreset.js) through the store (`windPreset`, `applyWindPreset`). Also on the Ballistic page since #151 |
-| [`ScopeAtmosphereCard`](../src/lib/components/ScopeAtmosphereCard.svelte) | ISA / Estimate / Accurate, with QNH / Station. Also on the Ballistic page since #151. The Trajectory Validation page keeps [`AtmosphereCard`](../src/lib/components/AtmosphereCard.svelte) |
+| [`ScopeAtmosphereCard`](../src/lib/components/ScopeAtmosphereCard.svelte) | ISA / Estimate / Accurate, with QNH / Station. Also on the Ballistic page since #151. In Accurate, "Use current weather here" since #152 (see [Current weather](#current-weather)). The Trajectory Validation page keeps [`AtmosphereCard`](../src/lib/components/AtmosphereCard.svelte) |
 | [`WindDial`](../src/lib/components/WindDial.svelte) | The direction dial of `ScopeWindCard`. `WindInput`, the Ballistic wind box before #151, was removed in #151 |
 | [`ChipGroup`](../src/lib/components/ChipGroup.svelte) | A row of toggle buttons with `aria-pressed`, at least 44 px wide, with a 44 px touch area (`.touch-hit` in [`app.css`](../src/app.css)) |
 
@@ -155,6 +155,23 @@ Since [#151](https://github.com/hawkins48b/cw-zro/issues/151) the Ballistic page
 
 
 The step only picks the table rows and the chart ticks ([#130](https://github.com/hawkins48b/cw-zro/issues/130), owner decision: at least 1, in the range unit; [#133](https://github.com/hawkins48b/cw-zro/issues/133), owner decision: at most the range). No key point depends on it ([#94](https://github.com/hawkins48b/cw-zro/issues/94)). [`tableStep`](../src/lib/utils/inputLimits.js) is the step the table uses: the size of the value typed, at least 1, and 25 for an empty box, 0 or text, as before; above the range, or infinite, it is the range ([`maxTableStep`](../src/lib/utils/inputLimits.js), at least 1), so the table has the muzzle row and the row at the range. [`tableStepLimit`](../src/lib/utils/inputLimits.js) picks the message under the box: `ballistic_step_min` under 1, for text or NaN; `ballistic_step_max` above the range or infinite. The table keeps `tableStep`. The empty box, 25, on a range under 25 is read as the range without a message. Both charts ask ApexCharts for at most `MAX_CHART_TICKS` (120) x-axis ticks, the count of the default step on the longest range ([`chartTickAmount`](../src/lib/utils/inputLimits.js)).
+
+### Current weather
+
+Since [#152](https://github.com/hawkins48b/cw-zro/issues/152) (owner decisions of 2026-11-16), the Accurate mode of `ScopeAtmosphereCard` has a button that fills altitude, pressure, temperature and humidity from the weather at the user's location, on the Scope View and the Ballistic page. What is sent is in [Data and privacy](data-and-privacy.md#what-leaves-the-device).
+
+| Piece | Where | What it does |
+|-------|-------|--------------|
+| Request and conversion | [`currentWeather.js`](../src/lib/utils/currentWeather.js) | `currentPosition` (geolocation, high accuracy, 15 s timeout, a fix up to 5 minutes old, at most 60 s with the permission prompt), `weatherUrl` (latitude and longitude rounded to 2 decimals), `fetchWeather` (`credentials: 'omit'`, `referrerPolicy: 'no-referrer'`, `cache: 'no-store'`, aborted after 10 s), `readWeather` (each value a finite number within the [input limits](ballistics-model.md#input-guards), Open-Meteo's default units), `siteAltitude`, `weatherPatch` (to the units the boxes show), `createWeatherFill` (one request at a time, a late answer ignored) |
+| Page wiring | [`currentWeather.svelte.js`](../src/lib/components/currentWeather.svelte.js) | `useCurrentWeather(store)`, called by both pages: the status, the button's `request`, the card's `onchange` that clears the status line after a change, a cancel on leaving Accurate, and a dispose when the page is left |
+| Display | `ScopeAtmosphereCard` | `weatherAvailable`, `weatherStatus` and `onweather` props; the card computes nothing |
+
+- **Nothing before a tap.** The pages create the helper on load, but it calls neither geolocation nor `fetch` until `request()`, which only the button calls.
+- **One change or none.** The answer is converted with the units shown when it arrives, then written in one `setAtmosphere` call: `mode: 'accurate'`, `pressureRef: 'qnh'` and the four boxes. Pressure is always Open-Meteo's `pressure_msl`, a sea-level pressure, so it is filled as QNH, and the app corrects it to the altitude as for a typed QNH ([`stationPressure`](../src/lib/utils/stationPressure.js), #107). Open-Meteo's `surface_pressure` is not used: it is for the model's ground height, not the GPS altitude. On any error the boxes stay as they were and the card shows one of four messages: `denied`, `unavailable`, `network`, `invalid`.
+- **Rounding.** Altitude whole (ft or m), pressure 1 decimal in hPa or 2 in inHg, temperature 1 decimal (°C or °F), humidity whole. Conversions are js-ballistics'. A value outside the limits of its box after conversion is `invalid`.
+- **Altitude.** The device's GPS altitude when it is a finite number within the altitude limits, else Open-Meteo's `elevation` (its model ground height at the point). Browser and Android GPS altitude is usually height above the WGS84 ellipsoid, not above sea level; the two differ by the geoid height, tens of metres in many places and up to about 100 m. It is not corrected (owner decision: GPS first). The user can edit the box.
+- **Stale answers.** Leaving the page, or leaving the Accurate mode, aborts the request and drops a late answer. A change to a box while the request runs does not stop it: the answer then replaces the four boxes.
+- **Where it shows.** [`isCurrentWeatherAvailable`](../src/lib/utils/currentWeather.js): web and mobile, with `navigator.geolocation`, `fetch` and `AbortController`. Not on the desktop build, detected by its `app:` scheme or an `Electron/` user agent; the desktop app also refuses the location permission ([`permissions.js`](../electron/permissions.js), unchanged).
 
 ### Where shots are built
 
@@ -218,7 +235,7 @@ In the mobile web views the app's own origin is `https://localhost` on Android, 
 | `style-src` | `'self' 'unsafe-inline'` | ApexCharts, Svelte transitions and `style:` set inline styles |
 | `img-src` | `'self' data: blob:` | ApexCharts |
 | `font-src` | `'self' data:` | |
-| `connect-src` | `'self'` | The app fetches only its two PDF templates |
+| `connect-src` | `'self' https://api.open-meteo.com` | The app fetches its two PDF templates, and the [current weather](#current-weather) from Open-Meteo on a tap (#152, owner decision of 2026-11-16). Only this directive names the host: no script, style, image or font comes from it. The desktop build shares the web build, so its policy names the host too, but it hides the button and refuses the location |
 | `object-src` | `'none'` | |
 | `base-uri` | `'self'` | |
 | `form-action` | `'none'` | No form is submitted anywhere |
@@ -232,6 +249,8 @@ SvelteKit hashes only the scripts it writes. An inline script in [`app.html`](..
 ## Mobile
 
 [`capacitor.config.json`](../capacitor.config.json) sets the app ID, `webDir: build` and the splash and status bar settings. `android/` and `ios/` are generated and git-ignored, so they are not in the repository ([#79](https://github.com/hawkins48b/cw-zro/issues/79)). No Capacitor plugin is imported in `src/`.
+
+The [current weather](#current-weather) (#152) uses the web view's own `navigator.geolocation`, not a Capacitor plugin. The native projects need location permissions for it; see [Mobile build](development.md#location-permission-for-the-current-weather).
 
 ## Decisions
 

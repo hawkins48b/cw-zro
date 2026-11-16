@@ -4,6 +4,7 @@
 	import DistanceInput from '#lib/components/DistanceInput.svelte';
 	import ScopeWindCard from '#lib/components/ScopeWindCard.svelte';
 	import ScopeAtmosphereCard from '#lib/components/ScopeAtmosphereCard.svelte';
+	import { useCurrentWeather } from '#lib/components/currentWeather.svelte.js';
 	import ScopeResult from '#lib/components/ScopeResult.svelte';
 	import ScopeReticle from '#lib/components/ScopeReticle.svelte';
 	import ChipGroup from '#lib/components/ChipGroup.svelte';
@@ -31,6 +32,8 @@
 
 	// ── Atmosphere (#148): ISA, Estimate or Accurate, see utils/scopeAtmosphere.js ──
 	let atmosphere = $derived(scopeView.atmosphere);
+	// "Use current weather here" (#152): nothing is asked or sent before a tap on the card's button.
+	const weather = useCurrentWeather(scopeView);
 	/** What the calculation is given: null is the standard atmosphere at sea level. */
 	let atmoParams = $derived(scopeAtmosphereParams(atmosphere));
 	/** What ISA and Estimate use, in the units of the boxes, for the line under the card. */
@@ -246,7 +249,10 @@
 			used={atmosphereUsed}
 			altitudeTooLow={shot.altitudeTooLow}
 			{noAirDensity}
-			onchange={(patch) => scopeView.setAtmosphere(patch)}
+			onchange={weather.onchange}
+			weatherAvailable={weather.available}
+			weatherStatus={weather.status}
+			onweather={weather.request}
 		/>
 	</div>
 </div>

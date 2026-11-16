@@ -1,5 +1,5 @@
 <script>
-	import { Sun, Cloud, CloudRain, CloudSnow, Plus, Minus } from '@lucide/svelte';
+	import { Sun, Cloud, CloudRain, CloudSnow, Plus, Minus, MapPin, Loader, ExternalLink } from '@lucide/svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { readDecimal } from '#lib/utils/decimal.js';
 	import { formatLimit } from '#lib/utils/format.js';
@@ -37,8 +37,44 @@
 	 * @prop {boolean} noAirDensity   - Values within limits that give no air density (#107), accurate mode.
 	 * @prop {(patch: object) => void} onchange - Called with the changed fields, e.g. { mode: 'estimate' },
 	 *   { weather: 'rain' }, { pressureRef: 'station' }, { temperature: '9' }.
+	 *
+	 * Current weather (#152), accurate mode only. The page owns the request; the card only shows it.
+	 * @prop {boolean} weatherAvailable - Show the button (web and mobile; false on the desktop build).
+	 * @prop {{ state: 'idle'|'loading'|'done'|'error',
+	 *          error?: 'denied'|'unavailable'|'network'|'invalid',
+	 *          time?: string }} weatherStatus
+	 *   time: when the fields were filled, already formatted for the locale ('14:05'), for state 'done'.
+	 *   On 'error' the page leaves the fields unchanged.
+	 * @prop {() => void} [onweather] - Called on a tap of the button. The page fills the fields through
+	 *   its own setAtmosphere, the same way as onchange.
 	 */
-	let { atmosphere, used = null, altitudeTooLow = false, noAirDensity = false, onchange } = $props();
+	let {
+		atmosphere,
+		used = null,
+		altitudeTooLow = false,
+		noAirDensity = false,
+		onchange,
+		weatherAvailable = false,
+		weatherStatus = { state: 'idle' },
+		onweather
+	} = $props();
+
+	let weatherLoading = $derived(weatherStatus?.state === 'loading');
+
+	/** The error line of a failed weather request, or ''. Unknown codes read as 'invalid'. */
+	let weatherError = $derived.by(() => {
+		if (weatherStatus?.state !== 'error') return '';
+		switch (weatherStatus.error) {
+			case 'denied':
+				return m.scope_view_current_weather_error_denied();
+			case 'unavailable':
+				return m.scope_view_current_weather_error_unavailable();
+			case 'network':
+				return m.scope_view_current_weather_error_network();
+			default:
+				return m.scope_view_current_weather_error_invalid();
+		}
+	});
 
 	const uid = $props.id();
 
@@ -348,5 +384,56 @@
 				'error'
 			)}
 		</div>
+
+		{#if weatherAvailable && onweather}
+			<!-- Current weather (#152): fills the four fields once; the user can edit them after. -->
+			<div class="space-y-1.5 pt-0.5">
+				<button
+					type="button"
+					class="btn w-full h-11 rounded-base border border-surface-300-700 bg-transparent hover:preset-tonal-surface text-[13px] font-semibold gap-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:opacity-60"
+					disabled={weatherLoading}
+					aria-busy={weatherLoading}
+					aria-describedby="{uid}-wx-note"
+					onclick={() => onweather()}
+				>
+					{#if weatherLoading}
+						<Loader class="size-4 motion-safe:animate-spin" aria-hidden="true" />
+						{m.scope_view_current_weather_loading()}
+					{:else}
+						<MapPin class="size-4" aria-hidden="true" />
+						{m.scope_view_current_weather_button()}
+					{/if}
+				</button>
+
+				{#if weatherError}
+					<p class="text-xs text-error-500" role="alert">{weatherError}</p>
+				{/if}
+
+				<!-- Present from the start so that screen readers announce the change. -->
+				<div aria-live="polite">
+					{#if weatherStatus?.state === 'done'}
+						<p class="rounded-base preset-tonal-primary px-2.5 py-2 text-xs leading-relaxed">
+							{m.scope_view_current_weather_done({ time: weatherStatus.time ?? '' })}
+							<span class="block mt-0.5 text-surface-600-400">
+								{m.scope_view_current_weather_attribution()}
+								<a
+									href="https://open-meteo.com/"
+									target="_blank"
+									rel="noopener noreferrer"
+									class="inline-flex items-center gap-0.5 underline underline-offset-2 hover:text-primary-700-300 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary-500"
+								>
+									Open-Meteo.com<ExternalLink class="size-3" aria-hidden="true" />
+									<span class="sr-only">{m.scope_view_current_weather_new_window()}</span>
+								</a>
+							</span>
+						</p>
+					{/if}
+				</div>
+
+				<p id="{uid}-wx-note" class="text-[11px] leading-snug text-surface-600-400">
+					{m.scope_view_current_weather_note()}
+				</p>
+			</div>
+		{/if}
 	{/if}
 </section>

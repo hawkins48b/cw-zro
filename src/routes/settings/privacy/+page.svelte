@@ -3,6 +3,7 @@
 	import {
 		HardDriveIcon,
 		ServerIcon,
+		MapPinIcon,
 		ShieldCheckIcon,
 		SmartphoneIcon,
 		WifiOffIcon
@@ -37,6 +38,15 @@
 			<li>{m.privacy_storage_language()}</li>
 		</ul>
 		<p class="text-sm text-surface-600-400">{m.privacy_storage_keep()}</p>
+	</div>
+
+	<!-- Current weather, only on a tap (#152; docs/data-and-privacy.md, What leaves the device) -->
+	<div class="card p-6 space-y-3">
+		<div class="flex items-center gap-2">
+			<MapPinIcon class="size-5 text-primary-500" />
+			<h2 class="font-semibold">{m.privacy_weather_title()}</h2>
+		</div>
+		<p class="text-sm text-surface-600-400">{m.privacy_weather_desc()}</p>
 	</div>
 
 	<!-- Web host -->

@@ -27,6 +27,7 @@
 	import ChipGroup from '#lib/components/ChipGroup.svelte';
 	import ScopeWindCard from '#lib/components/ScopeWindCard.svelte';
 	import ScopeAtmosphereCard from '#lib/components/ScopeAtmosphereCard.svelte';
+	import { useCurrentWeather } from '#lib/components/currentWeather.svelte.js';
 	import { Download, Columns3, MapPin, Waves } from '@lucide/svelte';
 	import { Unit } from 'js-ballistics';
 
@@ -52,6 +53,8 @@
 	let chartStep = $derived(tableStep(ballistic.range.step, ballistic.range.distance));
 	// ── Atmosphere (#151, owner decision): ISA, Estimate or Accurate, as on the Scope View ──
 	let atmosphere = $derived(ballistic.atmosphere);
+	// "Use current weather here" (#152): nothing is asked or sent before a tap on the card's button.
+	const weather = useCurrentWeather(ballistic);
 	/** What the calculation is given: null is the standard atmosphere at sea level. */
 	let atmoParams = $derived(scopeAtmosphereParams(atmosphere));
 	/** What ISA and Estimate use, in the units of the boxes, for the line under the card. */
@@ -631,7 +634,10 @@
 					used={atmosphereUsed}
 					altitudeTooLow={trajectory.altitudeTooLow}
 					{noAirDensity}
-					onchange={(patch) => ballistic.setAtmosphere(patch)}
+					onchange={weather.onchange}
+					weatherAvailable={weather.available}
+					weatherStatus={weather.status}
+					onweather={weather.request}
 				/>
 			</div>
 
