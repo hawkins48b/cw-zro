@@ -81,9 +81,11 @@ function powderSensitivity(profile, mv) {
  * engine for good, which try/catch cannot stop.
  *
  * The pressure is entered as sea-level pressure (QNH) and passed to Atmo as the pressure at the
- * site altitude (stationPressure, #107). The limits apply to the value entered.
+ * site altitude (stationPressure, #107), unless `pressureRef` is `'station'` (Scope View, #148):
+ * then it is passed as entered. The limits apply to the value entered.
  *
- * @param {object|null} atmosphere - { altitude, altitudeUnit, pressure, pressureUnit, temperature, temperatureUnit, humidity }
+ * @param {object|null} atmosphere - { altitude, altitudeUnit, pressure, pressureUnit, pressureRef?,
+ *   temperature, temperatureUnit, humidity }
  * @returns {Atmo|null}
  */
 function shotAtmosphere(atmosphere) {
@@ -119,11 +121,12 @@ function customAtmo(atmosphere) {
 	if (!isUsableAtmosphere(values, atmosphere)) return null;
 	const altitude =
 		atmosphere.altitudeUnit === 'm' ? UNew.Meter(values.altitude) : UNew.Foot(values.altitude);
+	const entered =
+		atmosphere.pressureUnit === 'hpa' ? UNew.hPa(values.pressure) : UNew.InHg(values.pressure);
 	// The entered pressure is sea-level pressure (QNH); Atmo needs the pressure at the site (#107).
-	const pressure = stationPressure(
-		atmosphere.pressureUnit === 'hpa' ? UNew.hPa(values.pressure) : UNew.InHg(values.pressure),
-		altitude
-	);
+	// Only the Scope View can mark it as already measured at the site (`pressureRef: 'station'`,
+	// #148): it is then used as entered. Any other value, or none, is QNH, as before.
+	const pressure = atmosphere.pressureRef === 'station' ? entered : stationPressure(entered, altitude);
 	const temperature =
 		atmosphere.temperatureUnit === 'c'
 			? UNew.Celsius(values.temperature)

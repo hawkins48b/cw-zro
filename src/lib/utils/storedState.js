@@ -18,6 +18,13 @@
  * The wind is not read here: see storedWind.js.
  */
 import { isNumberOrText } from './storedWind.js';
+import {
+	DEFAULT_PRESSURE_REF,
+	DEFAULT_WEATHER,
+	isAtmosphereMode,
+	isPressureRef,
+	isWeather
+} from './scopeAtmosphere.js';
 
 /** Whether a stored value is an object with fields: not null, not an array. */
 export const isRecord = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -195,3 +202,41 @@ export const storedSolveFor = (stored) => (stored === 'bc' ? 'bc' : 'velocity');
 export function storedValidationAtmosphere(stored, standard) {
 	return stored === undefined || stored === null ? { ...standard } : storedAtmosphere(stored);
 }
+
+/**
+ * The stored atmosphere of the Scope View (#148): the boxes as storedAtmosphere reads them, plus
+ * the mode, the weather of the estimate mode and the pressure reference of the accurate mode.
+ *
+ * State saved before #148 has no mode: `useISA` gives `isa`, anything else `accurate` with `qnh`,
+ * which is what the page computed then, so no saved result changes. A mode that is not one of the
+ * three is read the same way, from `useISA`, so a damaged mode gives the atmosphere the page used
+ * before. A damaged section is a custom atmosphere of empty boxes, as in storedAtmosphere, so no
+ * result appears for air the user did not choose. The weather is `cloudy` and the pressure
+ * reference `qnh` unless one of the others is stored. `useISA` is read back from the mode, so the
+ * two always agree.
+ *
+ * @param {unknown} stored
+ * @returns {ReturnType<typeof storedAtmosphere> & { mode: 'isa'|'estimate'|'accurate',
+ *   weather: 'sunny'|'cloudy'|'rain'|'snow', pressureRef: 'qnh'|'station' }}
+ */
+export function storedScopeAtmosphere(stored) {
+	const atmosphere = storedObject(stored);
+	const boxes = storedAtmosphere(atmosphere);
+	const mode = isAtmosphereMode(atmosphere.mode) ? atmosphere.mode : boxes.useISA ? 'isa' : 'accurate';
+	return {
+		...boxes,
+		useISA: mode === 'isa',
+		mode,
+		weather: isWeather(atmosphere.weather) ? atmosphere.weather : DEFAULT_WEATHER,
+		pressureRef: isPressureRef(atmosphere.pressureRef) ? atmosphere.pressureRef : DEFAULT_PRESSURE_REF
+	};
+}
+
+/**
+ * The stored result mode of the Scope View (#148): `hold` shows the reticle, anything else, or
+ * nothing, is `dial`. It changes no result.
+ *
+ * @param {unknown} stored
+ * @returns {'dial'|'hold'}
+ */
+export const storedResultMode = (stored) => (stored === 'hold' ? 'hold' : 'dial');

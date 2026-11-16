@@ -11,7 +11,7 @@ Data stays in the browser's `localStorage`, or the same store in the Electron an
 | `zro-profiles` | Profiles: names, rifle and optic names, ammunition, zero, ballistic data, click values | [`profiles`](../src/lib/stores/profiles.svelte.js) |
 | `zro-active-profile` | ID of the active profile | [`activeProfile`](../src/lib/stores/activeProfile.svelte.js) |
 | `zro-ballistic` | Ballistic calculator: range, atmosphere, wind, display options | [`ballistic`](../src/lib/stores/ballistic.svelte.js) |
-| `zro-scope-view` | Scope view: range, angle, atmosphere, wind, rotation | [`scopeView`](../src/lib/stores/scopeView.svelte.js) |
+| `zro-scope-view` | Scope view: range, angle, atmosphere (with its mode, weather and pressure reference, #148), wind, rotation, Dial or Hold | [`scopeView`](../src/lib/stores/scopeView.svelte.js) |
 | `zro-traj-validation` | Trajectory validation inputs | [`trajectoryValidation`](../src/lib/stores/trajectoryValidation.svelte.js) |
 | `zro-compare-traj` | Compared profiles, range, chart unit | [`compareTrajectories`](../src/lib/stores/compareTrajectories.svelte.js) |
 | `zro-mpbr` | MPBR target size | [`mpbr`](../src/lib/stores/mpbr.svelte.js) |

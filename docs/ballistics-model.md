@@ -39,9 +39,9 @@ Everything comes from a profile or from the screen. Values are stored as entered
 | Temperature | °F, °C | Temperature the velocity was measured at, with powder sensitivity on |
 | Temperature modifier | fps per degree of the unit above | Powder sensitivity |
 | Altitude | ft, m | Custom atmosphere: corrects the pressure, and the end of the flight |
-| Pressure | inHg, hPa | Custom atmosphere: sea-level pressure (QNH), as in weather reports |
-| Air temperature | °F, °C | Custom atmosphere |
-| Humidity | % | Custom atmosphere |
+| Pressure | inHg, hPa | Custom atmosphere: sea-level pressure (QNH), as in weather reports. On the Scope View, Accurate mode can take a station pressure instead (#148) |
+| Air temperature | °F, °C | Custom atmosphere; Scope View Estimate mode |
+| Humidity | % | Custom atmosphere. Scope View Estimate mode takes it from the weather |
 | Wind speed | mph, m/s | Wind |
 | Wind direction | degrees, where the wind comes from | Wind |
 
@@ -55,7 +55,7 @@ Weight and diameter do not change the drag. The BC alone carries that.
 
 | Screen | Function | Atmosphere | Wind | Powder sensitivity | Spin drift |
 |--------|----------|------------|------|--------------------|------------|
-| Scope view | `calculateShotPoint` | Standard or custom | Yes | Yes | Yes |
+| Scope view | `calculateShotPoint` | ISA (standard at the altitude), Estimate or Accurate, see [Scope View modes](#scope-view-modes) | Yes | Yes | Yes |
 | Ballistic calculator | `calculateFullTrajectory` | Standard or custom | Yes | Yes | Yes |
 | Trajectory validation | `calculateTrajectoryValidation` | Standard or custom | No | Yes | Yes |
 | Compare trajectories | `calculateFullTrajectory` | Standard only | No | Yes | Yes |
@@ -74,7 +74,7 @@ A single BC scales the standard G1 or G7 drag table from the library. Any `bcTyp
 
 ## Atmosphere
 
-**Standard.** With "use ISA" on, the app calls `new Atmo()`: sea level, 15 °C (59 °F), 1013.25 hPa, 0 % humidity.
+**Standard.** With "use ISA" on (Ballistic, Trajectory Validation), the app calls `new Atmo()`: sea level, 15 °C (59 °F), 1013.25 hPa, 0 % humidity. The Scope View's ISA mode does the same at altitude 0 only; see [Scope View modes](#scope-view-modes).
 
 **Custom.** Temperature and humidity are passed as entered, and the pressure after the altitude correction below. A temperature outside -90 to 70 °C (-130 to 158 °F), a pressure outside 300 to 1200 hPa (8.86 to 35.4 inHg), a humidity outside 0 to 100, or an altitude outside -1000 to 10000 m (-3281 to 32808 ft) gives no result, and the box shows the allowed range ([#92](https://github.com/hawkins48b/cw-zro/issues/92), [#125](https://github.com/hawkins48b/cw-zro/issues/125)). The limits are in the unit entered.
 
@@ -84,7 +84,23 @@ Before #107 the entered pressure was passed as it was, and altitude did not chan
 
 The altitude also sets where the engine ends a flight, at an altitude of -1410.748 ft, -430 m (see [Engine](#engine)): the site altitude plus the height of the bullet over the muzzle. A low site inside the altitude limits can therefore give no result. The Ballistic, scope view and trajectory validation pages then say under the altitude box that the altitude is too low for this shot ([#125](https://github.com/hawkins48b/cw-zro/issues/125)). On the `.308` test profile there is no result below about -1402 ft at 600 yd, or -349 ft at 3000 yd (-365 ft on js-ballistics 2.2).
 
-**During the flight**, density and speed of sound follow the height of the bullet once it is more than 30 ft from the starting altitude, using a fixed lapse rate. Speed of sound depends on temperature only, not on humidity.
+### Scope View modes
+
+Since [#148](https://github.com/hawkins48b/cw-zro/issues/148) the Scope View has three atmosphere modes (owner decision of 2026-11-16). [`scopeAtmosphereParams`](../src/lib/utils/scopeAtmosphere.js) turns each into what `calculateShotPoint` gets:
+
+| Mode | Boxes shown | Passed to `calculateShotPoint` |
+|------|-------------|-------------------------------|
+| ISA | Altitude | At altitude 0, `null` (`new Atmo()`, as before). Elsewhere, a custom atmosphere: 1013.25 hPa as QNH, scaled to the site by `stationPressure`, the ISA temperature of the altitude (`Atmo.standardTemperature`), 0 % humidity. That is the same air as `Atmo.icao` at that altitude |
+| Estimate | Altitude, weather, temperature | Custom: 1013.25 hPa as QNH, scaled to the site, the entered temperature, humidity from the weather: Sunny 40 %, Cloudy 65 %, Rain 90 %, Snow 80 % |
+| Accurate | Pressure with QNH / Station, altitude, temperature, humidity | Custom: the boxes as entered. QNH is scaled by `stationPressure` as above. Station (`pressureRef: 'station'`) is passed to `Atmo` as entered |
+
+ISA using the altitude is the developer's choice on #148, not yet confirmed by the owner. Before #148 the Scope View's ISA ignored the altitude and reset it to 0, so every saved ISA state has altitude 0 and gives the same result.
+
+Only the Scope View passes `pressureRef`. The Ballistic and Trajectory Validation stores read their atmosphere with `storedAtmosphere`, which drops the field, so their pressure is always QNH. MPBR and the dope cards use the standard atmosphere.
+
+ISA and Estimate show a line with the pressure at the site, temperature and humidity used ([`usedScopeAtmosphere`](../src/lib/utils/scopeAtmosphere.js)). It shows dashes when the altitude, or the Estimate temperature, is out of its limits.
+
+ and speed of sound follow the height of the bullet once it is more than 30 ft from the starting altitude, using a fixed lapse rate. Speed of sound depends on temperature only, not on humidity.
 
 **Humidity** is entered in percent and passed to the library as a fraction from 0 to 1, through `humidityFraction()`. The library divides values above 1 by 100 and keeps the rest, so passing the percentage would read 1 % as 100 % ([#84](https://github.com/hawkins48b/cw-zro/issues/84)). Saved values of 1 or less changed meaning with that fix.
 
@@ -116,6 +132,8 @@ An empty direction box counts as 0°, as its placeholder and the dial show ([#11
 
 A comma in the speed or direction box reads as a decimal point: `1,5` is 1.5, in the result, on the dial and in the badge ([#117](https://github.com/hawkins48b/cw-zro/issues/117)).
 
+**Scope View presets** ([#148](https://github.com/hawkins48b/cw-zro/issues/148), owner decision): None, Light and Strong set the speed to 0, 3.5 or 9 m/s, or 0, 7.8 or 20.1 mph in the unit shown ([`windPreset.js`](../src/lib/utils/windPreset.js)). They are the dope cards' metric winds; the mph values are those converted and rounded to 0.1, not the cards' 8 and 20 mph. A preset changes only the speed box, which stays editable, and goes through the same wind guard. The o'clock hint under the direction (`clockHour`) is display only.
+
 ## Spin drift
 
 With the option on and a twist entered, the library adds the empirical drift `1.25 × (Sg + 1.2) × t^1.83` inches, where `t` is the time of flight and `Sg` is the Miller stability factor, corrected for velocity, temperature and pressure. The profile form requires bullet length and twist.
@@ -138,7 +156,7 @@ The zero is the only saved distance. Near and far zero come from the trajectory.
 
 ## Angles
 
-**Uphill and downhill.** While its angle section is open, the scope view multiplies the distance by the cosine of the entered angle, or by the entered cosine, and then calculates a flat shot at that shorter distance. An entered cosine must be above 0 and at most 1 ([#121](https://github.com/hawkins48b/cw-zro/issues/121)), and an angle in degrees strictly between -90° and 90° ([#129](https://github.com/hawkins48b/cw-zro/issues/129)), or the box shows a message and there is no result. An empty box is a flat shot. This is an approximation: the engine's look angle is not used. Time, energy and velocity shown with it are those of the shorter distance. No other screen has an angle.
+**Uphill and downhill.** The scope view multiplies the distance by the cosine of the entered angle, or by the entered cosine, and then calculates a flat shot at that shorter distance. An entered cosine must be above 0 and at most 1 ([#121](https://github.com/hawkins48b/cw-zro/issues/121)), and an angle in degrees strictly between -90° and 90° ([#129](https://github.com/hawkins48b/cw-zro/issues/129)), or the box shows a message and there is no result. An empty box is a flat shot. Since [#148](https://github.com/hawkins48b/cw-zro/issues/148) the angle box is always shown and a saved angle always applies (owner decision of 2026-11-16); before, it applied only while its section was open, and the section started closed. This is an approximation: the engine's look angle is not used. Time, energy and velocity shown with it are those of the shorter distance. No other screen has an angle.
 
 **Cant.** Rotating the scope view recalculates the shot with a cant angle, for the reticle only. The adjustments shown come from the shot without cant. The zero is solved on the canted shot too. At 600 yd on the `.308` test profile, 5° gives 2.01 in of windage and 0.12 in more drop. Cant has a regression test and no independent check.
 
@@ -232,7 +250,7 @@ The limits were set by the owner on 2026-11-10 ([#89](https://github.com/hawkins
 | Range | Above 0, at most 3000 yd or m |
 | Zero distance | 1 to 3000 yd or m, after taking its absolute value |
 | Air temperature, custom | -90 to 70 °C, or -130 to 158 °F |
-| Air pressure, custom | 300 to 1200 hPa, or 8.86 to 35.4 inHg, as entered (sea level). About 78 to 1349 hPa after the altitude correction ([#107](https://github.com/hawkins48b/cw-zro/issues/107)) |
+| Air pressure, custom | 300 to 1200 hPa, or 8.86 to 35.4 inHg, as entered (sea level). About 78 to 1349 hPa after the altitude correction ([#107](https://github.com/hawkins48b/cw-zro/issues/107)). A Scope View Station pressure is not corrected, so the engine gets 300 to 1200 hPa at any altitude ([#148](https://github.com/hawkins48b/cw-zro/issues/148)) |
 | Humidity, custom | 0 to 100 % |
 | Altitude, custom | -1000 to 10000 m, or -3281 to 32808 ft ([#125](https://github.com/hawkins48b/cw-zro/issues/125)) |
 | Bullet weight | 1 to 2000 gr, or 0.065 to 130 g ([#125](https://github.com/hawkins48b/cw-zro/issues/125)) |
@@ -261,6 +279,7 @@ All ends are included. The gram and foot ends are the owner's rounded values, no
 | Shot point, full trajectory, custom atmosphere | Values within the limits above, altitude included (`isUsableAtmosphere`) | No result, and a message under the box |
 | Shot point, full trajectory, custom atmosphere | Air density above 0 after the altitude correction (`hasPositiveDensity`, [#107](https://github.com/hawkins48b/cw-zro/issues/107), approved by the owner on 2026-11-10). The library's density goes below 0 when the water vapour pressure is far above the air pressure: at 10000 m, 70 °C and 100 % humidity, a sea-level pressure of 300 to about 453 hPa (118 hPa at the site). At 60 °C it would need under 290 hPa, so at 60 °C or below it cannot happen inside the limits. 300 hPa ran for more than 5 minutes on a G7 BC 0.01, 9999 fps, 3000 yd zero | No result, and "This air is too thin and humid to calculate" under the pressure box (`hasNoAirDensity`) |
 | Ballistic, scope view and trajectory validation pages, custom atmosphere | The engine ended the flight at its minimum altitude of -1410.748 ft, as it reports it: `fire` throws the library's `RangeError` with `MinimumAltitudeReached`, or the zero solve fails and the flight it started from ends there ([`flightStop.js`](../src/lib/utils/flightStop.js), [#125](https://github.com/hawkins48b/cw-zro/issues/125), [#126](https://github.com/hawkins48b/cw-zro/issues/126)). No result changes | No result, as before, and "altitude too low for this shot" under the altitude box. Validation returns `minimum_altitude` |
+| Scope View, every atmosphere mode | ISA at an altitude other than 0, Estimate and Accurate all pass a custom atmosphere, so the three custom atmosphere rows above apply: limits, density (checked on the air actually used: Station pressure as entered, Estimate humidity) and the minimum altitude stop. ISA and Estimate pass 1013.25 hPa, so only their altitude and the Estimate temperature can be out of limits. An ISA altitude out of its limits is passed as entered, so the guard rejects it ([#148](https://github.com/hawkins48b/cw-zro/issues/148)) | No result, and a message under the box |
 | Ballistic page | Range above 0 and at most 3000 (`isUsableBallisticRange`). A negative range gives no result here, as on the compare page ([#122](https://github.com/hawkins48b/cw-zro/issues/122)) | No result, and a message under the box |
 | Scope view, angle in cos | Cosine finite, above 0 and at most 1 (`isUsableScopeAngle`). Empty is flat ([#121](https://github.com/hawkins48b/cw-zro/issues/121)) | No result, and a message under the box |
 | Scope view, angle in degrees | Angle finite and strictly between -90° and 90° (`isUsableScopeAngle`). Text that is not a number is rejected. Empty is flat ([#129](https://github.com/hawkins48b/cw-zro/issues/129)) | No result, and a message under the box |
@@ -284,6 +303,7 @@ Saved profiles are read through the same guards on every path, so a stored `Infi
 
 - The powder sensitivity temperature and modifier only have to be finite in the form. The velocity they give is checked.
 - The pressure correction for altitude ([#107](https://github.com/hawkins48b/cw-zro/issues/107)) gives the engine pressures down to 78 hPa. Probed on this branch with the engine in a worker and a 30 s limit: 2048 corners (G1 and G7, BC 0.01 and 2, 60 and 9999 fps, sight height ±10 in, zero 1 and 3000, altitude -1000 and 10000 m with 300 and 1200 hPa, -90 and 70 °C, 0 and 100 % humidity, no wind and 100 m/s at 90° in the engine's angle, shot point and full trajectory, range 3000 yd), and 480 cases at 10000 m from 300 to 1200 hPa. Without the density guard, 4 corners ran past 30 s, all at 10000 m, 300 hPa, 70 °C, 100 %. With it, none did. The slowest took 0.9 s alone. That probe ran on js-ballistics 2.2; on 3.1 only the worst corner was rechecked, and it returned. A density just above 0 is not proven safe for every combination. Readings that are physically impossible (water vapour pressure above the air pressure, as at 70 °C below about 312 hPa) still give a result when the density stays above 0.
+- A Scope View Station pressure reaches the engine uncorrected, 300 to 1200 hPa at any altitude from -1000 to 10000 m ([#148](https://github.com/hawkins48b/cw-zro/issues/148)). Hang probe of Station extremes (2026-11-16, js-ballistics 3.1.0): the 48 corner combinations of 300 and 1200 hPa, -90 and 70 °C, -1000 and 10000 m, at 100 and 3000 m, with a 20 m/s crosswind and humidity 100 %, on `P223_G1`, `P308_G1` and `P338_G7_METRIC`, each run in its own Vitest process under a 60 s kill timeout; none hung, the slowest took 32 ms, 26 gave a result and 22 none. Values between the corners were not probed.
 - The low end of the altitude limits gives no result, because the engine ends every flight below -1410.748 ft. The pages with a custom atmosphere say so. With the standard atmosphere (compare, MPBR, dope cards, and the other pages with "use ISA" on) a flight that drops 1410 ft below the muzzle ends the same way, and shows only the general no-result text.
 - In trajectory validation, only the profile's own first shot is checked for that stop. A later shot of the search that ends there counts as a failed shot, and can end in "no solution".
 - The hangs measured near the limits needed a sight height about as large as the zero distance or larger (20 in with a 0.5 zero, 10 in with a 0.2 zero), which the limits rule out; on 3.1 those two cases end at the minimum altitude instead. No proof covers every combination inside the limits. The dope cards were first probed on 3.1 (576 corners).

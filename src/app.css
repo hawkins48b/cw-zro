@@ -49,4 +49,22 @@
 	.input > span {
 		margin-block: calc(var(--spacing) * -1.5);
 	}
+
+	/*
+	 * A 44 px tall touch area around a small control (chips, segmented switches), without making it
+	 * look bigger (#148). Pair it with min-w-11 for the width. The area is the button's own
+	 * pseudo-element, so a tap on it is a tap on the button.
+	 */
+	.touch-hit {
+		position: relative;
+	}
+
+	.touch-hit::after {
+		content: '';
+		position: absolute;
+		inset-inline: 0;
+		top: 50%;
+		height: max(100%, 44px);
+		transform: translateY(-50%);
+	}
 }

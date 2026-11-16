@@ -102,6 +102,78 @@ describe('zro-scope-view', () => {
 		expect(storage.values['zro-scope-view']).toMatchObject({ rotation: 5, atmosphere: { useISA: true } });
 	});
 
+	it('reads a state saved before #148 as before: ISA, or Accurate with QNH, and the dial', async () => {
+		let { scopeView } = await load_(scope);
+		expect(scopeView.atmosphere).toMatchObject({ useISA: true, mode: 'isa', weather: 'cloudy', pressureRef: 'qnh' });
+		expect(scopeView.resultMode).toBe('dial');
+		({ scopeView } = await load_({ ...scope, atmosphere: { ...scope.atmosphere, useISA: false } }));
+		expect(scopeView.atmosphere).toMatchObject({ useISA: false, mode: 'accurate', pressureRef: 'qnh' });
+		// Reading writes nothing.
+		expect(storage.values['zro-scope-view'].atmosphere.mode).toBeUndefined();
+	});
+
+	it.each([[null], ['HOLD'], [1], [throwsAsText], [['hold']]])('reads a stored result mode of %j as dial', async (resultMode) => {
+		const { scopeView } = await load_({ ...scope, resultMode });
+		expect(scopeView.resultMode).toBe('dial');
+	});
+
+	it('remembers the result mode', async () => {
+		const { scopeView } = await load_(scope);
+		scopeView.setResultMode('hold');
+		expect(scopeView.resultMode).toBe('hold');
+		expect(storage.values['zro-scope-view'].resultMode).toBe('hold');
+		scopeView.setResultMode('anything');
+		expect(scopeView.resultMode).toBe('dial');
+	});
+
+	it('changes the mode without losing the boxes, and keeps useISA with it', async () => {
+		const { scopeView } = await load_({ ...scope, atmosphere: { ...scope.atmosphere, useISA: false, altitude: '4000', temperature: '20' } });
+		scopeView.setAtmosphere({ mode: 'isa' });
+		expect(storage.values['zro-scope-view'].atmosphere).toMatchObject({ mode: 'isa', useISA: true, altitude: '4000', temperature: '20' });
+		scopeView.setAtmosphere({ mode: 'estimate', weather: 'rain' });
+		expect(scopeView.atmosphere).toMatchObject({ mode: 'estimate', useISA: false, weather: 'rain', altitude: '4000' });
+		scopeView.setAtmosphere({ mode: 'accurate', pressureRef: 'station' });
+		expect(scopeView.atmosphere).toMatchObject({ mode: 'accurate', useISA: false, pressureRef: 'station', temperature: '20' });
+		scopeView.setAtmosphere({ mode: 'fog' });
+		expect(scopeView.atmosphere.mode).toBe('accurate');
+	});
+
+	it('keeps the old useISA switches: true resets to the standard atmosphere, false is Accurate', async () => {
+		const { scopeView } = await load_({ ...scope, atmosphere: { ...scope.atmosphere, useISA: false, altitude: '4000', pressureRef: 'station' } });
+		scopeView.setAtmosphere({ useISA: true });
+		expect(scopeView.atmosphere).toEqual({ ...scope.atmosphere, useISA: true, mode: 'isa', weather: 'cloudy', pressureRef: 'qnh' });
+		scopeView.setAtmosphere({ useISA: false });
+		expect(scopeView.atmosphere).toMatchObject({ useISA: false, mode: 'accurate' });
+	});
+
+	it.each([
+		['mph', 'light', '7.8'],
+		['mph', 'strong', '20.1'],
+		['mps', 'light', '3.5'],
+		['mps', 'strong', '9'],
+		['mps', 'none', '0']
+	])('sets the %s preset %s to %s and keeps the direction', async (speedUnit, preset, speed) => {
+		const { scopeView } = await load_({ ...scope, wind: { speed: '12', speedUnit, direction: '45', directionConvention: 'from-target' } });
+		expect(scopeView.windPreset).toBeNull();
+		scopeView.applyWindPreset(preset);
+		expect(scopeView.wind).toEqual({ speed, speedUnit, direction: '45' });
+		expect(scopeView.windPreset).toBe(preset);
+	});
+
+	it('ignores a preset that is not one, and marks none for the default wind', async () => {
+		const { scopeView } = await load_(scope);
+		expect(scopeView.windPreset).toBe('none');
+		scopeView.applyWindPreset('gale');
+		expect(scopeView.wind.speed).toBe('0');
+	});
+
+	it('sets the mph speed for a damaged stored unit, as shotWinds reads it', async () => {
+		const { scopeView } = await load_({ ...scope, wind: { speed: '5', speedUnit: throwsAsText, direction: '90', directionConvention: 'from-target' } });
+		scopeView.applyWindPreset('strong');
+		expect(scopeView.storedWind.speed).toBe('20.1');
+		expect(scopeView.windPreset).toBe('strong');
+	});
+
 	it('still migrates a stored clock wind', async () => {
 		// 3 o'clock was the engine's 90, a wind from the left. Since #106 that is shown as 270.
 		const { scopeView } = await load_({ ...scope, wind: { speed: '5', speedUnit: 'mph', direction: '3', directionUnit: 'clock' } });

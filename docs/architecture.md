@@ -95,8 +95,10 @@ Stores use runes in `.svelte.js` files. [`localStore.svelte.js`](../src/lib/stor
 | Store | Read by | A damaged value gives |
 |-------|---------|-----------------------|
 | Range of Scope View, Ballistic, compare and Trajectory Validation | [`storedRange`](../src/lib/utils/storedState.js) | An empty box: the range message and no result. The unit is `m`, else `yd`. An empty Ballistic step is 25, as its placeholder says; the step only picks the table rows. A step below 1 or above the range is not damaged: the box shows the limit, see [Ballistic table step](#ballistic-table-step) |
-| Atmosphere of Scope View and Ballistic | [`storedAtmosphere`](../src/lib/utils/storedState.js) | An empty box, which is out of its limits: the box's message and no result. A damaged section is a custom atmosphere with empty boxes, not the standard one. `useISA` is on for any truthy value, as before |
-| Scope View angle | [`storedElevation`](../src/lib/utils/storedState.js) | An empty box, a flat shot in either unit, as before. The unit is `deg`, else a cosine, as `scopeEffectiveRange` reads it, so a missing unit changes no result. A stored angle at or beyond ±90° is not damaged: the box shows the angle message and there is no result ([#129](https://github.com/hawkins48b/cw-zro/issues/129)) |
+| Atmosphere of Ballistic | [`storedAtmosphere`](../src/lib/utils/storedState.js) | An empty box, which is out of its limits: the box's message and no result. A damaged section is a custom atmosphere with empty boxes, not the standard one. `useISA` is on for any truthy value, as before. Fields it does not list, such as `pressureRef`, are dropped |
+| Atmosphere of Scope View | [`storedScopeAtmosphere`](../src/lib/utils/storedState.js) ([#148](https://github.com/hawkins48b/cw-zro/issues/148)) | The boxes as `storedAtmosphere` reads them, plus `mode` (`isa`, `estimate`, `accurate`), `weather` (`cloudy` unless `sunny`, `rain` or `snow`) and `pressureRef` (`qnh` unless `station`). A missing or damaged mode comes from `useISA`: ISA, else Accurate with QNH, which is what the page computed before #148. `useISA` is read back from the mode and still written beside it. Switching modes keeps the boxes. [`scopeAtmosphereParams`](../src/lib/utils/scopeAtmosphere.js) turns it into the calculator's atmosphere, see [Scope View modes](ballistics-model.md#scope-view-modes) |
+| Scope View result mode | [`storedResultMode`](../src/lib/utils/storedState.js) ([#148](https://github.com/hawkins48b/cw-zro/issues/148)) | `dial`; only `hold` is kept. It changes no result |
+| Scope View angle | [`storedElevation`](../src/lib/utils/storedState.js) | An empty box, a flat shot in either unit, as before. Since #148 the stored angle always applies. The unit is `deg`, else a cosine, as `scopeEffectiveRange` reads it, so a missing unit changes no result. A stored angle at or beyond ±90° is not damaged: the box shows the angle message and there is no result ([#129](https://github.com/hawkins48b/cw-zro/issues/129)) |
 | Scope View rotation (cant) | [`storedRotation`](../src/lib/utils/storedState.js) | No cant. Only a finite number from -90 to 90 is used, so the slider, the reticle and the result agree |
 | Ballistic display options | [`storedBallisticOptions`](../src/lib/utils/storedState.js) | The default: they change no result |
 | MPBR target | [`storedMpbrTarget`](../src/lib/utils/storedState.js) | An empty size: the Calculate button stays off. The unit is `cm`, else `in`, as `calculateMPBR` reads it |
@@ -118,7 +120,22 @@ Two values are read twice, because the safe value to show would give a result wh
 
 The profiles store calls [`profileOps.js`](../src/lib/utils/profileOps.js) for its list operations, on the usable list, so a write replaces a damaged list with a usable one. The same goes for the one-time click value migration at import, and for the ids read as text: the first write stores them. Lookups stay strict (`===`), on text ids.
 
-### Ballistic table step
+### Scope View components
+
+Since [#148](https://github.com/hawkins48b/cw-zro/issues/148) the Scope View page ([`+page.svelte`](../src/routes/scope-view/+page.svelte)) is built from these components. They compute nothing: the page passes every value.
+
+| Component | Role |
+|-----------|------|
+| [`DistanceInput`](../src/lib/components/DistanceInput.svelte) | Target distance card: + / − per digit (1 to `MAX_DISTANCE`), typed entry, yd / m |
+| [`ScopeResult`](../src/lib/components/ScopeResult.svelte) | Result card with Dial / Hold; Hold renders the `hold` snippet, which the page fills with [`ScopeReticle`](../src/lib/components/ScopeReticle.svelte) |
+| [`ScopeWindCard`](../src/lib/components/ScopeWindCard.svelte) | Wind presets, speed, dial, ± 5°, o'clock hint. Presets come from [`windPreset.js`](../src/lib/utils/windPreset.js) through the store (`windPreset`, `applyWindPreset`) |
+| [`ScopeAtmosphereCard`](../src/lib/components/ScopeAtmosphereCard.svelte) | ISA / Estimate / Accurate, with QNH / Station. The Ballistic and Trajectory Validation pages keep [`AtmosphereCard`](../src/lib/components/AtmosphereCard.svelte) |
+| [`WindDial`](../src/lib/components/WindDial.svelte) | The direction dial, shared by `ScopeWindCard` and [`WindInput`](../src/lib/components/WindInput.svelte) (Ballistic) |
+| [`ChipGroup`](../src/lib/components/ChipGroup.svelte) | A row of toggle buttons with `aria-pressed`, at least 44 px wide, with a 44 px touch area (`.touch-hit` in [`app.css`](../src/app.css)) |
+
+On phones the page is one column: profile bar, distance, result, wind, angle, atmosphere. From 640 px the result is in a right column, sticky.
+
+
 
 The step only picks the table rows and the chart ticks ([#130](https://github.com/hawkins48b/cw-zro/issues/130), owner decision: at least 1, in the range unit; [#133](https://github.com/hawkins48b/cw-zro/issues/133), owner decision: at most the range). No key point depends on it ([#94](https://github.com/hawkins48b/cw-zro/issues/94)). [`tableStep`](../src/lib/utils/inputLimits.js) is the step the table uses: the size of the value typed, at least 1, and 25 for an empty box, 0 or text, as before; above the range, or infinite, it is the range ([`maxTableStep`](../src/lib/utils/inputLimits.js), at least 1), so the table has the muzzle row and the row at the range. [`tableStepLimit`](../src/lib/utils/inputLimits.js) picks the message under the box: `ballistic_step_min` under 1, for text or NaN; `ballistic_step_max` above the range or infinite. The table keeps `tableStep`. The empty box, 25, on a range under 25 is read as the range without a message. Both charts ask ApexCharts for at most `MAX_CHART_TICKS` (120) x-axis ticks, the count of the default step on the longest range ([`chartTickAmount`](../src/lib/utils/inputLimits.js)).
 

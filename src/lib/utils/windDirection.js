@@ -30,3 +30,19 @@ export const MAX_WIND_DIRECTION_DEGREES = 1e6;
 export function halfTurn(degrees) {
 	return (((degrees % 360) + 540) % 360);
 }
+
+/**
+ * The hour on a shooter's clock for a shown direction (where the wind comes from, #106), for the
+ * hint under the Scope View direction field (#148): 0° is 12 o'clock, 90° is 3, 180° is 6, 270° is
+ * 9. Rounded to the nearest hour, so 15° to 44.9° is 1 o'clock. Display only: the engine never
+ * reads it. Null for a value readDecimal-style parsing would not give a finite number.
+ *
+ * @param {number} degrees
+ * @returns {number|null} 1 to 12
+ */
+export function clockHour(degrees) {
+	if (typeof degrees !== 'number' || !Number.isFinite(degrees)) return null;
+	const turned = ((degrees % 360) + 360) % 360;
+	const hour = Math.round(turned / 30) % 12;
+	return hour === 0 ? 12 : hour;
+}

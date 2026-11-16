@@ -102,7 +102,7 @@
 	<!-- Header -->
 	<h2 class="h5 flex items-center gap-2">
 		{m.scope_view_reticle()}
-		<span class="badge preset-outlined-surface-200-800 text-xs font-normal">{reticleType.toUpperCase()} reticule</span>
+		<span class="badge preset-outlined-surface-200-800 text-xs font-normal">{m.scope_view_reticle_badge({ type: reticleType.toUpperCase() })}</span>
 	</h2>
 
 	<!-- SVG Reticle View -->
@@ -419,9 +419,9 @@
 		<!-- Reticle scale hint -->
 		<span class="ml-auto">
 			{#if reticleType === 'mil-dot' || reticleType === 'mrad'}
-				1 interval = 1 MRAD
+				{m.scope_view_reticle_interval({ unit: m.unit_mrad() })}
 			{:else if reticleType === 'moa'}
-				1 interval = 1 MOA
+				{m.scope_view_reticle_interval({ unit: m.unit_moa() })}
 			{/if}
 		</span>
 	</div>
@@ -429,23 +429,24 @@
 	<!-- Rotation (cant) dial -->
 	<div class="space-y-2">
 		<div class="flex items-center gap-3">
-			<span class="text-xs text-surface-600-400 shrink-0">{m.scope_view_rotation()}</span>
+			<label for="scope-cant" class="text-xs text-surface-600-400 shrink-0">{m.scope_view_rotation()}</label>
 			<input
+				id="scope-cant"
 				type="range"
 				min="-90"
 				max="90"
 				step="1"
 				value={scopeView.rotation}
 				oninput={(e) => scopeView.setRotation(Number(e.target.value))}
-				class="flex-1 accent-primary-500"
+				aria-valuetext="{scopeView.rotation}°"
+				class="flex-1 min-w-0 h-11 accent-primary-500"
 			/>
 			<span class="text-xs font-mono w-10 text-right tabular-nums">{scopeView.rotation}°</span>
 		</div>
 		<div class="flex justify-center">
 			<button
 				type="button"
-				class="btn btn-sm preset-tonal-surface"
-				title={m.scope_view_rotation_reset()}
+				class="btn btn-sm min-h-11 preset-tonal-surface"
 				disabled={scopeView.rotation === 0}
 				onclick={() => scopeView.resetRotation()}
 			>
