@@ -26,7 +26,7 @@ These are the only uses of `localStorage` in `src/`, apart from the read in [`th
 
 ### Limits of this storage
 
-- Data lives on one device, in one browser. There is no sync, backup, export or import of profiles.
+- Data lives on one device, in one browser. There is no sync, backup or import of profiles. One profile at a time can be exported as a JSON file ([#149](https://github.com/hawkins48b/cw-zro/issues/149), see below), but the app cannot read it back yet.
 - Clearing site data deletes everything. The web, desktop and mobile apps each have their own separate storage.
 - A value that is not valid JSON is replaced by the default, so a corrupted store loses its content.
 - Anyone with access to the device or browser profile can read it.
@@ -44,7 +44,18 @@ The host sees what any web server sees, such as IP address, requested path and u
 
 The ballistic engine (bclibc, WebAssembly, [#77](https://github.com/hawkins48b/cw-zro/issues/77)) is embedded in the app's own code as text and compiled on the device. It is not downloaded from anywhere, and it makes no network call: the module imports nothing from the page.
 
-**Generated files** are built on the device. CSV exports and PDF dope cards are saved through the normal download. They contain profile names and data, so they go wherever the user sends them.
+**Generated files** are built on the device. CSV exports, PDF dope cards and profile exports are saved through the normal download. They contain profile names and data, so they go wherever the user sends them.
+
+**Profile export** ([#149](https://github.com/hawkins48b/cw-zro/issues/149)). Export in the profile's menu on the Profiles page saves `zro-profile-<name>.json`, built by [`profileExport.js`](../src/lib/utils/profileExport.js). Nothing is sent: the page makes a `blob:` URL and clicks a download link. The file holds the whole profile as stored (`profiles.get`), its id included, in an envelope:
+
+| Field | Value |
+|-------|-------|
+| `format` | `"zro-profile"` |
+| `version` | `1` |
+| `exportedAt` | The time of the export, ISO 8601 in UTC (`null` if the clock gives no valid date) |
+| `profile` | The stored profile, every field as stored, damaged values included |
+
+The file name keeps letters (accented ones too), digits, `_` and `-` from the profile name; every other run of characters (spaces, dots, path characters, control and format characters, emoji) becomes one `-`; `-` and `_` are trimmed from the ends, and the name part is cut to 60 characters. A name with nothing left gives `zro-profile.json`. A profile that is missing or not an object gives no file. Not checked on a device: whether the Android and iOS web views save a `blob:` download at all (the same open point as the CSV and the dope cards).
 
 ## What does not exist
 

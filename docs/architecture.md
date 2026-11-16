@@ -157,13 +157,13 @@ The input handling is written out five times: in `calculateShotPoint`, `calculat
 
 ## Layout by screen width
 
-| Width | Navigation |
-|-------|------------|
-| Under 640 px | Bottom bar |
-| 640 to 1023 px | Side rail |
-| 1024 px and over | Full sidebar |
+| Width | Navigation | Theme control |
+|-------|------------|---------------|
+| Under 640 px | Tab bar at the bottom: Scope, Calculators, Profiles, Settings, each with icon and label. The header shows back (when there is history), the page title and the theme button | Header button |
+| 640 to 1023 px | Rail, 96 px wide: logo, the same four items with icon and label. The header shows back and the title | Button at the foot of the rail |
+| 1024 px and over | Sidebar, 240 px: logo and tagline, the four items, the calculators listed under Calculators (Ballistic, Dope Cards, MPBR, Compare, Trajectory Validation, the hub's order), the version at the foot. No header | Light / Dark buttons at the foot |
 
-The width decides this, not the platform.
+The width decides this, not the platform. Since [#149](2026-11-16-149-nav-hub-profiles.md) the three are plain `<nav>` elements in [`+layout.svelte`](../src/routes/+layout.svelte), built from one item list and shown by CSS breakpoints (`sm`, `lg`); Skeleton's `Navigation` component is no longer used. An item is active on its page and on the pages under it, compared on the path without `/fr` or `/de`, so it is marked in every language; `/` counts as Scope View. The link of the page itself has `aria-current="page"`, a section the page is in `aria-current="true"`.
 
 ## Desktop
 
@@ -176,7 +176,7 @@ The width decides this, not the platform.
 | Main window navigates within `app://-` | Allowed |
 | Main window navigates anywhere else | Blocked |
 
-An external link needs `target="_blank"`. Without it, the link is blocked instead of opening in the browser. The rules are in [`navigation.js`](../electron/navigation.js) and have tests.
+An external link needs `target="_blank"`. Without it, the link is blocked instead of opening in the browser. Downloads (CSV, PDF dope cards, profile JSON) are `<a download>` clicks on a `blob:` URL; `main.js` has no `will-download` handler, so Electron uses its default, which usually shows a save dialog. Not checked in a running desktop build. The rules are in [`navigation.js`](../electron/navigation.js) and have tests.
 
 Hardening ([#104](https://github.com/hawkins48b/cw-zro/issues/104)):
 
@@ -210,7 +210,7 @@ ApexCharts 8.8.1 needs nothing more ([#75](https://github.com/hawkins48b/cw-zro/
 
 `'wasm-unsafe-eval'` is there for `js-ballistics` 3.1.0 ([#77](https://github.com/hawkins48b/cw-zro/issues/77), owner decision of 2026-11-12). Its engine, bclibc, is WebAssembly embedded in the bundle as text and compiled on the device with `WebAssembly.instantiate`. A `script-src` without this keyword refuses that compile (checked in Chromium: "Refused to compile or instantiate WebAssembly module"), and every calculator and dope card then fails. The keyword allows compiling WebAssembly only; `eval()`, `new Function()` and inline scripts stay blocked, and no code is loaded from another origin.
 
-SvelteKit hashes only the scripts it writes. An inline script in [`app.html`](../src/app.html) would be blocked, so the dark mode script is the file [`static/theme-init.js`](../static/theme-init.js). A `<meta>` policy cannot set `frame-ancestors`; that needs a header from the web host. Downloads of `blob:` links (PDF and CSV) are navigations, which the policy does not cover.
+SvelteKit hashes only the scripts it writes. An inline script in [`app.html`](../src/app.html) would be blocked, so the dark mode script is the file [`static/theme-init.js`](../static/theme-init.js). A `<meta>` policy cannot set `frame-ancestors`; that needs a header from the web host. Downloads of `blob:` links (PDF, CSV and profile JSON) are navigations, which the policy does not cover.
 
 ## Mobile
 
