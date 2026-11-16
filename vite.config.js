@@ -82,7 +82,8 @@ export default defineConfig({
 				// condition selects. Only these files, so no other test resolves a package differently.
 				extends: true,
 				resolve: { conditions: ['browser'] },
-				test: { name: 'components', include: ['src/**/*.svelte.test.js'] }
+				// The first import compiles the page and its dependencies: slow on a cold CI runner.
+				test: { name: 'components', include: ['src/**/*.svelte.test.js'], hookTimeout: 60000 }
 			}
 		]
 	}

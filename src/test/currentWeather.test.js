@@ -181,7 +181,7 @@ describe('fetchWeather', () => {
 
 	it('maps a failed request (offline, CORS, CSP) to network', async () => {
 		await expectCode(fetchWeather(url, { fetch: async () => Promise.reject(new TypeError('Failed to fetch')) }), 'network');
-		await expectCode(fetchWeather(url, { fetch: undefined }), 'network');
+		await expectCode(fetchWeather(url, { fetch: null }), 'network');
 	});
 
 	it('maps an HTTP error to network', async () => {
