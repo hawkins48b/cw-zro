@@ -9,7 +9,7 @@ const isWindObject = (wind) => wind !== null && typeof wind === 'object' && !Arr
 const shownValue = (value) => (isNumberOrText(value) ? value : '');
 
 /**
- * The wind a page shows, from the wind in storage. Pages and WindInput read this, so a damaged value
+ * The wind a page shows, from the wind in storage. Pages and ScopeWindCard read this, so a damaged value
  * cannot throw while they render (#118). Storage can hold an object that cannot become text.
  *
  * Calculators must keep the stored value instead. shotWinds gives no result for a stored array,

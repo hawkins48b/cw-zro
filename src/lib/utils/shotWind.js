@@ -43,7 +43,7 @@ const MAX_WIND_SPEED_MPS = 100;
  * and throw on an object that cannot become text. A stored speed of any other shape gives no result
  * rather than no wind, because the page can still show it as a speed (owner decision on #116). Text is read as parseFloat reads it, as the dial
  * does, so '90abc' stays 90, except that a comma reads as a decimal point: '1,5' is 1.5, not 1
- * (readDecimal, owner decision on #117). WindInput reads the box with the same function, so the
+ * (readDecimal, owner decision on #117). ScopeWindCard and WindDial read the box with the same function, so the
  * dial, the badge and the result agree.
  *
  * @param {object|null} [wind] - { speed, speedUnit: 'mph'|'mps', direction }

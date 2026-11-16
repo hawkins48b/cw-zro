@@ -5,7 +5,7 @@ import { shotWinds } from '#lib/utils/shotWind.js';
 const fallback = { speed: '0', speedUnit: 'mph', direction: '90' };
 const throwsAsText = JSON.parse('{"toString":1}');
 
-/** Reading the wind the way the pages and WindInput do. None of this may throw. */
+/** Reading the wind the way the pages and ScopeWindCard do. None of this may throw. */
 function readLikeThePage(wind) {
 	parseFloat(wind.speed);
 	parseFloat(wind.direction);

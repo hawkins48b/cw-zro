@@ -7,9 +7,9 @@
 	import WindDial from '#lib/components/WindDial.svelte';
 
 	/**
-	 * Wind card of the Scope View (#148): None / Light / Strong presets, speed with mph / m/s,
+	 * Wind card of the Scope View (#148) and the Ballistic page (#151): None / Light / Strong presets, speed with mph / m/s,
 	 * direction dial, a − / + 5° direction box and an o'clock hint. The direction is where the wind
-	 * comes from (#106). The Ballistic page keeps WindInput.
+	 * comes from (#106).
 	 *
 	 * The presets' speeds are the page's business (owner decision on #148: Light 3.5 m/s or 7.8 mph,
 	 * Strong 9 m/s or 20.1 mph): this card only reports the chip tapped and shows the one it is told.

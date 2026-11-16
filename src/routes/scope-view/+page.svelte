@@ -16,7 +16,7 @@
 		hasNoAirDensity
 	} from '#lib/utils/ballisticCalculator.js';
 	import { Unit } from 'js-ballistics';
-	import { readDecimal } from '#lib/utils/decimal.js';
+	import { clickCount, clickValue } from '#lib/utils/clicks.js';
 	import { MAX_DISTANCE } from '#lib/utils/inputLimits.js';
 	import { isUsableScopeAngle, isUsableScopeRange, scopeEffectiveRange } from '#lib/utils/scopeRange.js';
 	import { formatLimit, formatNumber } from '#lib/utils/format.js';
@@ -80,11 +80,9 @@
 	let elevValue = $derived(getElevationValue(point, elevUnit));
 	let windValue = $derived(getWindageValue(point, windUnit));
 
-	let elevClickVal = $derived(readDecimal(shown?.elevationClickValue) || 0.5);
-	let windClickVal = $derived(readDecimal(shown?.windageClickValue) || 0.5);
-
-	let elevClicks = $derived(elevValue !== null ? Math.round(Math.abs(elevValue) / elevClickVal) : null);
-	let windClicks = $derived(windValue !== null ? Math.round(Math.abs(windValue) / windClickVal) : null);
+	// Clicks as the Ballistic table counts them too (#151): utils/clicks.js.
+	let elevClicks = $derived(clickCount(elevValue, clickValue(shown?.elevationClickValue)));
+	let windClicks = $derived(clickCount(windValue, clickValue(shown?.windageClickValue)));
 
 	// Direction logic (matches v1 convention)
 	let elevDir = $derived(elevValue !== null ? (elevValue <= 0 ? 'up' : 'down') : null);

@@ -13,8 +13,8 @@
 	import ChipGroup from '#lib/components/ChipGroup.svelte';
 
 	/**
-	 * Atmosphere card of the Scope View, with three modes (#148, owner decision). The Ballistic and
-	 * Trajectory Validation pages keep AtmosphereCard.
+	 * Atmosphere card of the Scope View (#148) and the Ballistic page (#151), with three modes (owner
+	 * decisions). The Trajectory Validation page keeps AtmosphereCard.
 	 *
 	 * - isa: altitude only; a line shows the standard pressure and temperature used (`used`).
 	 * - estimate: altitude, weather, temperature (± 1 and quick picks); a line shows what is used.

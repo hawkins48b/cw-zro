@@ -4,7 +4,7 @@
 	import { readDecimal } from '#lib/utils/decimal.js';
 
 	/**
-	 * The wind direction dial, shared by WindInput (Ballistic) and ScopeWindCard (Scope View, #148).
+	 * The wind direction dial, used by ScopeWindCard (Scope View #148, Ballistic #151).
 	 * Drag or tap to set, arrow keys turn it by 5°.
 	 *
 	 * @prop {string} direction - Where the wind comes from, in degrees, as typed (text).

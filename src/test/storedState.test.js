@@ -61,12 +61,10 @@ function readLikeThePage(value) {
 }
 
 const DEFAULT_OPTIONS = {
-	showAtmosphere: false,
-	showWind: false,
-	showVelocityChart: false,
 	showAnnotations: true,
 	visibleColumns: ['rangeYd', 'elevIn', 'elevMOA', 'velFps', 'energyFtlb', 'time'],
-	velChartUnit: 'fps'
+	velChartUnit: 'fps',
+	chartMode: 'drop'
 };
 
 it('uses a test value that really throws as text', () => {
@@ -405,7 +403,13 @@ describe('storedBallisticOptions', () => {
 	const ALL_COLUMNS = ['rangeYd', 'rangeM', 'elevIn', 'elevMOA', 'velFps', 'energyFtlb', 'time'].map((id) => ({ id }));
 
 	it('leaves good options as they are', () => {
-		const options = { ...DEFAULT_OPTIONS, showWind: true, visibleColumns: ['time'], velChartUnit: 'mps' };
+		const options = {
+			...DEFAULT_OPTIONS,
+			showAnnotations: false,
+			visibleColumns: ['time'],
+			velChartUnit: 'mps',
+			chartMode: 'velocity'
+		};
 		expect(storedBallisticOptions(options, DEFAULT_OPTIONS)).toEqual(options);
 	});
 
@@ -430,15 +434,24 @@ describe('storedBallisticOptions', () => {
 	});
 
 	it('uses the default for a flag that is not a boolean, and fps for any unit but mps', () => {
-		const read = storedBallisticOptions(
-			{ showWind: 'yes', showAnnotations: 0, showVelocityChart: throwsAsText, velChartUnit: {} },
-			DEFAULT_OPTIONS
-		);
-		expect(read.showWind).toBe(false);
-		expect(read.showAnnotations).toBe(true);
-		expect(read.showVelocityChart).toBe(false);
-		expect(read.velChartUnit).toBe('fps');
+		for (const showAnnotations of [0, 'yes', throwsAsText, null]) {
+			const read = storedBallisticOptions({ showAnnotations, velChartUnit: {} }, DEFAULT_OPTIONS);
+			expect(read.showAnnotations).toBe(true);
+			expect(read.velChartUnit).toBe('fps');
+		}
 	});
+
+	it('drops the section flags of before #151, which the page no longer has', () => {
+		const stored = { ...DEFAULT_OPTIONS, showWind: true, showAtmosphere: throwsAsText, showVelocityChart: true };
+		expect(storedBallisticOptions(stored, DEFAULT_OPTIONS)).toEqual(DEFAULT_OPTIONS);
+	});
+
+	it.each([['a number', 5], ['other text', 'elevation'], ['an object', {}], ['null', null], ['a throwing object', throwsAsText]])(
+		'shows the drop chart for a chart mode of %s (#151)',
+		(_, chartMode) => {
+			expect(storedBallisticOptions({ chartMode }, DEFAULT_OPTIONS).chartMode).toBe('drop');
+		}
+	);
 });
 
 /*

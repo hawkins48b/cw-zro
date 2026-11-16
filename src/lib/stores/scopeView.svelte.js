@@ -1,5 +1,7 @@
 import { WIND_FROM_TARGET, migrateStoredWind, pageWind, patchWind } from '#lib/utils/storedWind.js';
 import {
+	ISA_ATMOSPHERE,
+	patchedAtmosphere,
 	storedElevation,
 	storedObject,
 	storedRange,
@@ -7,23 +9,8 @@ import {
 	storedRotation,
 	storedScopeAtmosphere
 } from '#lib/utils/storedState.js';
-import { isAtmosphereMode } from '#lib/utils/scopeAtmosphere.js';
 import { activeWindPreset, windPresetSpeed } from '#lib/utils/windPreset.js';
 import { localStore } from './localStore.svelte.js';
-
-const ISA_DEFAULTS = {
-	altitude: '0',
-	altitudeUnit: 'ft',
-	pressure: '29.92',
-	pressureUnit: 'inhg',
-	temperature: '59',
-	temperatureUnit: 'f',
-	humidity: '0'
-};
-
-// The standard atmosphere with its default boxes, weather and pressure reference (#148). useISA is
-// kept beside the mode, so state written now reads the same in a build from before #148.
-const ISA_ATMOSPHERE = { useISA: true, mode: 'isa', weather: 'cloudy', pressureRef: 'qnh', ...ISA_DEFAULTS };
 
 // Direction where the wind comes from, since #106: 90 is from the right.
 const DEFAULT_WIND = { speed: '0', speedUnit: 'mph', direction: '90', directionConvention: WIND_FROM_TARGET };
@@ -87,22 +74,9 @@ export const scopeView = {
 	setElevation(patch) {
 		store.value = { ...state(), elevation: { ...this.elevation, ...patch } };
 	},
-	/**
-	 * Change the atmosphere. `useISA: true` resets it to the standard atmosphere, as before #148;
-	 * `useISA: false` is the accurate mode. A `mode` changes the mode only: the boxes are kept, so
-	 * switching back shows what the user entered. useISA is written to match the mode.
-	 */
+	/** Change the atmosphere: see patchedAtmosphere in storedState.js (#148). */
 	setAtmosphere(patch) {
-		if (patch.useISA === true) {
-			store.value = { ...state(), atmosphere: { ...ISA_ATMOSPHERE } };
-			return;
-		}
-		const { useISA, ...rest } = patch;
-		const next = { ...this.atmosphere, ...rest };
-		if (useISA === false && rest.mode === undefined) next.mode = 'accurate';
-		if (!isAtmosphereMode(next.mode)) next.mode = this.atmosphere.mode;
-		next.useISA = next.mode === 'isa';
-		store.value = { ...state(), atmosphere: next };
+		store.value = { ...state(), atmosphere: patchedAtmosphere(this.atmosphere, patch) };
 	},
 	setWind(patch) {
 		store.value = { ...state(), wind: patchWind(state().wind, patch, DEFAULT_WIND) };

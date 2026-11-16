@@ -119,25 +119,26 @@ export function storedRotation(stored) {
 /**
  * The stored display options of the Ballistic page. They change no result, so a damaged option
  * falls back to its default. A flag must be a boolean; the columns must be a list, and only its
- * texts are kept; the velocity chart unit is `mps` or else `fps`.
+ * texts are kept; the velocity chart unit is `mps` or else `fps`; the chart shown (#151) is
+ * `velocity` or else `drop`.
+ *
+ * The flags `showAtmosphere`, `showWind` and `showVelocityChart` of before #151 opened sections the
+ * page no longer has: they are not read, and the next change of an option drops them.
  *
  * @param {unknown} stored
- * @param {{ showAtmosphere: boolean, showWind: boolean, showVelocityChart: boolean,
- *   showAnnotations: boolean, visibleColumns: string[], velChartUnit: string }} defaults
+ * @param {{ showAnnotations: boolean, visibleColumns: string[], velChartUnit: string,
+ *   chartMode: 'drop'|'velocity' }} defaults
  * @returns {typeof defaults}
  */
 export function storedBallisticOptions(stored, defaults) {
 	const options = storedObject(stored);
-	const flag = (key) => (typeof options[key] === 'boolean' ? options[key] : defaults[key]);
 	return {
-		showAtmosphere: flag('showAtmosphere'),
-		showWind: flag('showWind'),
-		showVelocityChart: flag('showVelocityChart'),
-		showAnnotations: flag('showAnnotations'),
+		showAnnotations: typeof options.showAnnotations === 'boolean' ? options.showAnnotations : defaults.showAnnotations,
 		visibleColumns: Array.isArray(options.visibleColumns)
 			? options.visibleColumns.filter((column) => typeof column === 'string')
 			: [...defaults.visibleColumns],
-		velChartUnit: options.velChartUnit === 'mps' ? 'mps' : 'fps'
+		velChartUnit: options.velChartUnit === 'mps' ? 'mps' : 'fps',
+		chartMode: options.chartMode === 'velocity' ? 'velocity' : 'drop'
 	};
 }
 
@@ -240,3 +241,70 @@ export function storedScopeAtmosphere(stored) {
  * @returns {'dial'|'hold'}
  */
 export const storedResultMode = (stored) => (stored === 'hold' ? 'hold' : 'dial');
+
+/**
+ * The standard atmosphere as the Scope View and Ballistic stores write it: the default boxes (sea
+ * level, 29.92 inHg, 59 °F, 0 %), the mode, weather and pressure reference (#148, #151). useISA is
+ * kept beside the mode, so state written now reads the same in a build from before #148 or #151.
+ */
+export const ISA_ATMOSPHERE = Object.freeze({
+	useISA: true,
+	mode: 'isa',
+	weather: DEFAULT_WEATHER,
+	pressureRef: DEFAULT_PRESSURE_REF,
+	altitude: '0',
+	altitudeUnit: 'ft',
+	pressure: '29.92',
+	pressureUnit: 'inhg',
+	temperature: '59',
+	temperatureUnit: 'f',
+	humidity: '0'
+});
+
+/**
+ * The atmosphere to store after a change on the atmosphere card, for the Scope View (#148) and
+ * Ballistic (#151) stores. `useISA: true` resets it to the standard atmosphere, as before #148;
+ * `useISA: false` is the accurate mode. A `mode` changes the mode only: the boxes are kept, so
+ * switching back shows what the user entered. A mode that is not one of the three keeps the
+ * current one. useISA is written to match the mode.
+ *
+ * @param {ReturnType<typeof storedScopeAtmosphere>} current - the atmosphere as the store reads it
+ * @param {Record<string, unknown>} patch
+ * @returns {Record<string, unknown>}
+ */
+export function patchedAtmosphere(current, patch) {
+	if (patch.useISA === true) return { ...ISA_ATMOSPHERE };
+	const { useISA, ...rest } = patch;
+	const next = { ...current, ...rest };
+	if (useISA === false && rest.mode === undefined) next.mode = 'accurate';
+	if (!isAtmosphereMode(next.mode)) next.mode = current.mode;
+	next.useISA = next.mode === 'isa';
+	return next;
+}
+
+/**
+ * The stored atmosphere of the Ballistic page (#151): read as on the Scope View
+ * (storedScopeAtmosphere), with two differences for state saved before #151, which has no mode.
+ *
+ * - Before #151 the page used the sea-level standard atmosphere (`null`) whenever `useISA` was on,
+ *   whatever the boxes held: the boxes were hidden, and choosing the standard atmosphere reset them
+ *   to altitude 0. The ISA mode now uses the altitude, so a saved ISA state is read at altitude 0,
+ *   which gives `null` again. Normal use only ever saved altitude 0 with useISA; this covers a state
+ *   edited by hand or damaged in the altitude only.
+ * - Before #151 the page read its atmosphere with storedAtmosphere, which drops `pressureRef`, so
+ *   the pressure was always QNH. A `pressureRef` in such a state (edited by hand) is read as `qnh`
+ *   (security review of #151).
+ *
+ * So every saved result stays the same. Reading writes nothing; the next change stores these
+ * values with the mode.
+ *
+ * @param {unknown} stored
+ * @returns {ReturnType<typeof storedScopeAtmosphere>}
+ */
+export function storedBallisticAtmosphere(stored) {
+	const atmosphere = storedScopeAtmosphere(stored);
+	if (isAtmosphereMode(storedObject(stored).mode)) return atmosphere;
+	// Saved before #151: as the page computed it then.
+	const before151 = { ...atmosphere, pressureRef: DEFAULT_PRESSURE_REF };
+	return before151.mode === 'isa' ? { ...before151, altitude: '0' } : before151;
+}

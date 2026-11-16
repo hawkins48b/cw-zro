@@ -10,7 +10,7 @@ Data stays in the browser's `localStorage`, or the same store in the Electron an
 |-----|---------|-------|
 | `zro-profiles` | Profiles: names, rifle and optic names, ammunition, zero, ballistic data, click values. Not written on first launch: since [#150](https://github.com/hawkins48b/cw-zro/issues/150) it appears with the first profile saved (guided setup, sample profile or profile form) | [`profiles`](../src/lib/stores/profiles.svelte.js) |
 | `zro-active-profile` | ID of the active profile. Not written on first launch either (#150): it appears when a profile is made active | [`activeProfile`](../src/lib/stores/activeProfile.svelte.js) |
-| `zro-ballistic` | Ballistic calculator: range, atmosphere, wind, display options | [`ballistic`](../src/lib/stores/ballistic.svelte.js) |
+| `zro-ballistic` | Ballistic calculator: range and step, atmosphere (with its mode, weather and pressure reference, #151), wind, display options (annotations, table columns, velocity unit, chart shown) | [`ballistic`](../src/lib/stores/ballistic.svelte.js) |
 | `zro-scope-view` | Scope view: range, angle, atmosphere (with its mode, weather and pressure reference, #148), wind, rotation, Dial or Hold | [`scopeView`](../src/lib/stores/scopeView.svelte.js) |
 | `zro-traj-validation` | Trajectory validation inputs | [`trajectoryValidation`](../src/lib/stores/trajectoryValidation.svelte.js) |
 | `zro-compare-traj` | Compared profiles, range, chart unit | [`compareTrajectories`](../src/lib/stores/compareTrajectories.svelte.js) |

@@ -56,7 +56,7 @@ Weight and diameter do not change the drag. The BC alone carries that.
 | Screen | Function | Atmosphere | Wind | Powder sensitivity | Spin drift |
 |--------|----------|------------|------|--------------------|------------|
 | Scope view | `calculateShotPoint` | ISA (standard at the altitude), Estimate or Accurate, see [Scope View modes](#scope-view-modes) | Yes | Yes | Yes |
-| Ballistic calculator | `calculateFullTrajectory` | Standard or custom | Yes | Yes | Yes |
+| Ballistic calculator | `calculateFullTrajectory` | ISA, Estimate or Accurate, as the Scope View since [#151](https://github.com/hawkins48b/cw-zro/issues/151), see [Scope View modes](#scope-view-modes) | Yes | Yes | Yes |
 | Trajectory validation | `calculateTrajectoryValidation` | Standard or custom | No | Yes | Yes |
 | Compare trajectories | `calculateFullTrajectory` | Standard only | No | Yes | Yes |
 | MPBR | `calculateMPBR` | Standard only | No | No | Vertical only is used |
@@ -74,7 +74,7 @@ A single BC scales the standard G1 or G7 drag table from the library. Any `bcTyp
 
 ## Atmosphere
 
-**Standard.** With "use ISA" on (Ballistic, Trajectory Validation), the app calls `new Atmo()`: sea level, 15 °C (59 °F), 1013.25 hPa, 0 % humidity. The Scope View's ISA mode does the same at altitude 0 only; see [Scope View modes](#scope-view-modes).
+**Standard.** With "use ISA" on (Trajectory Validation), the app calls `new Atmo()`: sea level, 15 °C (59 °F), 1013.25 hPa, 0 % humidity. The ISA mode of the Scope View and the Ballistic page does the same at altitude 0 only; see [Scope View modes](#scope-view-modes).
 
 **Custom.** Temperature and humidity are passed as entered, and the pressure after the altitude correction below. A temperature outside -90 to 70 °C (-130 to 158 °F), a pressure outside 300 to 1200 hPa (8.86 to 35.4 inHg), a humidity outside 0 to 100, or an altitude outside -1000 to 10000 m (-3281 to 32808 ft) gives no result, and the box shows the allowed range ([#92](https://github.com/hawkins48b/cw-zro/issues/92), [#125](https://github.com/hawkins48b/cw-zro/issues/125)). The limits are in the unit entered.
 
@@ -86,9 +86,9 @@ The altitude also sets where the engine ends a flight, at an altitude of -1410.7
 
 ### Scope View modes
 
-Since [#148](https://github.com/hawkins48b/cw-zro/issues/148) the Scope View has three atmosphere modes (owner decision of 2026-11-16). [`scopeAtmosphereParams`](../src/lib/utils/scopeAtmosphere.js) turns each into what `calculateShotPoint` gets:
+Since [#148](https://github.com/hawkins48b/cw-zro/issues/148) the Scope View has three atmosphere modes (owner decision of 2026-11-16), and since [#151](https://github.com/hawkins48b/cw-zro/issues/151) the Ballistic page has the same three (owner decision). [`scopeAtmosphereParams`](../src/lib/utils/scopeAtmosphere.js) turns each into what `calculateShotPoint` (Scope View) or `calculateFullTrajectory` (Ballistic, through `ballisticPageTrajectory`) gets:
 
-| Mode | Boxes shown | Passed to `calculateShotPoint` |
+| Mode | Boxes shown | Passed to the calculator |
 |------|-------------|-------------------------------|
 | ISA | Altitude | At altitude 0, `null` (`new Atmo()`, as before). Elsewhere, a custom atmosphere: 1013.25 hPa as QNH, scaled to the site by `stationPressure`, the ISA temperature of the altitude (`Atmo.standardTemperature`), 0 % humidity. That is the same air as `Atmo.icao` at that altitude |
 | Estimate | Altitude, weather, temperature | Custom: 1013.25 hPa as QNH, scaled to the site, the entered temperature, humidity from the weather: Sunny 40 %, Cloudy 65 %, Rain 90 %, Snow 80 % |
@@ -96,7 +96,9 @@ Since [#148](https://github.com/hawkins48b/cw-zro/issues/148) the Scope View has
 
 ISA using the altitude is the developer's choice on #148, not yet confirmed by the owner. Before #148 the Scope View's ISA ignored the altitude and reset it to 0, so every saved ISA state has altitude 0 and gives the same result.
 
-Only the Scope View passes `pressureRef`. The Ballistic and Trajectory Validation stores read their atmosphere with `storedAtmosphere`, which drops the field, so their pressure is always QNH. MPBR and the dope cards use the standard atmosphere.
+The Ballistic page worked the same way before #151: "use ISA" gave `new Atmo()` whatever the boxes held, and choosing it reset them to altitude 0. Its store reads a state saved before #151 (no `mode`) with `useISA` on at altitude 0 ([`storedBallisticAtmosphere`](../src/lib/utils/storedState.js)), so even a hand-edited ISA state gives `null` as before, and a custom one is Accurate with QNH, the air it computed, even with a hand-edited `pressureRef: 'station'`. ISA at another altitude and Estimate only apply once the user picks them. Every custom atmosphere still goes through `calculateFullTrajectory`'s guards; `ballisticAtmosphere.test.js` checks both with the engine stubbed.
+
+The Scope View and the Ballistic page pass `pressureRef`. The Trajectory Validation store reads its atmosphere with `storedAtmosphere`, which drops the field, so its pressure is always QNH. MPBR and the dope cards use the standard atmosphere.
 
 ISA and Estimate show a line with the pressure at the site, temperature and humidity used ([`usedScopeAtmosphere`](../src/lib/utils/scopeAtmosphere.js)). It shows dashes when the altitude, or the Estimate temperature, is out of its limits.
 

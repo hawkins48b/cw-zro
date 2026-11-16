@@ -1,21 +1,14 @@
 import { WIND_FROM_TARGET, migrateStoredWind, pageWind, patchWind } from '#lib/utils/storedWind.js';
 import {
-	storedAtmosphere,
+	ISA_ATMOSPHERE,
+	patchedAtmosphere,
+	storedBallisticAtmosphere,
 	storedBallisticOptions,
 	storedObject,
 	storedRange
 } from '#lib/utils/storedState.js';
+import { activeWindPreset, windPresetSpeed } from '#lib/utils/windPreset.js';
 import { localStore } from './localStore.svelte.js';
-
-const ISA_DEFAULTS = {
-	altitude: '0',
-	altitudeUnit: 'ft',
-	pressure: '29.92',
-	pressureUnit: 'inhg',
-	temperature: '59',
-	temperatureUnit: 'f',
-	humidity: '0'
-};
 
 const DEFAULT_COLUMNS = ['rangeYd', 'elevIn', 'elevMOA', 'velFps', 'energyFtlb', 'time'];
 
@@ -23,17 +16,16 @@ const DEFAULT_COLUMNS = ['rangeYd', 'elevIn', 'elevMOA', 'velFps', 'energyFtlb',
 const DEFAULT_WIND = { speed: '0', speedUnit: 'mph', direction: '90', directionConvention: WIND_FROM_TARGET };
 
 const DEFAULT_OPTIONS = {
-	showAtmosphere: false,
-	showWind: false,
-	showVelocityChart: false,
 	showAnnotations: true,
 	visibleColumns: DEFAULT_COLUMNS,
-	velChartUnit: 'fps'
+	velChartUnit: 'fps',
+	// The chart of the Bullet Path card (#151): 'drop' or 'velocity'.
+	chartMode: 'drop'
 };
 
 const store = localStore('zro-ballistic', () => ({
 	range: { distance: '500', unit: 'yd', step: '25' },
-	atmosphere: { useISA: true, ...ISA_DEFAULTS },
+	atmosphere: { ...ISA_ATMOSPHERE },
 	wind: DEFAULT_WIND,
 	options: DEFAULT_OPTIONS
 }));
@@ -53,8 +45,12 @@ export const ballistic = {
 	get range() {
 		return storedRange(state().range, { step: true });
 	},
+	/**
+	 * The boxes, plus mode, weather and pressureRef, as on the Scope View (#151). Hand it to
+	 * scopeAtmosphereParams. State saved before #151 reads as the page computed it then.
+	 */
 	get atmosphere() {
-		return storedAtmosphere(state().atmosphere);
+		return storedBallisticAtmosphere(state().atmosphere);
 	},
 	/** The wind to show. Never hand this to a calculator: use storedWind. */
 	get wind() {
@@ -64,6 +60,11 @@ export const ballistic = {
 	get storedWind() {
 		return state().wind;
 	},
+	/** The preset the shown wind speed matches in its unit, or null (#151, as the Scope View). */
+	get windPreset() {
+		const wind = this.wind;
+		return activeWindPreset(wind.speed, wind.speedUnit);
+	},
 	get options() {
 		return storedBallisticOptions(state().options, DEFAULT_OPTIONS);
 	},
@@ -71,15 +72,17 @@ export const ballistic = {
 	setRange(patch) {
 		store.value = { ...state(), range: { ...this.range, ...patch } };
 	},
+	/** Change the atmosphere as the Scope View does: see patchedAtmosphere in storedState.js. */
 	setAtmosphere(patch) {
-		if (patch.useISA === true) {
-			store.value = { ...state(), atmosphere: { useISA: true, ...ISA_DEFAULTS } };
-		} else {
-			store.value = { ...state(), atmosphere: { ...this.atmosphere, ...patch } };
-		}
+		store.value = { ...state(), atmosphere: patchedAtmosphere(this.atmosphere, patch) };
 	},
 	setWind(patch) {
 		store.value = { ...state(), wind: patchWind(state().wind, patch, DEFAULT_WIND) };
+	},
+	/** Set the speed of a preset in the speed unit shown; the direction stays (#151). */
+	applyWindPreset(preset) {
+		const speed = windPresetSpeed(preset, this.wind.speedUnit);
+		if (speed !== null) this.setWind({ speed });
 	},
 	setOptions(patch) {
 		store.value = { ...state(), options: { ...this.options, ...patch } };
@@ -90,6 +93,6 @@ export const ballistic = {
 		this.setOptions({ visibleColumns: next });
 	},
 	resetAtmosphere() {
-		store.value = { ...state(), atmosphere: { useISA: true, ...ISA_DEFAULTS } };
+		store.value = { ...state(), atmosphere: { ...ISA_ATMOSPHERE } };
 	}
 };

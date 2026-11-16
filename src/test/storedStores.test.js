@@ -183,6 +183,7 @@ describe('zro-scope-view', () => {
 
 describe('zro-ballistic', () => {
 	const ISA = { useISA: true, altitude: '0', altitudeUnit: 'ft', pressure: '29.92', pressureUnit: 'inhg', temperature: '59', temperatureUnit: 'f', humidity: '0' };
+	// Options as saved before #151, with the section flags it dropped.
 	const options = {
 		showAtmosphere: false,
 		showWind: false,
@@ -210,7 +211,10 @@ describe('zro-ballistic', () => {
 		expect(() => readLikeThePage(ballistic.range.step)).not.toThrow();
 		expect(() => readLikeThePage(ballistic.atmosphere.altitude)).not.toThrow();
 		expect(typeof ballistic.atmosphere.useISA).toBe('boolean');
-		expect(typeof ballistic.options.showWind).toBe('boolean');
+		expect(typeof ballistic.options.showAnnotations).toBe('boolean');
+		expect(['drop', 'velocity']).toContain(ballistic.options.chartMode);
+		expect(['isa', 'estimate', 'accurate']).toContain(ballistic.atmosphere.mode);
+		expect(['qnh', 'station']).toContain(ballistic.atmosphere.pressureRef);
 		expect(() => ['time'].filter((id) => ballistic.options.visibleColumns.includes(id))).not.toThrow();
 		ballistic.toggleColumn('time');
 		expect(Array.isArray(storage.values['zro-ballistic'].options.visibleColumns)).toBe(true);
@@ -228,7 +232,73 @@ describe('zro-ballistic', () => {
 		expect(ballistic.atmosphere.useISA).toBe(false);
 		expect(ballistic.atmosphere.altitude).toBe('');
 		ballistic.setAtmosphere({ useISA: true });
-		expect(ballistic.atmosphere).toEqual(ISA);
+		expect(ballistic.atmosphere).toEqual({ ...ISA, mode: 'isa', weather: 'cloudy', pressureRef: 'qnh' });
+	});
+
+	it('reads a state saved before #151 as before: ISA at altitude 0, or Accurate with QNH, without a write', async () => {
+		let { ballistic } = await load_({ ...ball, atmosphere: { ...ISA, altitude: '4000' } });
+		expect(ballistic.atmosphere).toMatchObject({ useISA: true, mode: 'isa', altitude: '0', weather: 'cloudy', pressureRef: 'qnh' });
+		expect(storage.values['zro-ballistic'].atmosphere).toEqual({ ...ISA, altitude: '4000' });
+		({ ballistic } = await load_({ ...ball, atmosphere: { ...ISA, useISA: false, altitude: '4000' } }));
+		expect(ballistic.atmosphere).toMatchObject({ useISA: false, mode: 'accurate', pressureRef: 'qnh', altitude: '4000' });
+		expect(storage.values['zro-ballistic'].atmosphere.mode).toBeUndefined();
+	});
+
+	it('changes the mode without losing the boxes, and writes useISA with it for an older build', async () => {
+		const { ballistic } = await load_({ ...ball, atmosphere: { ...ISA, useISA: false, altitude: '4000', temperature: '20' } });
+		ballistic.setAtmosphere({ mode: 'isa' });
+		expect(storage.values['zro-ballistic'].atmosphere).toMatchObject({ mode: 'isa', useISA: true, altitude: '4000', temperature: '20' });
+		ballistic.setAtmosphere({ mode: 'estimate', weather: 'snow' });
+		expect(storage.values['zro-ballistic'].atmosphere).toMatchObject({ mode: 'estimate', useISA: false, weather: 'snow' });
+		ballistic.setAtmosphere({ mode: 'accurate', pressureRef: 'station' });
+		expect(ballistic.atmosphere).toMatchObject({ mode: 'accurate', useISA: false, pressureRef: 'station', altitude: '4000' });
+		ballistic.setAtmosphere({ mode: 'fog' });
+		expect(ballistic.atmosphere.mode).toBe('accurate');
+		ballistic.setAtmosphere({ useISA: true });
+		expect(storage.values['zro-ballistic'].atmosphere).toEqual({ ...ISA, mode: 'isa', weather: 'cloudy', pressureRef: 'qnh' });
+	});
+
+	it('starts on the standard atmosphere, in ISA mode', async () => {
+		const { ballistic } = await load('#lib/stores/ballistic.svelte.js', {});
+		expect(ballistic.atmosphere).toEqual({ ...ISA, mode: 'isa', weather: 'cloudy', pressureRef: 'qnh' });
+		expect(ballistic.options.chartMode).toBe('drop');
+	});
+
+	it.each([
+		['mph', 'light', '7.8'],
+		['mph', 'strong', '20.1'],
+		['mps', 'light', '3.5'],
+		['mps', 'strong', '9'],
+		['mps', 'none', '0']
+	])('sets the %s preset %s to %s and keeps the direction', async (speedUnit, preset, speed) => {
+		const { ballistic } = await load_({ ...ball, wind: { speed: '12', speedUnit, direction: '45', directionConvention: 'from-target' } });
+		expect(ballistic.windPreset).toBeNull();
+		ballistic.applyWindPreset(preset);
+		expect(ballistic.wind).toEqual({ speed, speedUnit, direction: '45' });
+		expect(ballistic.windPreset).toBe(preset);
+	});
+
+	it('ignores a preset that is not one, and sets the mph speed for a damaged unit', async () => {
+		let { ballistic } = await load_({ ...ball, wind: { speed: '0', speedUnit: 'mph', direction: '90', directionConvention: 'from-target' } });
+		expect(ballistic.windPreset).toBe('none');
+		ballistic.applyWindPreset('gale');
+		expect(ballistic.wind.speed).toBe('0');
+		({ ballistic } = await load_({ ...ball, wind: { speed: '5', speedUnit: throwsAsText, direction: '90', directionConvention: 'from-target' } }));
+		ballistic.applyWindPreset('strong');
+		expect(ballistic.storedWind.speed).toBe('20.1');
+		expect(ballistic.windPreset).toBe('strong');
+	});
+
+	it('drops the section flags of before #151 on the next option change, and remembers the chart and columns', async () => {
+		const { ballistic } = await load_({ ...ball, options: { ...options, showWind: true } });
+		ballistic.setOptions({ chartMode: 'velocity' });
+		ballistic.toggleColumn('elevClicks');
+		expect(storage.values['zro-ballistic'].options).toEqual({
+			showAnnotations: true,
+			visibleColumns: [...options.visibleColumns, 'elevClicks'],
+			velChartUnit: 'fps',
+			chartMode: 'velocity'
+		});
 	});
 
 	it('toggles a column on top of damaged columns', async () => {

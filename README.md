@@ -64,7 +64,7 @@ The [docs index](docs/README.md) lists these guides and the dated delivery docum
 | Feature | What it does |
 |---------|--------------|
 | Scope view | Live field calculator: distance, wind and angle give click adjustments, on a red-dot, MOA, MRAD or mil-dot reticle |
-| Ballistic calculator | Trajectory table with selectable columns, CSV export, elevation and velocity charts |
+| Ballistic calculator | Trajectory table with selectable columns (clicks included) and the Scope View distance marked, CSV export, a drop or velocity chart, near and far zero, highest point and subsonic distance; wind presets and the ISA, Estimate or Accurate atmosphere of the Scope View |
 | MPBR | Maximum point-blank range for a target size, with the zero to use and a chart |
 | Trajectory validation | Solves muzzle velocity or BC from an observed impact, and can save it to the profile |
 | Compare trajectories | Several profiles on one chart |
