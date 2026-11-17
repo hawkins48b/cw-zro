@@ -280,6 +280,18 @@
 		"homepage": "https://tailwindcss.com/"
 	},
 	{
+		"name": "three",
+		"version": "0.187.0",
+		"license": "MIT",
+		"platforms": [
+			"web",
+			"android",
+			"ios",
+			"desktop"
+		],
+		"homepage": "https://threejs.org/"
+	},
+	{
 		"name": "tslib",
 		"version": "1.14.1",
 		"license": "0BSD",

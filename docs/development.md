@@ -72,6 +72,46 @@ npm run templates:precision
 
 and commit the three PDFs. The output has no date or id, so an unchanged layout writes the same bytes. `precisionCardPdf.test.js` fails when a committed template differs from what the script writes. The fill code reads the same layout and words, so the numbers stay in their cells.
 
+### Tutorial models
+
+The 3D models of the ballistic tutorial (epic [#180](https://github.com/hawkins48b/cw-zro/issues/180), [#181](https://github.com/hawkins48b/cw-zro/issues/181)) are binary glTF files in `static/models/`, copied into every build like any static file. No app page loads them yet: the tutorial route comes with #182. [`scripts/build-models.js`](../scripts/build-models.js) draws them from three.js geometry and plain materials (no third-party model, no texture, no download) and writes them with three's `GLTFExporter`; the shapes are in [`scripts/models/`](../scripts/models/). After changing a shape, run:
+
+```bash
+npm run models:build
+```
+
+and commit the `.glb` files. The output has no date, id or random number (trees and grass use a seeded generator), so an unchanged model writes the same bytes. `src/test/tutorialModels.test.js` fails when a committed file differs from what the script writes, and checks the node names, pivots, sizes and budgets below.
+
+Conventions, for every model:
+
+| Rule | Value |
+|------|-------|
+| Units | Metres, real size. The bullet's rifling engraving is 0.15 mm deep, a little deeper than a real one, to be seen |
+| Axes | +Y up. Forward (muzzle, objective, line of sight) is -Z: a shooter at the origin looks down -Z, so a target stands at negative Z and faces +Z |
+| Nodes | A named part is one mesh (one material) or a group of meshes named `<part>_<material>`. A part's origin is its pivot. The tests check the names below |
+| Materials | Plain PBR colours, no UVs; the grass has vertex colours. Meshes hold `POSITION`, `NORMAL` and an index |
+
+| Model | Origin | Named nodes (turn axis in the node's own axes) | Triangles | Bytes |
+|-------|--------|------------------------------------------------|-----------|-------|
+| `rifle` | Bore axis at the breech (bolt face) | `stock`, `barrel`, `muzzle` (origin at the muzzle exit, about 0.675 m forward), `receiver`, `bolt` (origin on the bore axis: turns about Z, slides along Z), `optic-rail` (origin at the top of the rail, at its middle), `trigger`, `trigger-guard`, `magazine` | 1084 | 64,968 |
+| `scope` | Optical axis, halfway between the rings | `body`, `objective` and `ocular` (origins at their lens centre), `elevation-turret` (Y), `windage-turret` (X, right), `parallax-turret` (X, left), `magnification-ring` (Z), `rings` (bases 38 mm below the axis: put the scope's origin 0.038 m above the rifle's `optic-rail` origin), `eyepoint` (empty, 90 mm behind the ocular). No reticle | 1628 | 74,680 |
+| `holo-sight` | Middle of the base underside (rail contact) | `base`, `housing`, `battery-cap`, `hood`, `window` (origin at the middle of the window), `buttons`. No brand or logo | 296 | 20,216 |
+| `tree-broadleaf`, `tree-birch` | Foot of the trunk | `trunk` > `branch-<n>` > `leaves-<n>-<k>`, and `leaves-top`. Branch nodes are not rotated: a small rotation about X or Z sways a branch from its base, with its leaves | 1064, 880 | 93,044, 76,740 |
+| `tree-conifer` | Foot of the trunk | `trunk` > `branch-<n>` (limbs, origin on the trunk) > `leaves-<n>` (foliage cone) | 522 | 35,160 |
+| `grass` | Middle of the tuft, on the ground | One mesh, `grass`, for instancing: 7 blades, double-sided, normals up | 21 | 2,720 |
+| `ipsc-target` | Ground, under the target | `target` (origin at the middle of the bottom edge of the face, 0.8 m up) > `board`, `zone-a`, `zone-c`, `zone-d` (one plane, no overlap), `hard-cover` (visible: hide it when not wanted); `stand`. 46 × 76 cm, zones only roughly the classic layout | 141 | 13,532 |
+| `bullet` | Middle of the base, nose at -Z | `ogive`, `bearing-surface` (6 helical engravings, 1:10" twist), `boat-tail`. .30 calibre, 31.2 mm | 2016 | 43,272 |
+| `spotting-scope` | Ground, between the tripod legs | `tripod`, `head` (pan about Y) > `scope-body` (tilt about X) > `objective`, `focus-ring` (Z), `eyepiece` (45°) | 632 | 32,976 |
+| `flag` | Foot of the pole | `pole` (3 m), `cloth` (90 × 45 cm, 16 × 8 quads, double-sided; origin at the top of its hoist edge, hangs out along +X: point +X downwind) | 396 | 11,516 |
+
+All eleven files together are 468,824 bytes (the test keeps the total under 750 KiB, each file under 150 KiB and 2500 triangles, the grass at 32). The counts are from `npm run models:build`, which prints them. GLTFExporter is written for the browser: the script gives it a small `FileReader` on Node's `Blob`, and it needs no canvas since there is no texture.
+
+#### Model viewer (dev only)
+
+`npm run dev`, then http://localhost:5173/dev/models: the models of `static/models`, orbit (drag), zoom (wheel), pan (right drag), a wireframe switch, grid and axes, the node tree with the triangles of each node, the file size, and the origin of a clicked node. Reload after `npm run models:build`.
+
+It is not a SvelteKit route. A Vite plugin, [`tools/model-viewer/plugin.js`](../tools/model-viewer/plugin.js), added in `vite.config.js` with `apply: 'serve'`, answers exactly `GET` and `HEAD /dev/models` in the dev server with a page that loads [`tools/model-viewer/main.js`](../tools/model-viewer/main.js) through Vite. So `npm run build` and `build:mobile` have neither the page nor its code, and no app code imports three. SvelteKit limits what Vite serves to `src/`, `node_modules/` and its own folders; the plugin adds `main.js` alone to that list, so the rest of `tools/` and `scripts/` stay refused (403). The page is the plugin's, not SvelteKit's, so the app's Content-Security-Policy does not apply to it.
+
 ### Included software list
 
 Settings > About and the Licences page list every package the app ships, from [`src/lib/data/licenses.json`](../src/lib/data/licenses.json) (#166). The file is generated and committed:

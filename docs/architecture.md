@@ -17,6 +17,7 @@ Versions are those locked in `package-lock.json` on `develop`.
 | Ballistics | `js-ballistics`, pinned by owner decision ([#77](https://github.com/hawkins48b/cw-zro/issues/77)), with its WebAssembly engine bclibc (LGPL-3.0) | 3.1.0 (bclibc 2.0.0) |
 | Charts | ApexCharts, lazy-loaded, pinned on an exact version by owner decision ([#75](https://github.com/hawkins48b/cw-zro/issues/75)); licence text checked by a test (#164) | 8.8.1 |
 | PDF | `pdf-lib` | 1.17.1 |
+| 3D | three.js, pinned on an exact version; only the tutorial models' build script and the dev viewer use it so far (#181) | 0.187.0 |
 | Translations | Paraglide | 3.1.0 |
 | Tests | Vitest, jsdom | 5.1.0, 31.0.0 |
 | Mobile | Capacitor | 8.6.0 |
@@ -47,8 +48,9 @@ electron/                    # Desktop main process, navigation rules, menu, per
 messages/                    # en.json, fr.json, de.json
 project.inlang/              # Paraglide settings
 resources/                   # Desktop icons
-scripts/                     # Audit check, precision card templates, licence list
-static/                      # Copied to build/: logo, PDF templates, robots.txt
+scripts/                     # Audit check, precision card templates, licence list, tutorial models (models/)
+static/                      # Copied to build/: logo, PDF templates, tutorial models (models/), robots.txt
+tools/model-viewer/          # Dev-only viewer of the tutorial models, at /dev/models in npm run dev, in no build
 ```
 
 Configuration is in [`vite.config.js`](../vite.config.js). There is no `svelte.config.js`: the SvelteKit options are passed to `sveltekit({...})` there. `#lib` is an alias defined under `imports` in [`package.json`](../package.json).
@@ -252,6 +254,8 @@ The input handling is written out six times: in `calculateShotPoint`, `calculate
 **Aborted ApexCharts request on a reload** ([#99](https://github.com/hawkins48b/cw-zro/issues/99)). The Ballistic, MPBR, Trajectory Validation and Compare pages import ApexCharts in `onMount`, so its chunk is requested after the page has rendered. If the page is reloaded, or left, before that response arrives, the browser cancels the request of the document it unloads, and lists it as aborted (`net::ERR_ABORTED`). The new document requests the chunk again and draws the charts. Reproduced on 2026-11-11 with a production build behind a static host with an `index.html` fallback, in Chromium, by delaying the chunk 400 ms and reloading `/calculators/ballistic` as soon as the page had text: the first request is aborted, the second completes and the chart renders, with no page error. Reloading after the chunk has loaded aborts nothing. The earlier smoke tests (#71, #72) reloaded as soon as the page showed text, which is that race. The chunk path is absolute (`/_app/immutable/...`), so a deep URL does not change it. A start without a locale in the URL and a stored language other than English ([#96](https://github.com/hawkins48b/cw-zro/issues/96)) aborts the requests of the first document the same way, because `hooks.client.js` replaces the page; ApexCharts is not among them, since that document never mounts a page. Neither costs more than a repeated download.
 
 **Web and mobile builds share `build/`.** The second one overwrites the first.
+
+Every build also carries the tutorial models, `build/models/*.glb`, 468,824 bytes ([Tutorial models](development.md#tutorial-models)). No page loads them yet. The dev-only model viewer is in no build.
 
 ## Layout by screen width
 
