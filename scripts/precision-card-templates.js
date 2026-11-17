@@ -1,0 +1,251 @@
+/**
+ * Draws the static templates of the precision dope card (#157) with pdf-lib and writes them to
+ * `static/pdf/precision-<locale>.pdf`, one per card language. Since #160 they hold no unit: the
+ * wind, pressure and temperature units, the column values and lines, the ring speeds and the
+ * cover's reference values are drawn by precisionCardPdf.js, for the units the user picked.
+ *
+ * Run: npm run templates:precision
+ *
+ * Each file holds three A6 pages: the cover, the range page (copied once per distance by
+ * precisionCardPdf.js) and the worksheet. The geometry comes from
+ * src/lib/utils/precisionCardLayout.js and the words from src/lib/utils/precisionCardWords.js, the
+ * modules the fill code reads, so the numbers land in the printed cells. The output is
+ * deterministic (no dates or ids in the file), and src/test/precisionCardPdf.test.js checks
+ * that the committed files are what this script writes: run it after any change to the layout or
+ * the words, and commit the PDFs.
+ */
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { PDFDocument, StandardFonts } from 'pdf-lib';
+import {
+	BADGE,
+	COLORS,
+	COVER,
+	FOOTER,
+	LEFT,
+	PAGE_SIZE,
+	RANGE,
+	RIGHT,
+	WIDTH,
+	WORKSHEET,
+	coverCell,
+	dialPoint,
+	painter,
+	precisionTemplatePath,
+	worksheetRowTop,
+	worksheetSectionHeight
+} from '../src/lib/utils/precisionCardLayout.js';
+import { PRECISION_LOCALES, precisionWords } from '../src/lib/utils/precisionCardWords.js';
+
+/** The path of a template, relative to `static/`. */
+export const templatePath = precisionTemplatePath;
+
+/**
+ * The template of a language.
+ * @param {'en'|'fr'|'de'} locale
+ * @returns {Promise<Uint8Array>}
+ */
+export async function buildPrecisionTemplate(locale) {
+	const words = precisionWords(locale);
+	const doc = await PDFDocument.create({ updateMetadata: false });
+	const fonts = {
+		regular: await doc.embedFont(StandardFonts.Helvetica),
+		bold: await doc.embedFont(StandardFonts.HelveticaBold)
+	};
+	const size = [PAGE_SIZE.width, PAGE_SIZE.height];
+	drawCover(painter(doc.addPage(size), fonts), words);
+	drawRange(painter(doc.addPage(size), fonts), words);
+	drawWorksheet(painter(doc.addPage(size), fonts), words);
+	return doc.save({ useObjectStreams: false });
+}
+
+function drawCover(p, words) {
+	const h = COVER.header;
+	p.rect(LEFT, h.top, WIDTH, h.height, { fill: COLORS.ink });
+	p.text(words.title.toUpperCase(), h.textX, h.title.baseline, { size: h.title.size, bold: true, color: COLORS.white });
+
+	COVER.groups.forEach((group, g) => {
+		const fields = COVER.fields[g];
+		p.rect(LEFT, group.top, WIDTH, group.band, { fill: COLORS.band });
+		p.line(LEFT, group.top + group.band, RIGHT, group.top + group.band);
+		p.text(words[fields.title], LEFT + 8, group.top + COVER.titleBaseline, { size: COVER.titleSize, bold: true });
+		for (let r = 1; r < fields.rows.length; r++) {
+			const y = group.top + group.band + r * group.row;
+			p.line(LEFT, y, RIGHT, y, { color: COLORS.grid });
+		}
+		p.line(LEFT + WIDTH / 2, group.top + group.band, LEFT + WIDTH / 2, group.top + group.height, { color: COLORS.grid });
+		p.rect(LEFT, group.top, WIDTH, group.height, { border: COLORS.ink });
+		for (const row of fields.rows) {
+			for (const key of row) {
+				const cell = /** @type {NonNullable<ReturnType<typeof coverCell>>} */ (coverCell(key));
+				p.text(words[key], cell.left + COVER.cell.padding, cell.baseline, { size: COVER.cell.size, color: COLORS.muted });
+			}
+		}
+	});
+
+	const d = COVER.disclaimer;
+	const lines = wrap(p, words.disclaimer, WIDTH, d.size);
+	lines.forEach((line, i) => {
+		p.text(line, LEFT, d.lastBaseline - (lines.length - 1 - i) * d.lineHeight, { size: d.size, color: COLORS.muted });
+	});
+	p.line(LEFT, FOOTER.rule, RIGHT, FOOTER.rule);
+}
+
+/** Lines of a text that fit a width, split at spaces. */
+function wrap(p, text, width, size) {
+	const lines = [];
+	let line = '';
+	for (const word of text.split(' ')) {
+		const next = line ? `${line} ${word}` : word;
+		if (line && p.width(next, size) > width) {
+			lines.push(line);
+			line = word;
+		} else line = next;
+	}
+	if (line) lines.push(line);
+	return lines;
+}
+
+function drawRange(p, words) {
+	// Distance and ① box
+	const t = RANGE.top;
+	p.rect(t.split, t.top, RIGHT - t.split, t.height, { fill: COLORS.ink });
+	p.rect(LEFT, t.top, WIDTH, t.height, { border: COLORS.ink, borderWidth: 1.5 });
+	p.text(words.distance, t.distance.x, t.label.baseline, { size: t.label.size, bold: true, color: COLORS.muted });
+	p.badge('1', t.badge.cx, t.badge.cy, { inverted: true });
+	p.text(words.elevation, t.elevationLabelX, t.label.baseline, { size: t.label.size, bold: true, color: COLORS.white });
+
+	// ② row
+	const e = RANGE.extras;
+	p.badge('2', e.badge.cx, e.badge.cy);
+	for (let i = 1; i < 3; i++) {
+		const x = e.left + (i * (RIGHT - e.left)) / 3;
+		p.line(x, e.top, x, e.bottom);
+	}
+	p.line(LEFT, e.rule, RIGHT, e.rule);
+
+	// ③ and ④ tables: the unit, the column values and the lines between the columns are drawn
+	// at fill time (#160), since the number of columns depends on the unit.
+	const tb = RANGE.table;
+	for (const table of RANGE.tables) {
+		const top = table.top;
+		p.rect(LEFT, top, tb.labelRight - LEFT, tb.height, { fill: COLORS.band });
+		p.line(LEFT, top + tb.divider, RIGHT, top + tb.divider, { color: COLORS.grid });
+		p.line(tb.labelRight, top, tb.labelRight, top + tb.height);
+		p.badge(table.badge, tb.badgeCx, top + tb.divider / 2);
+		p.rect(LEFT, top, WIDTH, tb.height, { border: COLORS.ink });
+	}
+
+	// ⑤ line
+	const s = RANGE.spin;
+	p.badge('5', s.badge.cx, s.badge.cy);
+	p.text(words.spinDrift, s.labelX, s.baseline, { size: s.size });
+	p.text(words.timeOfFlight, s.timeLabelRight, s.baseline, { size: s.size, color: COLORS.muted, align: 'right' });
+	p.line(LEFT, s.rule, RIGHT, s.rule, { color: COLORS.dash, dash: [3, 2] });
+
+	// ⑥ quarter dial
+	const dl = RANGE.dial;
+	p.badge('6', dl.badge.cx, dl.badge.cy);
+	const ox = dl.origin.x;
+	const oy = dl.origin.y;
+	const cx = dl.centre.x;
+	const cy = dl.centre.y;
+	for (const r of dl.radii) {
+		p.path(`M ${cx} ${cy - r} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`, ox, oy, { border: COLORS.ring, dash: [4, 3] });
+	}
+	// Thin rays every 15° (#159); 90° is the III axis.
+	for (const angle of dl.rays.filter((a) => a < 90)) {
+		const end = dialPoint(angle, dl.radii[dl.radii.length - 1] + dl.rayOverhang);
+		p.line(ox + cx, oy + cy, end.x, end.y, { color: COLORS.ray });
+	}
+	p.line(ox + cx, oy + cy, ox + cx, oy + dl.axisTop, { width: 1.25 });
+	p.line(ox + cx, oy + cy, ox + dl.axisRight, oy + cy, { width: 1.25 });
+	p.circle(ox + cx, oy + cy, 3.5);
+	for (const label of dl.clockLabels) {
+		p.text(label.text, ox + label.x, oy + label.y, { size: dl.clockSize, bold: true, align: 'center' });
+	}
+	for (const label of dl.clockAngles) {
+		p.text(label.text, ox + label.x, oy + label.y, { size: dl.clockAngleSize, color: COLORS.muted, align: label.align });
+	}
+	for (const angle of dl.halfRays) {
+		const at = dialPoint(angle, dl.halfRayRadius);
+		p.text(`${angle}°`, at.x, at.y + dl.halfRaySize * dl.baselineDrop, { size: dl.halfRaySize, bold: true, align: 'center' });
+	}
+	// The ring speeds and the wind unit are drawn at fill time (#160).
+}
+
+function drawWorksheet(p, words) {
+	const h = WORKSHEET.header;
+	p.rect(LEFT, h.top, h.split - LEFT, h.height, { fill: COLORS.ink });
+	p.text(words.firingData, h.titleX, h.baseline, { size: h.titleSize, bold: true, color: COLORS.white });
+	p.text(words.distance, h.split + 8, h.baseline, { size: h.labelSize, bold: true, color: COLORS.muted });
+	p.line(h.unitLeft, h.top, h.unitLeft, h.top + h.height);
+	p.rect(LEFT, h.top, WIDTH, h.height, { border: COLORS.ink, borderWidth: 1.5 });
+
+	const [c0, c1, c2, c3, c4] = WORKSHEET.columns;
+	for (const section of WORKSHEET.sections) {
+		const top = section.top;
+		const height = worksheetSectionHeight(section);
+		p.rect(LEFT, top, WIDTH, WORKSHEET.band, { fill: COLORS.ink });
+		p.text(words[section.title], LEFT + WIDTH / 2, top + 14, { size: WORKSHEET.titleSize, bold: true, color: COLORS.white, align: 'center' });
+		const sub = top + WORKSHEET.band;
+		p.rect(LEFT, sub, WIDTH, WORKSHEET.subheader, { fill: COLORS.soft });
+		p.text(words.data, (c1 + c3) / 2, sub + 12.5, { size: WORKSHEET.unitSize, color: COLORS.muted, align: 'center' });
+		p.line(c1, sub, c1, sub + WORKSHEET.subheader);
+		p.line(c3, sub, c3, sub + WORKSHEET.subheader);
+		p.line(LEFT, sub + WORKSHEET.subheader, RIGHT, sub + WORKSHEET.subheader);
+
+		section.rows.forEach((row, i) => {
+			const rt = worksheetRowTop(section, i);
+			const mid = rt + WORKSHEET.row / 2;
+			p.rect(c0, rt, c1 - c0, WORKSHEET.row, { fill: COLORS.softer });
+			if (row.unit === 'none') p.rect(c1, rt, c3 - c1, WORKSHEET.row, { fill: COLORS.ink });
+			p.badge(row.n, c0 + 8 + BADGE.r, mid);
+			p.text(words[row.label], c0 + 8 + 2 * BADGE.r + 6, mid + 4.5, { size: WORKSHEET.labelSize, bold: true });
+			if (row.clock) drawClockIcon(p, c1 - 8 - 12, mid);
+			const sign = row.sign === 'leftOrRight' ? words.leftOrRight : row.sign === 'spin' ? '' : row.sign;
+			p.text(sign, c3 + WORKSHEET.signX, mid + 5.5, { size: WORKSHEET.signSize, bold: true });
+			p.line(c1, rt, c1, rt + WORKSHEET.row);
+			p.line(c2, rt, c2, rt + WORKSHEET.row, { color: COLORS.grid });
+			p.line(c3, rt, c3, rt + WORKSHEET.row);
+			p.line(LEFT, rt + WORKSHEET.row, RIGHT, rt + WORKSHEET.row, { color: COLORS.grid });
+		});
+
+		const tt = worksheetRowTop(section, section.rows.length);
+		p.rect(LEFT, tt, WIDTH, WORKSHEET.total, { fill: COLORS.soft });
+		p.text(words[section.total], LEFT + 8, tt + 24.5, { size: WORKSHEET.labelSize, bold: true });
+		p.line(c1, tt, c1, tt + WORKSHEET.total);
+		p.line(c3, tt, c3, tt + WORKSHEET.total);
+		p.rect(c3 + 3, tt + 3, c4 - c3 - 6, WORKSHEET.total - 6, { fill: COLORS.white, border: COLORS.ink, borderWidth: 2 });
+		p.rect(LEFT, top, WIDTH, height, { border: COLORS.ink, borderWidth: 1.5 });
+	}
+	p.line(LEFT, FOOTER.rule, RIGHT, FOOTER.rule);
+}
+
+/** The small clock face of the wind row. */
+function drawClockIcon(p, cx, cy) {
+	p.circle(cx, cy, 10.5, { fill: COLORS.white, border: COLORS.ink, borderWidth: 1.5 });
+	p.circle(cx, cy, 1.6);
+	p.line(cx, cy - 9.5, cx, cy - 7, { width: 1.5 });
+	p.line(cx + 9.5, cy, cx + 7, cy, { width: 1.5 });
+	p.line(cx, cy + 9.5, cx, cy + 7, { width: 1.5 });
+	p.line(cx - 9.5, cy, cx - 7, cy, { width: 1.5 });
+}
+
+/** Writes every template into `static/pdf/`. */
+export async function writePrecisionTemplates(root = process.cwd()) {
+	const written = [];
+	for (const locale of PRECISION_LOCALES) {
+		const lang = /** @type {'en'|'fr'|'de'} */ (locale);
+		const file = path.join(root, 'static', templatePath(lang));
+		fs.writeFileSync(file, await buildPrecisionTemplate(lang));
+		written.push(path.relative(root, file));
+	}
+	return written;
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+	const written = await writePrecisionTemplates();
+	for (const file of written) console.log(`wrote ${file}`);
+}

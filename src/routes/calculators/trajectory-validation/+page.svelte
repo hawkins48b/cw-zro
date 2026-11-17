@@ -1,15 +1,19 @@
 <script>
 	import { onMount } from 'svelte';
-	import { m } from '$lib/paraglide/messages.js';
-	import { activeProfile } from '$lib/stores/activeProfile.svelte.js';
-	import { profiles } from '$lib/stores/profiles.svelte.js';
-	import { settings } from '$lib/stores/settings.svelte.js';
-	import { trajectoryValidation } from '$lib/stores/trajectoryValidation.svelte.js';
-	import { calculateTrajectoryValidation } from '$lib/utils/trajectoryValidation.js';
-	import { calculateFullTrajectory } from '$lib/utils/ballisticCalculator.js';
+	import { m } from '#lib/paraglide/messages.js';
+	import { activeProfile } from '#lib/stores/activeProfile.svelte.js';
+	import { profiles } from '#lib/stores/profiles.svelte.js';
+	import { settings } from '#lib/stores/settings.svelte.js';
+	import { trajectoryValidation } from '#lib/stores/trajectoryValidation.svelte.js';
+	import { calculateTrajectoryValidation } from '#lib/utils/trajectoryValidation.js';
+	import { altitudeTooLowMessage } from '#lib/components/altitudeMessage.js';
+	import { calculateFullTrajectory } from '#lib/utils/ballisticCalculator.js';
+	import { readDecimal } from '#lib/utils/decimal.js';
+	import { formatLimit } from '#lib/utils/format.js';
+	import { MAX_DISTANCE } from '#lib/utils/inputLimits.js';
 	import { Unit } from 'js-ballistics';
 	import { CheckCircle } from '@lucide/svelte';
-	import AtmosphereCard from '$lib/components/AtmosphereCard.svelte';
+	import AtmosphereCard from '#lib/components/AtmosphereCard.svelte';
 
 	// ── ApexCharts (lazy-loaded, browser-only) ───────────────────────
 	let ApexCharts = $state(null);
@@ -23,6 +27,17 @@
 	// ── Derived: measure type/unit shortcuts ─────────────────────────
 	let solveFor = $derived(trajectoryValidation.solveFor);
 	let measureType = $derived(trajectoryValidation.measure.type);
+	let measureDirection = $derived(trajectoryValidation.direction);
+	let measureHint = $derived.by(() => {
+		if (measureType === 'angle') {
+			return measureDirection === 'above'
+				? m.traj_val_measure_hint_angle_above()
+				: m.traj_val_measure_hint_angle();
+		}
+		return measureDirection === 'above'
+			? m.traj_val_measure_hint_distance_above()
+			: m.traj_val_measure_hint_distance();
+	});
 	let measureUnit = $derived(
 		measureType === 'distance'
 			? trajectoryValidation.measure.distanceUnit
@@ -60,7 +75,8 @@
 			measureValue,
 			measureUnit,
 			solveFor,
-			atmoParams
+			atmoParams,
+			measureDirection
 		);
 	});
 
@@ -69,8 +85,8 @@
 		const profile = activeProfile.profile;
 		if (!profile) return null;
 
-		const rangeDist = parseFloat(trajectoryValidation.range.distance);
-		if (!isFinite(rangeDist) || rangeDist < 100) return null;
+		const rangeDist = readDecimal(trajectoryValidation.range.distance);
+		if (!isFinite(rangeDist) || rangeDist < 100 || rangeDist > MAX_DISTANCE) return null;
 
 		const step = 1;
 		const chartRange = { distance: rangeDist, unit: trajectoryValidation.range.unit, step };
@@ -110,10 +126,10 @@
 		function getYValue(point) {
 			if (mType === 'distance') {
 				const u = mUnit === 'cm' ? Unit.Centimeter : Unit.Inch;
-				return Math.round(point.targetDrop.In(u) * 10) / 10;
+				return Math.round(point.slantHeight.In(u) * 10) / 10;
 			}
 			const u = mUnit === 'mrad' ? Unit.MRad : Unit.MOA;
-			return Math.round(point.dropAdjustment.In(u) * 10) / 10;
+			return Math.round(point.dropAngle.In(u) * 10) / 10;
 		}
 
 		const initialData = (data.initial.trajectory ?? []).map((p) => ({
@@ -223,7 +239,7 @@
 		const data = chartData;
 		if (!ac || !el || !data) return;
 
-		const rangeVal = parseFloat(trajectoryValidation.range.distance) || 100;
+		const rangeVal = readDecimal(trajectoryValidation.range.distance) || 100;
 		const opts = buildChartOptions(
 			data,
 			settings.darkMode,
@@ -264,7 +280,7 @@
 
 {#if !activeProfile.profile}
 	<div class="py-12 text-center space-y-3">
-		<p class="text-surface-500-400">{m.traj_val_no_profile()}</p>
+		<p class="text-surface-600-400">{m.traj_val_no_profile()}</p>
 		<a href="/profiles" class="btn preset-tonal-primary">{m.nav_profiles()}</a>
 	</div>
 {:else}
@@ -314,10 +330,12 @@
 							{/each}
 						</div>
 					</div>
-					{#if parseFloat(trajectoryValidation.range.distance) > 0 && parseFloat(trajectoryValidation.range.distance) < 100}
+					{#if readDecimal(trajectoryValidation.range.distance) > 0 && readDecimal(trajectoryValidation.range.distance) < 100}
 						<p class="text-xs text-error-500">{m.traj_val_range_min_error()}</p>
+					{:else if readDecimal(trajectoryValidation.range.distance) > MAX_DISTANCE}
+						<p class="text-xs text-error-500">{m.validation_range({ min: formatLimit(100), max: formatLimit(MAX_DISTANCE), unit: distLabel })}</p>
 					{:else}
-						<p class="text-xs text-surface-500-400">{m.traj_val_range_hint()}</p>
+						<p class="text-xs text-surface-600-400">{m.traj_val_range_hint()}</p>
 					{/if}
 				</div>
 			</div>
@@ -335,6 +353,23 @@
 									? 'preset-filled-primary-500'
 									: 'preset-tonal-surface'}"
 								onclick={() => trajectoryValidation.setMeasure({ type: opt.value })}
+							>{opt.label}</button>
+						{/each}
+					</div>
+				</div>
+
+				<!-- Direction toggle -->
+				<div class="flex items-center justify-between gap-2">
+					<span id="traj-val-direction" class="text-sm font-medium">{m.traj_val_direction()}</span>
+					<div class="flex gap-1 shrink-0" role="group" aria-labelledby="traj-val-direction">
+						{#each [{ value: 'below', label: m.traj_val_direction_below() }, { value: 'above', label: m.traj_val_direction_above() }] as opt}
+							<button
+								type="button"
+								class="chip text-xs {measureDirection === opt.value
+									? 'preset-filled-primary-500'
+									: 'preset-tonal-surface'}"
+								aria-pressed={measureDirection === opt.value}
+								onclick={() => trajectoryValidation.setMeasure({ direction: opt.value })}
 							>{opt.label}</button>
 						{/each}
 					</div>
@@ -384,11 +419,9 @@
 									: { distanceValue: e.target.value }
 							)}
 						/>
-						<span class="text-sm text-surface-500-400 shrink-0">{measureLabel}</span>
+						<span class="text-sm text-surface-600-400 shrink-0">{measureLabel}</span>
 					</div>
-					<p class="text-xs text-surface-500-400">
-						{measureType === 'angle' ? m.traj_val_measure_hint_angle() : m.traj_val_measure_hint_distance()}
-					</p>
+					<p class="text-xs text-surface-600-400">{measureHint}</p>
 				</div>
 			</div>
 		</div>
@@ -396,41 +429,46 @@
 		<!-- ═══ Atmosphere ═══════════════════════════════════════════════ -->
 		<AtmosphereCard
 			atmosphere={trajectoryValidation.atmosphere}
+			altitudeTooLow={validationResult?.error === 'minimum_altitude'}
 			onchange={(patch) => trajectoryValidation.setAtmosphere(patch)}
 		/>
 
 		<!-- ═══ Results ══════════════════════════════════════════════════ -->
 		{#if validationResult?.error === 'range'}
-			<p class="text-sm text-warning-500 text-center py-2">{m.traj_val_range_error()}</p>
+			<p class="text-sm text-warning-800-200 text-center py-2">{m.traj_val_range_error()}</p>
+		{:else if validationResult?.error === 'minimum_altitude'}
+			<p class="text-sm text-warning-800-200 text-center py-2">{altitudeTooLowMessage(trajectoryValidation.atmosphere.altitudeUnit)}</p>
 		{:else if validationResult?.error === 'no_solution'}
-			<p class="text-sm text-warning-500 text-center py-2">{m.traj_val_no_result()}</p>
+			<p class="text-sm text-warning-800-200 text-center py-2">{m.traj_val_no_result()}</p>
+		{:else if validationResult?.error === 'timeout'}
+			<p class="text-sm text-warning-800-200 text-center py-2">{m.traj_val_timeout()}</p>
 		{:else if validationResult && !validationResult.error}
 			<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
 				{#if solveFor === 'velocity'}
 					<!-- Profile velocity -->
 					<div class="px-3 py-3 rounded-lg bg-surface-50-950">
-						<p class="text-xs text-surface-500-400 uppercase tracking-wide leading-none mb-1">
+						<p class="text-xs text-surface-600-400 uppercase tracking-wide leading-none mb-1">
 							{m.traj_val_profile_velocity()}
 						</p>
 						<p class="text-sm font-semibold tabular-nums leading-none">
 							{validationResult.initialVelocity}
-							<span class="text-xs font-normal text-surface-500-400">{velLabel}</span>
+							<span class="text-xs font-normal text-surface-600-400">{velLabel}</span>
 						</p>
 					</div>
 					<!-- Validated velocity -->
 					<div class="px-3 py-3 rounded-lg bg-surface-50-950">
-						<p class="text-xs text-surface-500-400 uppercase tracking-wide leading-none mb-1">
+						<p class="text-xs text-surface-600-400 uppercase tracking-wide leading-none mb-1">
 							{m.traj_val_validated_velocity()}
 						</p>
 						<p class="text-sm font-semibold tabular-nums leading-none text-success-500">
 							{validationResult.validatedVelocity}
-							<span class="text-xs font-normal text-surface-500-400">{velLabel}</span>
+							<span class="text-xs font-normal text-surface-600-400">{velLabel}</span>
 						</p>
 					</div>
 				{:else}
 					<!-- Profile BC -->
 					<div class="px-3 py-3 rounded-lg bg-surface-50-950">
-						<p class="text-xs text-surface-500-400 uppercase tracking-wide leading-none mb-1">
+						<p class="text-xs text-surface-600-400 uppercase tracking-wide leading-none mb-1">
 							{m.traj_val_profile_bc()}
 						</p>
 						<p class="text-sm font-semibold tabular-nums leading-none">
@@ -439,7 +477,7 @@
 					</div>
 					<!-- Validated BC -->
 					<div class="px-3 py-3 rounded-lg bg-surface-50-950">
-						<p class="text-xs text-surface-500-400 uppercase tracking-wide leading-none mb-1">
+						<p class="text-xs text-surface-600-400 uppercase tracking-wide leading-none mb-1">
 							{m.traj_val_validated_bc()}
 						</p>
 						<p class="text-sm font-semibold tabular-nums leading-none text-success-500">
@@ -463,7 +501,10 @@
 				</div>
 			</div>
 		{:else}
-			<p class="text-sm text-surface-500-400 text-center py-2">{m.traj_val_hint()}</p>
+			<p class="text-sm text-surface-600-400 text-center py-2">{m.traj_val_hint()}</p>
+		{/if}
+		{#if validationResult?.suggestAbove}
+			<p class="text-xs text-warning-800-200 text-center">{m.traj_val_above_los_notice()}</p>
 		{/if}
 
 		<!-- ═══ Comparison chart ═════════════════════════════════════════ -->

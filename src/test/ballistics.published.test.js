@@ -16,7 +16,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { Unit } from 'js-ballistics';
-import { calculateFullTrajectory } from '$lib/utils/ballisticCalculator.js';
+import { calculateFullTrajectory } from '#lib/utils/ballisticCalculator.js';
 import { WIND_10MPH } from './fixtures/ballisticProfiles.js';
 
 // ── Source A: Federal Gold Medal Match GM308M ───────────────────────────────
@@ -83,7 +83,7 @@ function federalTable(profile, atmosphere) {
 			{
 				velocityFps: p.velocity.In(Unit.FPS),
 				energyFtLb: p.energy.In(Unit.FootPound),
-				trajectoryIn: p.targetDrop.In(Unit.Inch),
+				trajectoryIn: p.slantHeight.In(Unit.Inch),
 				windDriftIn: p.windage.In(Unit.Inch)
 			}
 		])

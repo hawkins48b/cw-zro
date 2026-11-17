@@ -1,11 +1,14 @@
 import { describe, it, expect } from 'vitest';
+import { MAX_NAME_LENGTH, normalizeProfiles } from '#lib/utils/storedProfiles.js';
 import {
+	copyName,
 	addProfile,
 	updateProfile,
 	removeProfile,
 	getProfile,
-	duplicateProfile
-} from '$lib/utils/profileOps.js';
+	duplicateProfile,
+	safeReturnPath
+} from '#lib/utils/profileOps.js';
 
 const makeProfile = (overrides = {}) => ({
 	name: 'Remington 700',
@@ -147,6 +150,15 @@ describe('duplicateProfile', () => {
 		expect(list[1].name).toBe('Original - Copy');
 	});
 
+	it('keeps " - Copy" on a copy of a name at the length limit (#141)', () => {
+		const name = 'x'.repeat(MAX_NAME_LENGTH);
+		const { list: seed, id } = addProfile([], makeProfile({ name }));
+		const { list } = duplicateProfile(seed, id);
+		expect(list[1].name).toBe('x'.repeat(MAX_NAME_LENGTH - 7) + ' - Copy');
+		expect(normalizeProfiles(list)[1].name).toBe(list[1].name);
+		expect(copyName({ name: 'Short' })).toBe('Short - Copy');
+	});
+
 	it('gives the copy a new unique id', () => {
 		const { list: seed, id } = addProfile([], makeProfile());
 		const { list, id: newId } = duplicateProfile(seed, id);
@@ -178,5 +190,32 @@ describe('duplicateProfile', () => {
 		const { list } = duplicateProfile(seed, 'bad-id');
 		expect(list).toHaveLength(1);
 		expect(list[0].name).toBe('Stays');
+	});
+});
+
+describe('safeReturnPath', () => {
+	it.each([
+		'/profiles',
+		'/profiles/new',
+		'/fr/profiles/new',
+		'/de/profiles/7f3c1a2e-91b4-4c60-8d2e-5a1b9c0d3e4f'
+	])('keeps the profile page %s', (path) => {
+		expect(safeReturnPath(path)).toBe(path);
+	});
+
+	it.each([
+		[null],
+		[''],
+		['/nope'],
+		['/xx/profiles'],
+		['/profiles/a/b'],
+		['/profiles/../settings'],
+		['//evil.com/profiles'],
+		['/\\evil.com'],
+		['https://evil.com/profiles'],
+		['javascript:alert(1)'],
+		['/profiles\n']
+	])('falls back to the list for %j', (value) => {
+		expect(safeReturnPath(value)).toBe('/profiles');
 	});
 });

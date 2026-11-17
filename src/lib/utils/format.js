@@ -1,4 +1,4 @@
-import { getLocale } from '$lib/paraglide/runtime';
+import { getLocale } from '#lib/paraglide/runtime.js';
 
 /**
  * Format a number according to the current locale.
@@ -21,4 +21,14 @@ export function formatFixed(value, decimals = 1) {
 		minimumFractionDigits: decimals,
 		maximumFractionDigits: decimals
 	});
+}
+
+/**
+ * A limit as shown in a message: in the current locale, without thousands grouping, so that it
+ * reads back as the same number when typed (`3000`, and `25,4` in French and German, #117).
+ * @param {number} value
+ * @returns {string}
+ */
+export function formatLimit(value) {
+	return formatNumber(value, { useGrouping: false, maximumFractionDigits: 6 });
 }

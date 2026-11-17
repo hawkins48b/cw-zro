@@ -7,16 +7,23 @@
 	 * @prop {Function} onSave(data) - Called with the assembled profile object on submit.
 	 * @prop {Function} onCancel()   - Called when the user cancels or presses back.
 	 */
-	import { m } from '$lib/paraglide/messages.js';
+	import { m } from '#lib/paraglide/messages.js';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { localizeHref } from '$lib/paraglide/runtime.js';
+	import { localizeHref } from '#lib/paraglide/runtime.js';
 	import { untrack } from 'svelte';
 	import { ToggleLeft, ToggleRight, Search, Link, Link2Off } from '@lucide/svelte';
-	import UnitField from '$lib/components/UnitField.svelte';
-	import { validateProfile, isValid, buildAmmoString } from '$lib/utils/profileValidation.js';
-	import { ammoSelection } from '$lib/stores/ammoSelection.svelte.js';
-	import { formDraft } from '$lib/stores/formDraft.svelte.js';
+	import UnitField from '#lib/components/UnitField.svelte';
+	import {
+		validateProfile,
+		isValid,
+		buildProfileData,
+		profileFieldLimits
+	} from '#lib/utils/profileValidation.js';
+	import { MAX_NAME_LENGTH } from '#lib/utils/storedProfiles.js';
+	import { formatLimit } from '#lib/utils/format.js';
+	import { ammoSelection } from '#lib/stores/ammoSelection.svelte.js';
+	import { formDraft } from '#lib/stores/formDraft.svelte.js';
 
 	let { initialData = {}, onSave, onCancel } = $props();
 
@@ -129,11 +136,40 @@
 	let errors = $state({});
 	let submitted = $state(false);
 
+	const UNIT_LABELS = {
+		in: () => m.unit_in(),
+		cm: () => m.unit_cm(),
+		mm: () => m.unit_mm(),
+		gr: () => m.unit_gr(),
+		g: () => m.unit_g(),
+		yd: () => m.unit_yd(),
+		m: () => m.unit_m(),
+		fps: () => m.unit_fps(),
+		mps: () => m.unit_mps()
+	};
+
+	/** The message for a value outside a field's limits, in the unit chosen now. */
+	function rangeError(key) {
+		const limits = profileFieldLimits(key, form);
+		if (!limits) return m.validation_positive_number();
+		const min = limits.min !== undefined ? formatLimit(limits.min) : '';
+		const max = limits.max !== undefined ? formatLimit(limits.max) : '';
+		const unit = limits.unit ? UNIT_LABELS[limits.unit]() : '';
+		switch (limits.kind) {
+			case 'above_zero_max':
+				return m.validation_range_above_zero({ max, unit });
+			case 'range':
+				return unit ? m.validation_range({ min, max, unit }) : m.validation_range_no_unit({ min, max });
+			default:
+				return m.validation_range_below_max({ min, max, unit });
+		}
+	}
+
 	function fieldError(key) {
 		if (!submitted || !errors[key]) return '';
-		return errors[key] === 'required'
-			? m.validation_required()
-			: m.validation_positive_number();
+		if (errors[key] === 'required') return m.validation_required();
+		if (errors[key] === 'out_of_range') return rangeError(key);
+		return m.validation_positive_number();
 	}
 
 	function save() {
@@ -144,19 +180,8 @@
 			return;
 		}
 		errors = {};
-		const data = {
-			...form,
-			zeroDist: Number(form.zeroDist) || 0,
-			spinDrift,
-			tempSensitivity,
-			ammo: buildAmmoString(form.bulletBrand, form.bulletWeight, form.bulletWeightUnit),
-			optic: form.opticName || '—'
-		};
-		if (data.clickLink) {
-			data.windageClickValue = data.elevationClickValue;
-			data.windageClickUnit = data.elevationClickUnit;
-		}
-		onSave(data);
+		// A comma is stored as a decimal point (#117): Number('1,5') would be NaN.
+		onSave(buildProfileData(form, spinDrift, tempSensitivity));
 	}
 </script>
 
@@ -187,13 +212,14 @@
 			<input
 				class="input"
 				type="text"
+				maxlength={MAX_NAME_LENGTH}
 				bind:value={form.name}
 				placeholder={m.profile_rifle_designation_placeholder()}
 			/>
 			{#if fieldError('name')}
 				<p class="text-xs text-error-500">{fieldError('name')}</p>
 			{:else}
-				<p class="text-xs text-surface-500-400">{m.profile_rifle_designation_hint()}</p>
+				<p class="text-xs text-surface-600-400">{m.profile_rifle_designation_hint()}</p>
 			{/if}
 		</div>
 
@@ -222,13 +248,14 @@
 			<input
 				class="input"
 				type="text"
+				maxlength={MAX_NAME_LENGTH}
 				bind:value={form.opticName}
 				placeholder={m.profile_optic_name_placeholder()}
 			/>
 			{#if fieldError('opticName')}
 				<p class="text-xs text-error-500">{fieldError('opticName')}</p>
 			{:else}
-				<p class="text-xs text-surface-500-400">{m.profile_optic_name_hint()}</p>
+				<p class="text-xs text-surface-600-400">{m.profile_optic_name_hint()}</p>
 			{/if}
 		</div>
 
@@ -273,7 +300,7 @@
 					</button>
 				{/each}
 			</div>
-			<p class="text-xs text-surface-500-400">{m.profile_optic_reticle_type_hint()}</p>
+			<p class="text-xs text-surface-600-400">{m.profile_optic_reticle_type_hint()}</p>
 		</div>
 
 		<!-- Elevation click value -->
@@ -303,7 +330,7 @@
 					<Link2Off class="size-4" />
 				{/if}
 			</button>
-			<span class="text-xs text-surface-500-400">{m.profile_optic_click_link()}</span>
+			<span class="text-xs text-surface-600-400">{m.profile_optic_click_link()}</span>
 		</div>
 
 		<!-- Windage click value (only when unlinked) -->
@@ -343,13 +370,14 @@
 			<input
 				class="input"
 				type="text"
+				maxlength={MAX_NAME_LENGTH}
 				bind:value={form.bulletBrand}
 				placeholder={m.profile_ammo_brand_placeholder()}
 			/>
 			{#if fieldError('bulletBrand')}
 				<p class="text-xs text-error-500">{fieldError('bulletBrand')}</p>
 			{:else}
-				<p class="text-xs text-surface-500-400">{m.profile_ammo_brand_hint()}</p>
+				<p class="text-xs text-surface-600-400">{m.profile_ammo_brand_hint()}</p>
 			{/if}
 		</div>
 

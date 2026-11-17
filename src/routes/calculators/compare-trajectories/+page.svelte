@@ -1,11 +1,17 @@
 <script>
 	import { onMount } from 'svelte';
-	import { m } from '$lib/paraglide/messages.js';
-	import { localizeHref } from '$lib/paraglide/runtime';
-	import { profiles } from '$lib/stores/profiles.svelte.js';
-	import { settings } from '$lib/stores/settings.svelte.js';
-	import { compareTrajectories } from '$lib/stores/compareTrajectories.svelte.js';
-	import { calculateFullTrajectory } from '$lib/utils/ballisticCalculator.js';
+	import { m } from '#lib/paraglide/messages.js';
+	import { localizeHref } from '#lib/paraglide/runtime.js';
+	import { profiles } from '#lib/stores/profiles.svelte.js';
+	import { settings } from '#lib/stores/settings.svelte.js';
+	import { compareTrajectories } from '#lib/stores/compareTrajectories.svelte.js';
+	import { calculateFullTrajectory } from '#lib/utils/ballisticCalculator.js';
+	import { compareSeriesText } from '#lib/utils/compareEntries.js';
+	import { shownProfile } from '#lib/utils/storedProfiles.js';
+	import { isUsableZeroDistance, MIN_ZERO_DISTANCE, MAX_ZERO_DISTANCE } from '#lib/utils/zeroDistance.js';
+	import { readDecimal } from '#lib/utils/decimal.js';
+	import { formatLimit } from '#lib/utils/format.js';
+	import { isUsableRange, MAX_DISTANCE } from '#lib/utils/inputLimits.js';
 	import { Unit } from 'js-ballistics';
 	import { Plus, X } from '@lucide/svelte';
 
@@ -45,44 +51,56 @@
 	// ── Resolve entries to profiles ──────────────────────────────────
 	let resolvedEntries = $derived(
 		compareTrajectories.entries.map((entry) => {
-			const profile = profiles.get(entry.profileId);
+			const profile = profiles.findStored(entry.profileId);
 			if (!profile) return null;
-			const zeroLabel = `${entry.zeroDist}\u202f${entry.zeroUnit === 'm' ? m.unit_m() : m.unit_yd()}`;
+			const zeroUnitLabel = entry.zeroUnit === 'm' ? m.unit_m() : m.unit_yd();
+			// The calculators get the profile as stored; the page shows its names as text (#120).
+			const shown = shownProfile(profile);
 			return {
 				...entry,
 				profile,
-				label: `${profile.name} @ ${zeroLabel}`
+				shown,
+				// As typed: ApexCharts 8 writes series names as text (#75)
+				seriesName: compareSeriesText(shown.name, entry.zeroDist, zeroUnitLabel)
 			};
 		}).filter(Boolean)
 	);
 
 	// ── Compute trajectories for all entries ─────────────────────────
+	let rangeDist = $derived(readDecimal(compareTrajectories.range.distance));
+	let rangeUsable = $derived(isUsableRange(rangeDist));
+
+	/** The trajectory of each entry, in the order of resolvedEntries: null when it has none. */
+	let entryResults = $derived.by(() => {
+		if (!rangeUsable) return resolvedEntries.map(() => null);
+		const rangeObj = { distance: rangeDist, unit: compareTrajectories.range.unit, step: 1 };
+		return resolvedEntries.map((entry) =>
+			calculateFullTrajectory(
+				{ ...entry.profile, zeroDist: entry.zeroDist, zeroUnit: entry.zeroUnit },
+				rangeObj,
+				null,
+				null
+			)
+		);
+	});
+
 	let chartData = $derived.by(() => {
 		if (resolvedEntries.length === 0) return null;
 
-		const rangeDist = parseFloat(compareTrajectories.range.distance);
-		if (!isFinite(rangeDist) || rangeDist <= 0) return null;
-
-		const step = 1;
-		const rangeObj = { distance: rangeDist, unit: compareTrajectories.range.unit, step };
-
 		const series = [];
-		for (const entry of resolvedEntries) {
-			const overriddenProfile = {
-				...entry.profile,
-				zeroDist: entry.zeroDist,
-				zeroUnit: entry.zeroUnit
-			};
-			const result = calculateFullTrajectory(overriddenProfile, rangeObj, null, null);
+		for (const [i, entry] of resolvedEntries.entries()) {
+			const result = entryResults[i];
 			if (!result) continue;
 
 			const distUnit = isMetric ? Unit.Meter : Unit.Yard;
 			const yUnit = getYUnit(yAxisKey);
 			const data = (result.trajectory ?? []).map((p) => ({
 				x: Math.round(p.distance.In(distUnit) * 10) / 10,
-				y: Math.round(p.targetDrop.In(yUnit) * 100) / 100
+				y: Math.round(p.slantHeight.In(yUnit) * 100) / 100
 			}));
-			series.push({ name: entry.label, data });
+			// An entry without a result has no series, so the color comes from the entry's position:
+			// a line must keep the color of the dot on its card.
+			series.push({ name: entry.seriesName, data, color: entryColor(i) });
 		}
 
 		return series.length > 0 ? series : null;
@@ -94,10 +112,18 @@
 		'#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#64748b'
 	];
 
+	function entryColor(index) {
+		return CHART_COLORS[index % CHART_COLORS.length];
+	}
+
+	/**
+	 * @param {{ name: string, data: object[], color: string }[]} series - names as typed (#75)
+	 * @param {boolean} dark
+	 */
 	function buildChartOptions(series, dark) {
 		const dAxisLabel = isMetric ? m.unit_meters() : m.unit_yards();
 		const dLabel = isMetric ? m.unit_m() : m.unit_yd();
-		const yLabel = Y_AXIS_OPTIONS.find((o) => o.value === yAxisKey)?.label() ?? yAxisKey;
+		const yLabel = Y_AXIS_OPTIONS.find((o) => o.value === yAxisKey)?.label();
 
 		const maxX = series.reduce((max, s) => {
 			const last = s.data.at(-1)?.x ?? 0;
@@ -113,7 +139,11 @@
 				toolbar: { show: false },
 				animations: { enabled: false },
 				zoom: { enabled: false },
-				parentHeightOffset: 0
+				parentHeightOffset: 0,
+				// The svg aria-label, in the app's language and written as text (#111)
+				accessibility: {
+					description: m.compare_chart_description({ names: series.map((s) => s.name).join(', ') })
+				}
 			},
 			stroke: { width: 2, curve: 'monotoneCubic' },
 			theme: { mode: dark ? 'dark' : 'light' },
@@ -133,7 +163,7 @@
 				title: { text: yLabel, style: { fontSize: '12px' } },
 				labels: { formatter: (v) => `${v}` }
 			},
-			colors: CHART_COLORS.slice(0, series.length),
+			colors: series.map((s) => s.color),
 			annotations: {
 				yaxis: [
 					{
@@ -154,6 +184,10 @@
 					}
 				]
 			},
+			// Series names are profile names typed by the user. ApexCharts 8 writes them as text only
+			// while no legend.formatter, legend.tooltipHoverFormatter or tooltip.y.title.formatter changes
+			// them: such a formatter's output is written as HTML, so it must escape it (#103, #75).
+			// src/test/apexcharts.test.js fails if one is added here.
 			tooltip: {
 				theme: dark ? 'dark' : 'light',
 				x: { formatter: (v) => `${v} ${dLabel}` },
@@ -190,7 +224,7 @@
 
 	{#if profiles.list.length === 0}
 		<div class="py-12 text-center space-y-3">
-			<p class="text-surface-500-400">{m.compare_no_profiles()}</p>
+			<p class="text-surface-600-400">{m.compare_no_profiles()}</p>
 			<a href="/profiles" class="btn preset-tonal-primary">{m.nav_profiles()}</a>
 		</div>
 	{:else}
@@ -219,11 +253,11 @@
 							<div class="flex items-center gap-2">
 								<span
 									class="size-3 rounded-full shrink-0"
-									style="background-color: {CHART_COLORS[i % CHART_COLORS.length]}"
+									style="background-color: {entryColor(i)}"
 								></span>
 								<div class="flex-1 min-w-0">
-									<p class="text-sm font-semibold truncate">{entry.profile.name}</p>
-									<p class="text-xs opacity-70 truncate">{entry.profile.ammo}</p>
+									<p class="text-sm font-semibold truncate">{entry.shown.name}</p>
+									<p class="text-xs opacity-70 truncate">{entry.shown.ammo}</p>
 								</div>
 								<button
 									type="button"
@@ -241,8 +275,10 @@
 									class="flex-1 min-w-0 bg-transparent border-none outline-none shadow-none p-0 text-right"
 									type="text"
 									inputmode="decimal"
-									placeholder={String(entry.profile.zeroDist)}
+									placeholder={String(entry.shown.zeroDist)}
 									value={entry.zeroDist}
+									aria-invalid={!isUsableZeroDistance(entry.zeroDist)}
+									aria-describedby={isUsableZeroDistance(entry.zeroDist) ? undefined : `zero-error-${i}`}
 									oninput={(e) => compareTrajectories.updateEntry(entry.id, { zeroDist: e.target.value })}
 								/>
 								<div class="flex items-center gap-1 shrink-0">
@@ -257,11 +293,19 @@
 									{/each}
 								</div>
 							</div>
+							{#if !isUsableZeroDistance(entry.zeroDist)}
+								<p id={`zero-error-${i}`} class="mt-1 text-xs text-error-500">
+									{m.compare_zero_invalid({ min: formatLimit(MIN_ZERO_DISTANCE), max: formatLimit(MAX_ZERO_DISTANCE) })}
+								</p>
+							{:else if rangeUsable && !entryResults[i]}
+								<!-- A usable zero can still give no trajectory, e.g. a short zero on a slow load (#114). -->
+								<p class="mt-1 text-xs text-warning-800-200">{m.compare_zero_no_result()}</p>
+							{/if}
 						</div>
 					{/each}
 				</div>
 			{:else}
-				<p class="text-sm text-surface-500-400 text-center py-4">{m.compare_no_entries()}</p>
+				<p class="text-sm text-surface-600-400 text-center py-4">{m.compare_no_entries()}</p>
 			{/if}
 		</div>
 
@@ -277,6 +321,7 @@
 						inputmode="decimal"
 						placeholder="500"
 						value={compareTrajectories.range.distance}
+						aria-invalid={!rangeUsable}
 						oninput={(e) => compareTrajectories.setRange({ distance: e.target.value })}
 					/>
 					<div class="flex items-center gap-1 shrink-0">
@@ -291,6 +336,9 @@
 						{/each}
 					</div>
 				</div>
+				{#if !rangeUsable}
+					<p class="text-xs text-error-500">{m.validation_range_above_zero({ max: formatLimit(MAX_DISTANCE), unit: distLabel })}</p>
+				{/if}
 			</div>
 
 			<!-- Y axis unit -->

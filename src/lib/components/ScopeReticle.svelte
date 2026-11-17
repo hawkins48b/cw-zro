@@ -1,9 +1,10 @@
 <script>
-	import { m } from '$lib/paraglide/messages.js';
-	import { getElevationValue, getWindageValue } from '$lib/utils/ballisticCalculator.js';
-	import { scopeView } from '$lib/stores/scopeView.svelte.js';
-	import { activeProfile } from '$lib/stores/activeProfile.svelte.js';
-	import { settings } from '$lib/stores/settings.svelte.js';
+	import { m } from '#lib/paraglide/messages.js';
+	import { getElevationValue, getWindageValue } from '#lib/utils/ballisticCalculator.js';
+	import { scopeView } from '#lib/stores/scopeView.svelte.js';
+	import { activeProfile } from '#lib/stores/activeProfile.svelte.js';
+	import { shownProfile } from '#lib/utils/storedProfiles.js';
+	import { settings } from '#lib/stores/settings.svelte.js';
 	import { RotateCcw, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from '@lucide/svelte';
 
 	let { point = null } = $props();
@@ -50,17 +51,17 @@
 	const MOA_GRAD_LABELS = [4, 8, 12, 16];
 
 	// Reticle type from active profile
-	const reticleType = $derived(activeProfile.profile?.reticleType ?? 'red-dot');
+	const reticleType = $derived(shownProfile(activeProfile.profile)?.reticleType ?? 'red-dot');
 
 	// ── Aim point computation ─────────────────────────────────────────
 	// BDC holdover logic: the green dot shows the reticle mark the shooter
 	// should place ON the target (scope center ends up offset, bullet corrects back).
 	//
 	// js-ballistics sign conventions (matched by the page direction logic):
-	//   dropAdjustment ≤ 0  →  dial UP   (bullet is low  →  hold mark is BELOW center)
-	//   dropAdjustment > 0  →  dial DOWN  (bullet is high →  hold mark is ABOVE center)
-	//   windageAdjustment ≥ 0 → dial LEFT  (bullet drifted right → hold mark is RIGHT of center)
-	//   windageAdjustment < 0 → dial RIGHT (bullet drifted left  → hold mark is LEFT  of center)
+	//   dropAngle ≤ 0  →  dial UP   (bullet is low  →  hold mark is BELOW center)
+	//   dropAngle > 0  →  dial DOWN  (bullet is high →  hold mark is ABOVE center)
+	//   windageAngle ≥ 0 → dial LEFT  (bullet drifted right → hold mark is RIGHT of center)
+	//   windageAngle < 0 → dial RIGHT (bullet drifted left  → hold mark is LEFT  of center)
 	//
 	// Therefore:
 	//   aimX = CX - windMoa * scale   (positive windMoa = right of center)
@@ -101,7 +102,7 @@
 	<!-- Header -->
 	<h2 class="h5 flex items-center gap-2">
 		{m.scope_view_reticle()}
-		<span class="badge preset-outlined-surface-200-800 text-xs font-normal">{reticleType.toUpperCase()} reticule</span>
+		<span class="badge preset-outlined-surface-200-800 text-xs font-normal">{m.scope_view_reticle_badge({ type: reticleType.toUpperCase() })}</span>
 	</h2>
 
 	<!-- SVG Reticle View -->
@@ -402,7 +403,7 @@
 	{/if}
 
 	<!-- Legend row below the reticle -->
-	<div class="flex items-center gap-3 text-xs text-surface-500-400 flex-wrap">
+	<div class="flex items-center gap-3 text-xs text-surface-600-400 flex-wrap">
 		{#if aimPoint}
 			<span class="flex items-center gap-1.5">
 				<span class="inline-block size-2.5 rounded-full shrink-0" style="background:#00ff55"></span>
@@ -418,9 +419,9 @@
 		<!-- Reticle scale hint -->
 		<span class="ml-auto">
 			{#if reticleType === 'mil-dot' || reticleType === 'mrad'}
-				1 interval = 1 MRAD
+				{m.scope_view_reticle_interval({ unit: m.unit_mrad() })}
 			{:else if reticleType === 'moa'}
-				1 interval = 1 MOA
+				{m.scope_view_reticle_interval({ unit: m.unit_moa() })}
 			{/if}
 		</span>
 	</div>
@@ -428,23 +429,24 @@
 	<!-- Rotation (cant) dial -->
 	<div class="space-y-2">
 		<div class="flex items-center gap-3">
-			<span class="text-xs text-surface-500-400 shrink-0">{m.scope_view_rotation()}</span>
+			<label for="scope-cant" class="text-xs text-surface-600-400 shrink-0">{m.scope_view_rotation()}</label>
 			<input
+				id="scope-cant"
 				type="range"
 				min="-90"
 				max="90"
 				step="1"
 				value={scopeView.rotation}
 				oninput={(e) => scopeView.setRotation(Number(e.target.value))}
-				class="flex-1 accent-primary-500"
+				aria-valuetext="{scopeView.rotation}°"
+				class="flex-1 min-w-0 h-11 accent-primary-500"
 			/>
 			<span class="text-xs font-mono w-10 text-right tabular-nums">{scopeView.rotation}°</span>
 		</div>
 		<div class="flex justify-center">
 			<button
 				type="button"
-				class="btn btn-sm preset-tonal-surface"
-				title={m.scope_view_rotation_reset()}
+				class="btn btn-sm min-h-11 preset-tonal-surface"
 				disabled={scopeView.rotation === 0}
 				onclick={() => scopeView.resetRotation()}
 			>

@@ -3,13 +3,13 @@
 - **Date:** 2026-11-04
 - **Branch:** task/70-ballistics-reference-tests
 - **Issue:** [#70](https://github.com/hawkins48b/cw-zro/issues/70)
-- **Status:** Delivered with known issues (on the task branch, not merged yet)
+- **Status:** Delivered with known issues, on `develop` and `main`
 
 ## Summary
 
 Users rely on the ballistic numbers in the field, and the calculations had no tests. `js-ballistics` is about to go from 2.2.0-beta.2 to 3.x ([#77](https://github.com/hawkins48b/cw-zro/issues/77)), so a change in results could have gone unnoticed.
 
-This task adds tests only. No production code changed. The tests found calculation problems, listed below. None of them is fixed.
+This task adds tests only. No production code changed. The tests found calculation problems, listed below. This task fixed none of them. Later tasks fixed all but one, the per-shot re-zero.
 
 ## How to use
 
@@ -40,7 +40,7 @@ It records what the app computes today. It is not proof that the app is right.
 | Drop, wind | 0.01 in, 0.03 cm |
 | Energy | 0.5 ft-lb, 0.5 J |
 | Zero angle | 0.001 MOA, 0.0003 mrad |
-| Key points | 0.2 on near and far zero, max drop distance and subsonic distance; 0.1 on apex and max drop elevation; one 5 unit step on apex distance |
+| Key points | 0.2 on near and far zero, max drop distance and subsonic distance; 0.1 on apex and max drop elevation; 5 units on apex distance, because those pins were recorded from step 5 rows. Since [#85](https://github.com/hawkins48b/cw-zro/issues/85) the calculation no longer depends on the step, and its own tests hold it to 1 unit |
 | MPBR distances, solver results, display values, dope card labels | Exact |
 
 These tolerances are thousands of times above float noise, and small enough to catch a real change. At 1000 yd on the .308 profile, +0.1 % BC moves drop by 0.35 in, and +1 fps muzzle velocity moves it by 0.37 in. Switching the library's solver from Euler to RK4 moves drop by 0.32 in, so a solver change fails too.
@@ -79,18 +79,18 @@ Yes. Mutation runs during development showed the tests fail when the calculation
 
 ### Open calculation problems
 
-None of these is fixed. They are deliberately not pinned, so a test does not make a bug look correct. Each one needs a decision, then a test. The first six are `it.todo` entries at the end of the baseline test file.
+All rows except row 7 are fixed and have tests. Row 7 is not fixed. It is deliberately not pinned, so a test does not make a bug look correct. It needs a decision, then a test.
 
 | Problem | Where |
 |---------|-------|
-| Powder sensitivity unit mismatch: the form asks for fps per degree, the code uses % per 15 C | `ballisticCalculator.js:74`, `:280` |
-| Validation solver goal sign: the goal is forced below line of sight, which is wrong inside a short zero | `trajectoryValidation.js:51` |
-| Validation reports success after a failed shot: the solver stops and still returns a result | `trajectoryValidation.js:97`, `:100` |
-| Humidity of 1 % or less is read as a fraction: 1 % gives 100 % | `ballisticCalculator.js:106`, `:309` |
-| Max apex comes from recorded rows only, so it depends on the table step | `ballisticCalculator.js:359` |
-| MPBR under-reports on large targets: the zero search stops at 200 | `ballisticCalculator.js:477` |
+| **Fixed by [#81](https://github.com/hawkins48b/cw-zro/issues/81)** ([delivery doc](2026-11-04-81-powder-sensitivity.md)): powder sensitivity unit mismatch, the form asked for fps per degree and the code used % per 15 C | `powderSensitivity()` in `ballisticCalculator.js` |
+| **Fixed by [#82](https://github.com/hawkins48b/cw-zro/issues/82)** ([delivery doc](2026-11-05-82-83-validation-solver.md)): validation solver goal sign, the goal was forced below line of sight, which is wrong inside a short zero | `calculateTrajectoryValidation()` in `trajectoryValidation.js` |
+| **Fixed by [#83](https://github.com/hawkins48b/cw-zro/issues/83)** ([delivery doc](2026-11-05-82-83-validation-solver.md)): validation reported success after a failed shot, the solver stopped and still returned a result | `calculateTrajectoryValidation()` in `trajectoryValidation.js` |
+| **Fixed by [#84](https://github.com/hawkins48b/cw-zro/issues/84)** ([delivery doc](2026-11-05-84-humidity-fraction.md)): humidity of 1 % or less was read as a fraction, 1 % gave 100 % | `humidityFraction()` in `ballisticCalculator.js` |
+| **Fixed by [#85](https://github.com/hawkins48b/cw-zro/issues/85)** ([delivery doc](2026-11-05-85-max-apex.md)): max apex came from recorded rows only, so it depended on the table step | `calculateFullTrajectory()` in `ballisticCalculator.js` |
+| **Fixed by [#86](https://github.com/hawkins48b/cw-zro/issues/86)** ([delivery doc](2026-11-05-86-mpbr-search.md)): MPBR under-reported on large targets, the zero search stopped at 200 | `calculateMPBR()` in `ballisticCalculator.js` |
 | Per-shot re-zero is a modelling limit | `ballisticCalculator.js:136`, `:339` |
-| Dope card near zero prints the zero distance, not the computed near zero | `dopeCardImperial.js:42` (`dopeCardMetric.js:42` has the same code) |
+| **Fixed by [#86](https://github.com/hawkins48b/cw-zro/issues/86)** ([delivery doc](2026-11-05-86-mpbr-search.md)): dope card near zero printed the zero distance, not the computed near zero | `findZeroCrossings()` in `dopeCardZeros.js`, used by `dopeCardImperial.js` and `dopeCardMetric.js` |
 
 ### Not covered
 
@@ -107,3 +107,8 @@ For these, the baseline only shows that results did not change.
 ## Changelog
 
 - 2026-11-04: initial delivery
+- 2026-11-04: powder sensitivity marked as fixed by #81. The other `ballisticCalculator.js` line numbers in the table date from before that change
+- 2026-11-05: validation goal sign and success after a failed shot marked as fixed by #82 and #83. Summary and the `it.todo` row numbers corrected
+- 2026-11-05: humidity marked as fixed by #84. Summary and the `it.todo` row numbers corrected
+- 2026-11-05: max apex marked as fixed by #85. Summary, the `it.todo` row and the apex tolerance note corrected
+- 2026-11-05: MPBR and dope card near zero marked as fixed by #86. Status, summary and the open problems introduction corrected, and the `it.todo` sentence removed

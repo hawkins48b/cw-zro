@@ -1,19 +1,22 @@
+import { storedProfileId } from '#lib/utils/storedProfiles.js';
 import { localStore } from './localStore.svelte.js';
 import { profiles } from './profiles.svelte.js';
 
-const store = localStore('zro-active-profile', () => profiles.list[0]?.id ?? null);
+// profiles is imported first, so it has rewritten a stored id renumbered for links (#134) before
+// this store reads it.
+// Not seeded (#150): a first run that leaves the Welcome or the setup writes nothing to storage.
+const store = localStore('zro-active-profile', () => profiles.list[0]?.id ?? null, { seed: false });
 
 export const activeProfile = {
 	get id() {
-		const id = store.value;
-		if (id && profiles.get(id)) return id;
-		return profiles.list[0]?.id ?? null;
+		// A stored id that was renumbered on read (#134) still finds its profile, under its new id.
+		const found = profiles.findStored(storedProfileId(store.value));
+		return found ? found.id : (profiles.list[0]?.id ?? null);
 	},
 	setActive(id) {
 		store.value = id;
 	},
 	get profile() {
-		const id = store.value;
-		return (id && profiles.get(id)) || profiles.list[0] || null;
+		return profiles.findStored(storedProfileId(store.value)) || profiles.list[0] || null;
 	}
 };

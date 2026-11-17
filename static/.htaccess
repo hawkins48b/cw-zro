@@ -1,0 +1,22 @@
+# SPA fallback: unknown routes load index.html, where the client router shows
+# the page or its own error page. The web build needs this; it does nothing in
+# the Capacitor and Electron builds.
+<IfModule mod_rewrite.c>
+	RewriteEngine On
+
+	# Dotfiles and directories are not served, except .well-known and the root.
+	RewriteRule (^|/)\.(?!well-known(/|$)) - [R=404,L]
+	RewriteCond %{REQUEST_FILENAME} -d
+	RewriteRule ^.+ - [R=404,L]
+
+	# Real files and the root are served as they are.
+	RewriteCond %{REQUEST_FILENAME} -f [OR]
+	RewriteCond %{REQUEST_FILENAME} -d
+	RewriteRule ^ - [L]
+
+	# Missing assets stay real 404s: no HTML in place of a script or a PDF.
+	RewriteRule ^(_app|pdf)(/|$) - [L]
+	RewriteRule \.[^/]+$ - [L]
+
+	RewriteRule ^ index.html [L]
+</IfModule>

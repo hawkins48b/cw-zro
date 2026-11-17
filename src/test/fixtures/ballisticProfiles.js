@@ -37,6 +37,24 @@ export const P223_G1 = {
 	velocity: '3240'
 };
 
+/**
+ * The app's default example profile: 25 yd zero, tall optic. The bullet stays above the line of
+ * sight far past the zero: 8.8 in high at 100 yd, crossing back down near 500 yd.
+ */
+export const P223_SHORT_ZERO = {
+	...imperialProfile,
+	name: '.223 55 gr G1, short zero',
+	barrelTwist: '',
+	opticHeight: '3.5',
+	zeroDist: 25,
+	bulletDiameter: '0.223',
+	bulletWeight: '55',
+	bcType: 'G1',
+	bc: '0.285',
+	bulletLength: '',
+	velocity: '3000'
+};
+
 /** .308, 168 gr, G1, imperial inputs. */
 export const P308_G1 = {
 	...imperialProfile,
@@ -66,6 +84,25 @@ export const P65_G7 = {
 	bulletLength: '1.35',
 	velocity: '2710',
 	spinDrift: true
+};
+
+/**
+ * 300 BLK subsonic, 220 gr, G1, imperial inputs (#136). Its drop leaves the -80 in scale of the
+ * imperial card at about 280 yd and its elevation passes 20 MOA from 300 yd, so the cards must pin
+ * these values to the edge of the printed scales.
+ */
+export const P300BLK_SUBSONIC = {
+	...imperialProfile,
+	name: '300 BLK 220 gr subsonic',
+	barrelTwist: '8',
+	opticHeight: '2.6',
+	zeroDist: 100,
+	bulletDiameter: '0.308',
+	bulletWeight: '220',
+	bcType: 'G1',
+	bc: '0.608',
+	bulletLength: '1.4',
+	velocity: '1020'
 };
 
 /** .338 Lapua Magnum, 16.2 g, G7, every input metric, spin drift on. */
@@ -129,28 +166,45 @@ export const P308_G1_METRIC_ROUNDED = {
 	velocity: '808'
 };
 
-/** Hot, thin air, imperial inputs. */
+/**
+ * Hot, thin air, imperial inputs.
+ *
+ * Pressure is sea-level pressure (QNH) since #107. It was recorded as a station pressure of
+ * 24.9 inHg at 5000 ft; this is that value divided by the ISA ratio at 5000 ft, so the recorded
+ * results are unchanged.
+ */
 export const ATMO_HOT_ALTITUDE = {
 	altitude: '5000',
 	altitudeUnit: 'ft',
-	pressure: '24.9',
+	pressure: '29.926153780852953',
 	pressureUnit: 'inhg',
 	temperature: '85',
 	temperatureUnit: 'f',
 	humidity: '35'
 };
 
-/** Cold, thin air, metric inputs. */
+/**
+ * Cold, thin air, metric inputs.
+ *
+ * Pressure is sea-level pressure (QNH) since #107. It was recorded as a station pressure of
+ * 845 hPa at 1500 m; this is that value divided by the ISA ratio at 1500 m, so the recorded
+ * results are unchanged.
+ */
 export const ATMO_COLD_METRIC = {
 	altitude: '1500',
 	altitudeUnit: 'm',
-	pressure: '845',
+	pressure: '1012.5788798414616',
 	pressureUnit: 'hpa',
 	temperature: '-5',
 	temperatureUnit: 'c',
 	humidity: '60'
 };
 
-/** Full-value crosswinds as the wind control produces them (90 = from the left). */
-export const WIND_10MPH = { speed: '10', speedUnit: 'mph', direction: '90' };
-export const WIND_4MPS = { speed: '4', speedUnit: 'mps', direction: '90' };
+/**
+ * Full-value crosswinds from the left, as the wind control produces them. The direction is where
+ * the wind comes from since #106, so 270 is from the left. Before #106 these held 90, which the
+ * engine read as from the left too: the input was converted (owner decision on #106), and the
+ * recorded results are unchanged.
+ */
+export const WIND_10MPH = { speed: '10', speedUnit: 'mph', direction: '270' };
+export const WIND_4MPS = { speed: '4', speedUnit: 'mps', direction: '270' };

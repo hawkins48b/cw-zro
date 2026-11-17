@@ -1,7 +1,57 @@
 <script>
-	import { m } from '$lib/paraglide/messages.js';
+	import { m } from '#lib/paraglide/messages.js';
+	import { readDecimal } from '#lib/utils/decimal.js';
+	import { formatLimit } from '#lib/utils/format.js';
+	import {
+		HUMIDITY_LIMITS,
+		altitudeLimits,
+		pressureLimits,
+		temperatureLimits
+	} from '#lib/utils/inputLimits.js';
 
-	let { atmosphere, onchange } = $props();
+	import { altitudeTooLowMessage } from '#lib/components/altitudeMessage.js';
+	import { hasNoAirDensity } from '#lib/utils/ballisticCalculator.js';
+
+	/**
+	 * altitudeTooLow: the page's result is missing because the engine ended the flight at its
+	 * minimum altitude (#125, flightStop.js). Shown under the altitude box when the box itself is valid.
+	 */
+	let { atmosphere, onchange, altitudeTooLow = false } = $props();
+
+	/**
+	 * The range message of a box whose value the calculators reject (isUsableAtmosphere), or ''.
+	 * The box is read as the calculators read it, with a comma as a decimal point.
+	 */
+	function rangeError(value, limits, unit) {
+		const number = readDecimal(value);
+		if (number >= limits.min && number <= limits.max) return '';
+		return m.validation_range({ min: formatLimit(limits.min), max: formatLimit(limits.max), unit });
+	}
+
+	let altitudeError = $derived(
+		rangeError(
+			atmosphere.altitude,
+			altitudeLimits(atmosphere.altitudeUnit),
+			atmosphere.altitudeUnit === 'm' ? m.unit_m() : m.unit_ft()
+		)
+	);
+	let pressureError = $derived(
+		rangeError(
+			atmosphere.pressure,
+			pressureLimits(atmosphere.pressureUnit),
+			atmosphere.pressureUnit === 'hpa' ? m.unit_hpa() : m.unit_inhg()
+		)
+	);
+	let temperatureError = $derived(
+		rangeError(
+			atmosphere.temperature,
+			temperatureLimits(atmosphere.temperatureUnit),
+			atmosphere.temperatureUnit === 'c' ? m.unit_c() : m.unit_f()
+		)
+	);
+	let humidityError = $derived(rangeError(atmosphere.humidity, HUMIDITY_LIMITS, '%'));
+	// Values within their limits whose air density is not above 0 give no result (#107).
+	let noAirDensity = $derived(!atmosphere.useISA && hasNoAirDensity(atmosphere));
 </script>
 
 <div class="card preset-filled-surface-100-900">
@@ -39,6 +89,11 @@
 						{/each}
 					</div>
 				</div>
+				{#if altitudeError}
+					<p class="text-xs text-error-500">{altitudeError}</p>
+				{:else if altitudeTooLow}
+					<p class="text-xs text-warning-800-200" role="alert">{altitudeTooLowMessage(atmosphere.altitudeUnit)}</p>
+				{/if}
 			</div>
 
 			<!-- Pressure -->
@@ -62,6 +117,13 @@
 						{/each}
 					</div>
 				</div>
+				{#if pressureError}
+					<p class="text-xs text-error-500">{pressureError}</p>
+				{:else if noAirDensity}
+					<p class="text-xs text-error-500" role="alert">{m.ballistic_air_too_thin()}</p>
+				{:else}
+					<p class="text-xs text-surface-600-400">{m.ballistic_pressure_hint()}</p>
+				{/if}
 			</div>
 
 			<!-- Temperature -->
@@ -85,6 +147,9 @@
 						{/each}
 					</div>
 				</div>
+				{#if temperatureError}
+					<p class="text-xs text-error-500">{temperatureError}</p>
+				{/if}
 			</div>
 
 			<!-- Humidity -->
@@ -98,12 +163,15 @@
 						value={atmosphere.humidity}
 						oninput={(e) => onchange({ humidity: e.target.value })}
 					/>
-					<span class="text-sm text-surface-500-400 shrink-0">%</span>
+					<span class="text-sm text-surface-600-400 shrink-0">%</span>
 				</div>
+				{#if humidityError}
+					<p class="text-xs text-error-500">{humidityError}</p>
+				{/if}
 			</div>
 		{:else}
 			<!-- ICAO standard values -->
-			<div class="text-sm text-surface-500-400 space-y-0.5">
+			<div class="text-sm text-surface-600-400 space-y-0.5">
 				<p>0 {m.unit_ft()}, 29.92 {m.unit_inhg()}, 59 {m.unit_f()}, 0% {m.ballistic_humidity()}</p>
 				<p>0 {m.unit_m()}, 1013.25 {m.unit_hpa()}, 15 {m.unit_c()}, 0% {m.ballistic_humidity()}</p>
 			</div>

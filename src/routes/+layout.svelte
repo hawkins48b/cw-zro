@@ -1,50 +1,58 @@
 <script>
 	import '../app.css';
-	import favicon from '$lib/assets/favicon.svg';
+	import favicon from '#lib/assets/favicon.svg';
 	import { page } from '$app/state';
-	import { m } from '$lib/paraglide/messages.js';
-	import { localizeHref, deLocalizeHref } from '$lib/paraglide/runtime';
-	import { Navigation } from '@skeletonlabs/skeleton-svelte';
-	import {
-		ArrowLeftIcon,
-		ListIcon,
-		CalculatorIcon,
-		SettingsIcon
-	} from '@lucide/svelte';
-	import ReticleIcon from '$lib/components/ReticleIcon.svelte';
-	import DarkModeToggle from '$lib/components/DarkModeToggle.svelte';
-	import { settings, applyDarkMode } from '$lib/stores/settings.svelte.js';
-	import { browser } from '$app/environment';
+	import { m } from '#lib/paraglide/messages.js';
+	import { localizeHref, deLocalizeHref, getLocale } from '#lib/paraglide/runtime.js';
+	import { ArrowLeftIcon, ListIcon, CalculatorIcon, SlidersHorizontalIcon } from '@lucide/svelte';
+	import ReticleIcon from '#lib/components/ReticleIcon.svelte';
+	import DarkModeToggle from '#lib/components/DarkModeToggle.svelte';
+	import { settings, applyDarkMode } from '#lib/stores/settings.svelte.js';
 
 	let { children } = $props();
 
-	let innerWidth = $state(browser ? window.innerWidth : 1024);
-
-	let sideNavLayout = $derived(innerWidth < 1024 ? 'rail' : 'sidebar');
-
+	// One list for the three navigations (#149): phone tab bar, tablet rail, desktop sidebar. Each is
+	// its own <nav> shown at its breakpoint by CSS. shortKey is the label under the icon (tab bar,
+	// rail); the sidebar uses labelKey. subItems are only listed in the sidebar, in the hub's order.
 	const navItems = [
-		{ href: '/scope-view', labelKey: 'nav_scope_view', icon: ReticleIcon },
+		{ href: '/scope-view', labelKey: 'nav_scope_view', shortKey: 'nav_scope_short', icon: ReticleIcon },
 		{
 			href: '/calculators',
 			labelKey: 'nav_calculators',
+			shortKey: 'nav_calculators',
 			icon: CalculatorIcon,
 			subItems: [
 				{ href: '/calculators/ballistic', labelKey: 'calc_ballistic' },
+				{ href: '/calculators/dope-cards', labelKey: 'calc_dope_cards' },
 				{ href: '/calculators/mpbr', labelKey: 'calc_mpbr' },
-				{ href: '/calculators/trajectory-validation', labelKey: 'calc_trajectory_validation' },
 				{ href: '/calculators/compare-trajectories', labelKey: 'calc_compare' },
-				{ href: '/calculators/dope-cards', labelKey: 'calc_dope_cards' }
+				{ href: '/calculators/trajectory-validation', labelKey: 'calc_trajectory_validation' }
 			]
 		},
-		{ href: '/profiles', labelKey: 'nav_profiles', icon: ListIcon },
-		{ href: '/settings', labelKey: 'nav_settings', icon: SettingsIcon }
+		{ href: '/profiles', labelKey: 'nav_profiles', shortKey: 'nav_profiles', icon: ListIcon },
+		{ href: '/settings', labelKey: 'nav_settings', shortKey: 'nav_settings', icon: SlidersHorizontalIcon }
 	];
 
+	// The path without its /fr or /de prefix, so a nav item is active in every language.
+	let currentPath = $derived(deLocalizeHref(page.url.pathname));
+
+	// First-run screens (#150) are full screen: no header, rail, sidebar or tab bar.
+	const bareRoutes = ['/welcome', '/setup'];
+	let bare = $derived(bareRoutes.includes(currentPath.replace(/\/$/, '') || '/'));
+
 	function isActive(href) {
-		const path = page.url.pathname;
+		const path = currentPath;
 		if (href === '/scope-view') return path === '/scope-view' || path === '/';
-		return path.startsWith(href);
+		return path === href || path.startsWith(`${href}/`);
 	}
+
+	/** aria-current for a link: "page" on the page itself, "true" on a section the page is in. */
+	function currentAttr(href) {
+		if (currentPath === href || (href === '/scope-view' && currentPath === '/')) return 'page';
+		return isActive(href) ? 'true' : undefined;
+	}
+
+	const focusRing = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500';
 
 	let pageTitle = $derived.by(() => {
 		const path = deLocalizeHref(page.url.pathname);
@@ -55,6 +63,8 @@
 		if (path.startsWith('/calculators/compare-trajectories/add')) return m.compare_pick_profile();
 		if (path.startsWith('/calculators/compare-trajectories')) return m.compare_title();
 		if (path.startsWith('/calculators/ballistic')) return m.ballistic_title();
+		if (path.startsWith('/calculators/dope-cards/precision-guide')) return m.dope_guide_title();
+		if (path.startsWith('/calculators/dope-cards')) return m.dope_title();
 		if (path.startsWith('/calculators')) return m.calculators_title();
 		if (path.startsWith('/settings/about')) return m.about_title();
 		if (path.startsWith('/settings/privacy')) return m.privacy_title();
@@ -71,88 +81,120 @@
 	$effect(() => {
 		applyDarkMode(settings.darkMode);
 	});
-</script>
 
-<svelte:window bind:innerWidth />
+	// The static build serves one index.html for every locale, so its lang is always the base one.
+	// The language buttons reload the page, so this runs again after each switch.
+	$effect(() => {
+		document.documentElement.lang = getLocale();
+	});
+</script>
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
 <div class="h-dvh flex flex-col" style="padding-top: var(--safe-area-top); padding-bottom: var(--safe-area-bottom);">
-	<!-- Main area: sidebar/rail + content -->
+	{#if bare}
+	<main class="flex-1 min-h-0">
+		{@render children()}
+	</main>
+	{:else}
 	<div class="flex-1 flex overflow-hidden">
-		<!-- Side navigation (tablet/desktop) — hidden on mobile via CSS -->
-		<div class="hidden sm:contents">
-			<Navigation
-				layout={sideNavLayout}
-				class={sideNavLayout === 'sidebar' ? 'grid grid-rows-[auto_1fr_auto] gap-0' : '!w-14 !p-0'}
-			>
-				{#if sideNavLayout === 'sidebar'}
-					<div class="flex items-center gap-3 px-4 py-4 border-b border-surface-200-800">
-						<img src={favicon} alt="ZRO" class="size-9 shrink-0" />
-						<div class="leading-tight">
-							<p class="font-bold text-xl leading-none">ZRO</p>
-							<p class="text-xs text-surface-500 leading-none mt-1">{m.app_tagline()}</p>
+		<!-- Tablet rail (sm to lg): logo, labelled items, theme button -->
+		<nav
+			aria-label={m.nav_main()}
+			class="hidden sm:flex lg:hidden w-24 shrink-0 flex-col items-center gap-1.5 py-5 overflow-y-auto border-r border-surface-200-800 bg-surface-100-900"
+		>
+			<img src={favicon} alt="ZRO" class="size-10 mb-4 shrink-0" />
+			{#each navItems as item (item.href)}
+				{@const Icon = item.icon}
+				{@const active = isActive(item.href)}
+				<a
+					href={localizeHref(item.href)}
+					aria-current={currentAttr(item.href)}
+					class="w-20 flex flex-col items-center gap-1 py-1.5 rounded-container text-[11px] leading-tight text-center {focusRing} {active
+						? 'font-semibold text-primary-700-300'
+						: 'text-surface-600-400 hover:text-surface-950-50'}"
+				>
+					<span
+						class="w-14 h-8 rounded-full flex items-center justify-center {active ? 'preset-tonal-primary' : ''}"
+					>
+						<Icon class="size-[22px]" aria-hidden="true" />
+					</span>
+					{m[item.shortKey]()}
+				</a>
+			{/each}
+			<div class="flex-1"></div>
+			<DarkModeToggle class="border border-surface-200-800" />
+		</nav>
+
+		<!-- Desktop sidebar (lg and up) -->
+		<aside class="hidden lg:flex w-60 shrink-0 flex-col overflow-y-auto border-r border-surface-200-800 bg-surface-100-900">
+			<div class="flex items-center gap-3 px-[18px] py-[18px] border-b border-surface-200-800">
+				<img src={favicon} alt="" class="size-[38px] shrink-0" />
+				<div>
+					<p class="font-extrabold text-xl leading-none">ZRO</p>
+					<p class="text-xs leading-none mt-1 text-surface-600-400">{m.app_tagline()}</p>
+				</div>
+			</div>
+			<nav aria-label={m.nav_main()} class="flex flex-col gap-0.5 px-2.5 py-3">
+				{#each navItems as item (item.href)}
+					{@const Icon = item.icon}
+					{@const current = currentAttr(item.href)}
+					<a
+						href={localizeHref(item.href)}
+						aria-current={current}
+						class="flex items-center gap-2.5 h-10 px-2.5 rounded-base text-sm {focusRing} {current === 'page'
+							? 'preset-filled-primary-500 font-semibold'
+							: current
+								? 'font-semibold hover:preset-tonal-surface'
+								: 'hover:preset-tonal-surface'}"
+					>
+						<Icon class="size-[18px] shrink-0" aria-hidden="true" />
+						{m[item.labelKey]()}
+					</a>
+					{#if item.subItems}
+						<div class="ml-[19px] pl-2.5 border-l border-surface-200-800 flex flex-col gap-0.5">
+							{#each item.subItems as sub (sub.href)}
+								{@const subActive = isActive(sub.href)}
+								<a
+									href={localizeHref(sub.href)}
+									aria-current={currentAttr(sub.href)}
+									class="flex items-center h-[34px] px-2.5 rounded-base text-[13px] {focusRing} {subActive
+										? 'preset-filled-primary-500 font-semibold'
+										: 'text-surface-600-400 hover:preset-tonal-surface hover:text-surface-950-50'}"
+								>
+									{m[sub.labelKey]()}
+								</a>
+							{/each}
 						</div>
-					</div>
-				{/if}
-				<Navigation.Content>
-					<Navigation.Menu class={sideNavLayout === 'rail' ? '!gap-0' : ''}>
-						{#each navItems as item}
-							{@const Icon = item.icon}
-							{@const active = isActive(item.href)}
-							<Navigation.TriggerAnchor
-								href={localizeHref(item.href)}
-								class="{active ? 'preset-filled-primary-500' : ''} {sideNavLayout === 'rail' ? '!max-w-full' : ''}"
-							>
-								<Icon class={sideNavLayout === 'rail' ? 'size-5' : 'size-4'} />
-								{#if sideNavLayout === 'sidebar'}
-									<Navigation.TriggerText>{m[item.labelKey]()}</Navigation.TriggerText>
-								{/if}
-							</Navigation.TriggerAnchor>
-							{#if sideNavLayout === 'sidebar' && item.subItems}
-								<div class="ml-3 pl-3 border-l border-surface-300-700 flex flex-col gap-0.5">
-									{#each item.subItems as sub}
-										{@const subActive = page.url.pathname.startsWith(sub.href)}
-										<a
-											href={localizeHref(sub.href)}
-											class="text-sm px-2 py-1 rounded {subActive ? 'preset-filled-primary-500' : 'text-surface-600-400 hover:preset-tonal-surface'}"
-										>
-											{m[sub.labelKey]()}
-										</a>
-									{/each}
-								</div>
-							{/if}
-						{/each}
-						{#if sideNavLayout === 'sidebar'}
-							<div class="px-2 py-1">
-								<DarkModeToggle />
-							</div>
-						{/if}
-					</Navigation.Menu>
-				</Navigation.Content>
-				{#if sideNavLayout === 'sidebar'}
-					<div class="px-4 py-3 border-t border-surface-200-800">
-						<p class="text-xs text-surface-400">v{__APP_VERSION__}</p>
-					</div>
-				{/if}
-			</Navigation>
-		</div>
+					{/if}
+				{/each}
+			</nav>
+			<div class="flex-1"></div>
+			<div class="px-[18px] py-3.5 border-t border-surface-200-800 flex flex-col gap-3">
+				<DarkModeToggle variant="segmented" />
+				<p class="text-xs text-surface-600-400">v{__APP_VERSION__}</p>
+			</div>
+		</aside>
 
 		<!-- Page content with header inside scroll area -->
-		<main class="flex-1 overflow-y-auto">
-			<header class="flex items-center gap-1 px-4 py-2 sm:px-6 lg:hidden">
+		<main class="flex-1 min-w-0 overflow-y-auto">
+			<header class="flex items-center gap-1 pl-4 pr-2 py-2 sm:pl-6 sm:pr-4 lg:hidden">
 				{#if canGoBack}
-					<button onclick={() => history.back()} class="btn btn-icon" title={m.common_back()}>
-						<ArrowLeftIcon class="size-5" />
+					<button
+						type="button"
+						onclick={() => history.back()}
+						class="btn-icon size-11 shrink-0 -ml-2 rounded-base hover:preset-tonal-surface {focusRing}"
+						aria-label={m.common_back()}
+						title={m.common_back()}
+					>
+						<ArrowLeftIcon class="size-5" aria-hidden="true" />
 					</button>
 				{/if}
-				<span class="flex-1 font-semibold text-lg">{pageTitle}</span>
-				<DarkModeToggle />
-				<a href={localizeHref('/settings')} class="btn btn-icon" title={m.nav_settings()}>
-					<SettingsIcon class="size-5" />
-				</a>
+				<span class="flex-1 min-w-0 truncate font-bold text-xl">{pageTitle}</span>
+				<!-- The rail has its own theme button on tablets -->
+				<DarkModeToggle class="sm:hidden" />
 			</header>
 			<div class="px-2 pb-2 sm:px-2 sm:pb-6 lg:px-8 lg:py-8">
 				{@render children()}
@@ -160,21 +202,27 @@
 		</main>
 	</div>
 
-	<!-- Bottom bar navigation (mobile) — hidden on tablet+ via CSS -->
-	<div class="sm:hidden">
-		<Navigation layout="bar" class="!p-0">
-			<Navigation.Menu class="grid grid-cols-3 !gap-0">
-				{#each navItems.filter((item) => item.href !== '/settings') as item}
-					{@const Icon = item.icon}
-					{@const active = isActive(item.href)}
-					<Navigation.TriggerAnchor
-						href={localizeHref(item.href)}
-						class="{active ? 'preset-filled-primary-500' : ''} !rounded-none !py-1.5"
-					>
-						<Icon class="size-5" />
-					</Navigation.TriggerAnchor>
-				{/each}
-			</Navigation.Menu>
-		</Navigation>
-	</div>
+	<!-- Phone tab bar (below sm) -->
+	<nav
+		aria-label={m.nav_main()}
+		class="sm:hidden grid grid-cols-4 px-1.5 pt-1.5 pb-1 border-t border-surface-200-800 bg-surface-100-900"
+	>
+		{#each navItems as item (item.href)}
+			{@const Icon = item.icon}
+			{@const active = isActive(item.href)}
+			<a
+				href={localizeHref(item.href)}
+				aria-current={currentAttr(item.href)}
+				class="flex flex-col items-center gap-[3px] py-1.5 min-h-11 rounded-container text-[11px] leading-tight text-center {focusRing} {active
+					? 'font-semibold text-primary-700-300'
+					: 'text-surface-600-400'}"
+			>
+				<span class="w-[52px] h-7 rounded-full flex items-center justify-center {active ? 'preset-tonal-primary' : ''}">
+					<Icon class="size-5" aria-hidden="true" />
+				</span>
+				{m[item.shortKey]()}
+			</a>
+		{/each}
+	</nav>
+	{/if}
 </div>

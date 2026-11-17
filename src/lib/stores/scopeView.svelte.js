@@ -1,76 +1,101 @@
+import { WIND_FROM_TARGET, migrateStoredWind, pageWind, patchWind } from '#lib/utils/storedWind.js';
+import {
+	ISA_ATMOSPHERE,
+	patchedAtmosphere,
+	storedElevation,
+	storedObject,
+	storedRange,
+	storedResultMode,
+	storedRotation,
+	storedScopeAtmosphere
+} from '#lib/utils/storedState.js';
+import { activeWindPreset, windPresetSpeed } from '#lib/utils/windPreset.js';
 import { localStore } from './localStore.svelte.js';
 
-const ISA_DEFAULTS = {
-	altitude: '0',
-	altitudeUnit: 'ft',
-	pressure: '29.92',
-	pressureUnit: 'inhg',
-	temperature: '59',
-	temperatureUnit: 'f',
-	humidity: '0'
-};
+// Direction where the wind comes from, since #106: 90 is from the right.
+const DEFAULT_WIND = { speed: '0', speedUnit: 'mph', direction: '90', directionConvention: WIND_FROM_TARGET };
 
 const store = localStore('zro-scope-view', () => ({
 	range: { distance: '500', unit: 'yd' },
 	elevation: { angle: '0', unit: 'deg' },
-	atmosphere: { useISA: true, ...ISA_DEFAULTS },
-	wind: { speed: '0', speedUnit: 'mph', direction: '90' },
-	rotation: 0
+	atmosphere: { ...ISA_ATMOSPHERE },
+	wind: DEFAULT_WIND,
+	rotation: 0,
+	resultMode: 'dial'
 }));
 
-// One-time migration: convert stored clock direction to degrees
-if (store.value.wind?.directionUnit !== undefined) {
-	const w = store.value.wind;
-	const deg =
-		w.directionUnit === 'clock'
-			? String((parseInt(w.direction || '12') % 12) * 30)
-			: w.direction;
-	store.value = { ...store.value, wind: { speed: w.speed, speedUnit: w.speedUnit, direction: deg } };
+// The stored state, or an empty one when it is not an object (#120). Each getter checks its field:
+// see storedState.js.
+const state = () => storedObject(store.value);
+
+// One-time migrations: a stored clock direction to degrees, then the direction to where the wind
+// comes from (#106). A wind already converted comes back as the same object, so nothing is written.
+const migratedWind = migrateStoredWind(state().wind, { clock: true });
+if (migratedWind !== state().wind) {
+	store.value = { ...state(), wind: migratedWind };
 }
 
 export const scopeView = {
 	get range() {
-		return store.value.range;
+		return storedRange(state().range);
 	},
 	get elevation() {
-		return store.value.elevation;
+		return storedElevation(state().elevation);
 	},
+	/** The boxes, plus mode, weather and pressureRef (#148). Hand it to scopeAtmosphereParams. */
 	get atmosphere() {
-		return store.value.atmosphere;
+		return storedScopeAtmosphere(state().atmosphere);
 	},
+	/** The wind to show. Never hand this to a calculator: use storedWind. */
 	get wind() {
-		return store.value.wind;
+		return pageWind(state().wind, DEFAULT_WIND);
 	},
+	/** The wind as stored, for the calculators: shotWinds decides what a damaged value gives. */
+	get storedWind() {
+		return state().wind;
+	},
+	/** The preset the shown wind speed matches in its unit, or null (#148). */
+	get windPreset() {
+		const wind = this.wind;
+		return activeWindPreset(wind.speed, wind.speedUnit);
+	},
+	/** 'dial' or 'hold' (#148). */
+	get resultMode() {
+		return storedResultMode(state().resultMode);
+	},
+	/** The cant in degrees: 0 unless a finite number within the slider's range is stored. */
 	get rotation() {
-		return store.value.rotation ?? 0;
+		return storedRotation(state().rotation);
 	},
 
 	setRange(patch) {
-		store.value = { ...store.value, range: { ...store.value.range, ...patch } };
+		store.value = { ...state(), range: { ...this.range, ...patch } };
 	},
 	setElevation(patch) {
-		store.value = { ...store.value, elevation: { ...store.value.elevation, ...patch } };
+		store.value = { ...state(), elevation: { ...this.elevation, ...patch } };
 	},
+	/** Change the atmosphere: see patchedAtmosphere in storedState.js (#148). */
 	setAtmosphere(patch) {
-		if (patch.useISA === true) {
-			store.value = { ...store.value, atmosphere: { useISA: true, ...ISA_DEFAULTS } };
-		} else {
-			store.value = { ...store.value, atmosphere: { ...store.value.atmosphere, ...patch } };
-		}
+		store.value = { ...state(), atmosphere: patchedAtmosphere(this.atmosphere, patch) };
 	},
 	setWind(patch) {
-		store.value = { ...store.value, wind: { ...store.value.wind, ...patch } };
+		store.value = { ...state(), wind: patchWind(state().wind, patch, DEFAULT_WIND) };
+	},
+	/** Set the speed of a preset in the speed unit shown; the direction stays (#148). */
+	applyWindPreset(preset) {
+		const speed = windPresetSpeed(preset, this.wind.speedUnit);
+		if (speed !== null) this.setWind({ speed });
+	},
+	setResultMode(mode) {
+		store.value = { ...state(), resultMode: storedResultMode(mode) };
 	},
 	setRotation(angle) {
-		store.value = { ...store.value, rotation: angle };
+		store.value = { ...state(), rotation: angle };
 	},
 	resetRotation() {
-		store.value = { ...store.value, rotation: 0 };
+		store.value = { ...state(), rotation: 0 };
 	},
 	resetAtmosphere() {
-		store.value = {
-			...store.value,
-			atmosphere: { useISA: true, ...ISA_DEFAULTS }
-		};
+		store.value = { ...state(), atmosphere: { ...ISA_ATMOSPHERE } };
 	}
 };

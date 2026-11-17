@@ -1,75 +1,102 @@
 <script>
-	import { m } from '$lib/paraglide/messages.js';
+	import { m } from '#lib/paraglide/messages.js';
+	import { localizeHref } from '#lib/paraglide/runtime.js';
+	import DistanceInput from '#lib/components/DistanceInput.svelte';
+	import ScopeWindCard from '#lib/components/ScopeWindCard.svelte';
+	import ScopeAtmosphereCard from '#lib/components/ScopeAtmosphereCard.svelte';
+	import { useCurrentWeather } from '#lib/components/currentWeather.svelte.js';
+	import ScopeResult from '#lib/components/ScopeResult.svelte';
+	import ScopeReticle from '#lib/components/ScopeReticle.svelte';
+	import ChipGroup from '#lib/components/ChipGroup.svelte';
+	import { activeProfile } from '#lib/stores/activeProfile.svelte.js';
+	import { scopeView } from '#lib/stores/scopeView.svelte.js';
 	import {
-		ArrowUp,
-		ArrowDown,
-		ArrowLeft,
-		ArrowRight,
-		Timer,
-		Zap,
-		ChevronDown,
-		ChevronRight
-	} from '@lucide/svelte';
-
-	let showElevation = $state(false);
-	import DistanceInput from '$lib/components/DistanceInput.svelte';
-	import WindInput from '$lib/components/WindInput.svelte';
-	import AtmosphereCard from '$lib/components/AtmosphereCard.svelte';
-	import ScopeReticle from '$lib/components/ScopeReticle.svelte';
-	import { activeProfile } from '$lib/stores/activeProfile.svelte.js';
-	import { scopeView } from '$lib/stores/scopeView.svelte.js';
-	import { calculateShotPoint, getElevationValue, getWindageValue } from '$lib/utils/ballisticCalculator.js';
+		calculateShotPoint,
+		getElevationValue,
+		getWindageValue,
+		hasNoAirDensity
+	} from '#lib/utils/ballisticCalculator.js';
 	import { Unit } from 'js-ballistics';
+	import { clickCount, clickValue } from '#lib/utils/clicks.js';
+	import { MAX_DISTANCE } from '#lib/utils/inputLimits.js';
+	import { isUsableScopeAngle, isUsableScopeRange, scopeEffectiveRange } from '#lib/utils/scopeRange.js';
+	import { formatLimit, formatNumber } from '#lib/utils/format.js';
+	import {
+		formatUsedAtmosphere,
+		scopeAtmosphereParams,
+		usedScopeAtmosphere
+	} from '#lib/utils/scopeAtmosphere.js';
+	import { shownProfile } from '#lib/utils/storedProfiles.js';
 
-	// ── Derived computation ─────────────────────────────────────────
+	const uid = $props.id();
 
-	/**
-	 * Compute the effective horizontal distance using the cosine rule.
-	 * Elevation angle is applied so bullet drop reflects true horizontal range.
-	 */
-	let effectiveRange = $derived.by(() => {
-		const raw = parseFloat(scopeView.range.distance);
-		if (!raw || raw <= 0) return null;
-		if (!showElevation) return { distance: raw, unit: scopeView.range.unit };
-		const { angle, unit } = scopeView.elevation;
-		const a = parseFloat(angle) || 0;
-		const cosAngle = unit === 'deg' ? Math.cos((a * Math.PI) / 180) : parseFloat(angle) || 1;
-		const dist = raw * cosAngle;
-		return { distance: dist, unit: scopeView.range.unit };
-	});
-
-	let atmoParams = $derived(
-		scopeView.atmosphere.useISA ? null : scopeView.atmosphere
+	// ── Atmosphere (#148): ISA, Estimate or Accurate, see utils/scopeAtmosphere.js ──
+	let atmosphere = $derived(scopeView.atmosphere);
+	// "Use current weather here" (#152): nothing is asked or sent before a tap on the card's button.
+	const weather = useCurrentWeather(scopeView);
+	/** What the calculation is given: null is the standard atmosphere at sea level. */
+	let atmoParams = $derived(scopeAtmosphereParams(atmosphere));
+	/** What ISA and Estimate use, in the units of the boxes, for the line under the card. */
+	let atmosphereUsed = $derived(
+		formatUsedAtmosphere(usedScopeAtmosphere(atmosphere), {
+			number: formatNumber,
+			units: { hpa: m.unit_hpa(), inhg: m.unit_inhg(), c: m.unit_c(), f: m.unit_f() }
+		})
 	);
 
-	let point = $derived.by(() => {
+	// ── Derived computation ──
+
+	// The angle box is always shown now, and the stored angle always applies (#148, owner decision of
+	// 2026-11-16). Before, it was only applied while the section was open, and the section started
+	// closed on every visit. An angle of 0 or an empty box gives the same result as before.
+	let effectiveRange = $derived(scopeEffectiveRange(scopeView.range, scopeView.elevation));
+	let rangeUsable = $derived(isUsableScopeRange(scopeView.range.distance));
+	let angleUsable = $derived(isUsableScopeAngle(scopeView.elevation));
+	let distLabel = $derived(scopeView.range.unit === 'm' ? m.unit_m() : m.unit_yd());
+
+	// Whether the custom altitude is too low for this shot (#125), from the engine's stop reason.
+	let shot = $derived.by(() => {
 		const profile = activeProfile.profile;
-		if (!profile || !effectiveRange) return null;
-		return calculateShotPoint(profile, effectiveRange, atmoParams, scopeView.wind);
+		if (!profile || !effectiveRange) return { point: null, altitudeTooLow: false };
+		const report = {};
+		const point = calculateShotPoint(profile, effectiveRange, atmoParams, scopeView.storedWind, { report });
+		return { point, altitudeTooLow: !point && !!atmoParams && report.minimumAltitude };
 	});
+	let point = $derived(shot.point);
 
 	let cantedPoint = $derived.by(() => {
 		if (!scopeView.rotation) return point;
 		const profile = activeProfile.profile;
 		if (!profile || !effectiveRange) return null;
-		return calculateShotPoint(profile, effectiveRange, atmoParams, scopeView.wind, { cantAngle: scopeView.rotation });
+		return calculateShotPoint(profile, effectiveRange, atmoParams, scopeView.storedWind, { cantAngle: scopeView.rotation });
 	});
 
-	let elevUnit = $derived(activeProfile.profile?.elevationClickUnit ?? 'MOA');
-	let windUnit = $derived(activeProfile.profile?.windageClickUnit ?? 'MOA');
+	// Values within their limits whose air density is not above 0 give no result (#107), checked on
+	// the atmosphere actually used (Station pressure as entered, Estimate humidity).
+	let noAirDensity = $derived(hasNoAirDensity(atmoParams));
+
+	// The profile as the page shows it (#120): its click values and units can be read as text.
+	let shown = $derived(shownProfile(activeProfile.profile));
+	let elevUnit = $derived(shown?.elevationClickUnit ?? 'MOA');
+	let windUnit = $derived(shown?.windageClickUnit ?? 'MOA');
 
 	let elevValue = $derived(getElevationValue(point, elevUnit));
 	let windValue = $derived(getWindageValue(point, windUnit));
 
-	let elevClickVal = $derived(parseFloat(activeProfile.profile?.elevationClickValue) || 0.5);
-	let windClickVal = $derived(parseFloat(activeProfile.profile?.windageClickValue) || 0.5);
-
-	let elevClicks = $derived(elevValue !== null ? Math.round(Math.abs(elevValue) / elevClickVal) : null);
-	let windClicks = $derived(windValue !== null ? Math.round(Math.abs(windValue) / windClickVal) : null);
+	// Clicks as the Ballistic table counts them too (#151): utils/clicks.js.
+	let elevClicks = $derived(clickCount(elevValue, clickValue(shown?.elevationClickValue)));
+	let windClicks = $derived(clickCount(windValue, clickValue(shown?.windageClickValue)));
 
 	// Direction logic (matches v1 convention)
 	let elevDir = $derived(elevValue !== null ? (elevValue <= 0 ? 'up' : 'down') : null);
 	let windDir = $derived(windValue !== null ? (windValue >= 0 ? 'left' : 'right') : null);
+
+	let elevation = $derived(
+		elevValue === null ? null : { dir: elevDir, clicks: elevClicks, value: elevValue, unit: elevUnit }
+	);
+	let windage = $derived(
+		windValue === null ? null : { dir: windDir, clicks: windClicks, value: windValue, unit: windUnit }
+	);
 
 	// Trajectory info
 	let trajUnit = $state(scopeView.range.unit === 'm' ? 'metric' : 'imperial');
@@ -87,204 +114,145 @@
 			: { value: Math.round(point.velocity.In(Unit.FPS)), unit: m.unit_fps() };
 	});
 
+	let status = $derived(!activeProfile.profile ? 'no-profile' : point === null ? 'no-result' : 'ok');
+	let profilesHref = $derived(localizeHref('/profiles'));
 </script>
 
 <svelte:head>
 	<title>{m.scope_view_title()} — {m.app_name()}</title>
 </svelte:head>
 
-
-<!-- ── Main grid ─────────────────────────────────────────────────── -->
-<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-	<!-- ═══ LEFT: Conditions ════════════════════════════════════════ -->
-	<div class="space-y-4">
-		<div class="card preset-filled-surface-100-900 p-4 space-y-4">
-			<!-- Target distance -->
-			<DistanceInput
-				label={m.scope_view_range()}
-				value={scopeView.range.distance}
-				unit={scopeView.range.unit}
-				onchange={(v) => scopeView.setRange({ distance: v })}
-				onunitchange={(u) => scopeView.setRange({ unit: u })}
-			/>
-
-			<!-- Elevation angle -->
-			<div class="space-y-1.5">
-				<button
-					type="button"
-					class="flex items-center gap-2 w-full text-left"
-					onclick={() => (showElevation = !showElevation)}
-				>
-					{#if showElevation}
-						<ChevronDown class="size-4 text-surface-500-400 shrink-0" />
-					{:else}
-						<ChevronRight class="size-4 text-surface-500-400 shrink-0" />
-					{/if}
-					<span class="text-sm font-medium">{m.scope_view_angle()}</span>
-				</button>
-				{#if showElevation}
-					<div class="input !flex !items-center gap-2">
-						<input
-							class="flex-1 min-w-0 bg-transparent border-none outline-none shadow-none p-0"
-							type="text"
-							inputmode="decimal"
-							placeholder="0"
-							value={scopeView.elevation.angle}
-							oninput={(e) => scopeView.setElevation({ angle: e.target.value })}
-						/>
-						<div class="flex items-center gap-1 shrink-0">
-							{#each [{ value: 'deg', label: m.unit_deg() }, { value: 'cos', label: m.unit_cos() }] as opt}
-								<button
-									type="button"
-									class="chip text-xs {scopeView.elevation.unit === opt.value
-										? 'preset-filled-primary-500'
-										: 'preset-tonal-surface'}"
-									onclick={() => scopeView.setElevation({ unit: opt.value })}
-								>
-									{opt.label}
-								</button>
-							{/each}
-						</div>
-					</div>
-					<p class="text-xs text-surface-500-400">{m.scope_view_angle_hint()}</p>
+<!--
+	Phone: one column in the order of the design (profile, distance, result, wind, angle, atmosphere).
+	sm and up: inputs on the left, the result on the right, sticky in the scrolling <main>.
+-->
+<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-5 sm:items-start">
+	<!-- 1 · Active profile -->
+	<a
+		href={profilesHref}
+		class="sm:col-start-1 flex items-center gap-2.5 min-h-12 px-3 py-1.5 rounded-container border border-surface-200-800 preset-filled-surface-100-900 hover:border-primary-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
+	>
+		<span
+			class="size-2 rounded-full shrink-0 {activeProfile.profile ? 'bg-primary-500' : 'bg-surface-400-600'}"
+			aria-hidden="true"
+		></span>
+		<span class="flex-1 min-w-0">
+			<span class="block text-[11px] text-surface-600-400">{m.scope_view_active_profile()}</span>
+			<span class="block text-sm font-semibold truncate">
+				{#if shown}
+					{shown.name || m.scope_view_profile_unnamed()}{#if shown.ammo}<span class="font-normal text-surface-600-400"> · {shown.ammo}</span>{/if}
+				{:else}
+					{m.scope_view_profile_none()}
 				{/if}
-			</div>
+			</span>
+		</span>
+		<span class="text-sm font-semibold text-primary-700-300 shrink-0">
+			{shown ? m.scope_view_profile_change() : m.scope_view_profile_choose()}
+		</span>
+	</a>
 
-			<!-- Wind -->
-			<WindInput
-				speed={scopeView.wind.speed}
-				speedUnit={scopeView.wind.speedUnit}
-				direction={scopeView.wind.direction}
-				onchange={(patch) => scopeView.setWind(patch)}
-			/>
-		</div>
-
-		<!-- Atmosphere -->
-		<AtmosphereCard
-			atmosphere={scopeView.atmosphere}
-			onchange={(patch) => scopeView.setAtmosphere(patch)}
+	<!-- 2 · Target distance -->
+	<div class="sm:col-start-1">
+		<DistanceInput
+			label={m.scope_view_range()}
+			value={scopeView.range.distance}
+			unit={scopeView.range.unit}
+			onchange={(v) => scopeView.setRange({ distance: v })}
+			onunitchange={(u) => scopeView.setRange({ unit: u })}
+			invalid={rangeUsable ? '' : m.validation_range_above_zero({ max: formatLimit(MAX_DISTANCE), unit: distLabel })}
 		/>
 	</div>
 
-	<!-- ═══ RIGHT: Adjustments + Reticle ═══════════════════════════ -->
-	<div class="space-y-4">
-		<div class="card preset-filled-surface-100-900 p-4 space-y-4">
-			<h2 class="h5 border-b border-surface-200-800 pb-2 flex items-center gap-2">
-				{m.scope_view_adjustments()}
-				{#if activeProfile.profile?.reticleType}
-					<span class="badge preset-outlined-surface-200-800 text-xs font-normal">{activeProfile.profile.reticleType.toUpperCase()}</span>
-				{/if}
+	<!-- 3 · Result (right column, sticky, on sm and up) -->
+	<div class="sm:col-start-2 sm:row-start-1 sm:row-span-5 sm:sticky sm:top-4">
+		<ScopeResult
+			{status}
+			distance={rangeUsable ? String(scopeView.range.distance).trim() : null}
+			unitLabel={distLabel}
+			mode={scopeView.resultMode}
+			onmodechange={(mode) => scopeView.setResultMode(mode)}
+			{profilesHref}
+			{elevation}
+			{windage}
+			{flightTime}
+			{energy}
+			velocity={terminalVel}
+			energyUnit={trajUnit}
+			onenergyunitchange={(u) => (trajUnit = u)}
+		>
+			{#snippet hold()}
+				<ScopeReticle point={cantedPoint} />
+			{/snippet}
+		</ScopeResult>
+	</div>
+
+	<!-- 4 · Wind -->
+	<div class="sm:col-start-1">
+		<ScopeWindCard
+			speed={scopeView.wind.speed}
+			speedUnit={scopeView.wind.speedUnit}
+			direction={scopeView.wind.direction}
+			preset={scopeView.windPreset}
+			onchange={(patch) => scopeView.setWind(patch)}
+			onpreset={(preset) => scopeView.applyWindPreset(preset)}
+		/>
+	</div>
+
+	<!-- 5 · Elevation angle, always shown -->
+	<section
+		class="sm:col-start-1 card preset-filled-surface-100-900 border border-surface-200-800 px-3.5 py-3 space-y-2"
+	>
+		<div class="flex items-center justify-between gap-2">
+			<h2 class="text-sm font-semibold">
+				<label for="{uid}-angle">{m.scope_view_angle()}</label>
 			</h2>
-
-			{#if !activeProfile.profile}
-				<!-- No active profile -->
-				<div class="py-6 text-center space-y-2">
-					<p class="text-surface-500-400 text-sm">{m.scope_view_no_profile()}</p>
-					<a href="/profiles" class="btn btn-sm preset-tonal-primary">
-						{m.nav_profiles()}
-					</a>
-				</div>
-
-			{:else if point === null}
-				<!-- Profile present but calculation failed -->
-				<div class="py-6 text-center">
-					<p class="text-warning-500 text-sm">{m.scope_view_no_valid_result()}</p>
-				</div>
-
-			{:else}
-				<!-- ── Elevation result ───────────────────────────── -->
-				<div class="flex items-center justify-center gap-3 py-2">
-					<div class="flex items-center gap-2">
-						<div class="p-2 rounded-lg {elevDir === 'up' ? 'preset-tonal-primary' : 'preset-tonal-secondary'}">
-							{#if elevDir === 'up'}
-								<ArrowUp class="size-5" />
-							{:else}
-								<ArrowDown class="size-5" />
-							{/if}
-						</div>
-						<span class="text-xs font-semibold uppercase {elevDir === 'up' ? 'text-primary-500' : 'text-secondary-500'}">
-							{elevDir === 'up' ? m.scope_view_up() : m.scope_view_down()}
-						</span>
-					</div>
-					<p class="font-bold text-2xl leading-tight">
-						{elevClicks}
-						<span class="text-base font-normal text-surface-500-400">
-							{elevClicks === 1 ? m.scope_view_click() : m.scope_view_clicks()}
-						</span>
-						<span class="text-sm font-normal text-surface-500-400">
-							({Math.abs(elevValue ?? 0)} {elevUnit})
-						</span>
-					</p>
-				</div>
-
-				<!-- ── Windage result ─────────────────────────────── -->
-				<div class="flex items-center justify-center gap-3 py-2">
-					<div class="flex items-center gap-2">
-						<div class="p-2 rounded-lg {windDir === 'left' ? 'preset-tonal-tertiary' : 'preset-tonal-warning'}">
-							{#if windDir === 'left'}
-								<ArrowLeft class="size-5" />
-							{:else}
-								<ArrowRight class="size-5" />
-							{/if}
-						</div>
-						<span class="text-xs font-semibold uppercase {windDir === 'left' ? 'text-tertiary-500' : 'text-warning-500'}">
-							{windDir === 'left' ? m.scope_view_left() : m.scope_view_right()}
-						</span>
-					</div>
-					<p class="font-bold text-2xl leading-tight">
-						{windClicks}
-						<span class="text-base font-normal text-surface-500-400">
-							{windClicks === 1 ? m.scope_view_click() : m.scope_view_clicks()}
-						</span>
-						<span class="text-sm font-normal text-surface-500-400">
-							({Math.abs(windValue ?? 0)} {windUnit})
-						</span>
-					</p>
-				</div>
-
-				<!-- ── Trajectory info ────────────────────────────── -->
-				<div class="border-t border-surface-200-800 pt-4 space-y-3">
-					<div class="flex justify-end gap-1">
-						{#each [{ value: 'imperial', label: m.unit_ft_lb() + ' / ' + m.unit_fps() }, { value: 'metric', label: m.unit_j() + ' / ' + m.unit_mps() }] as opt}
-							<button
-								type="button"
-								class="chip text-xs {trajUnit === opt.value ? 'preset-filled-primary-500' : 'preset-tonal-surface'}"
-								onclick={() => (trajUnit = opt.value)}
-							>
-								{opt.label}
-							</button>
-						{/each}
-					</div>
-					<div class="grid grid-cols-3 gap-3 text-center">
-						<div>
-							<div class="flex justify-center mb-1">
-								<Timer class="size-4 text-surface-500-400" />
-							</div>
-							<p class="text-xs text-surface-500-400">{m.scope_view_flight_time()}</p>
-							<p class="font-semibold">{flightTime}<span class="text-xs font-normal text-surface-500-400 ml-0.5">{m.unit_s()}</span></p>
-						</div>
-						<div>
-							<div class="flex justify-center mb-1">
-								<Zap class="size-4 text-surface-500-400" />
-							</div>
-							<p class="text-xs text-surface-500-400">{m.scope_view_energy()}</p>
-							<p class="font-semibold">{energy?.value}<span class="text-xs font-normal text-surface-500-400 ml-0.5">{energy?.unit}</span></p>
-						</div>
-						<div>
-							<div class="flex justify-center mb-1">
-								<ArrowRight class="size-4 text-surface-500-400" />
-							</div>
-							<p class="text-xs text-surface-500-400">{m.scope_view_terminal_velocity()}</p>
-							<p class="font-semibold">{terminalVel?.value}<span class="text-xs font-normal text-surface-500-400 ml-0.5">{terminalVel?.unit}</span></p>
-						</div>
-					</div>
-				</div>
+			<ChipGroup
+				label={m.scope_view_angle_unit()}
+				options={[
+					{ value: 'deg', label: m.unit_deg() },
+					{ value: 'cos', label: m.unit_cos() }
+				]}
+				value={scopeView.elevation.unit}
+				onselect={(unit) => scopeView.setElevation({ unit })}
+			/>
+		</div>
+		<div class="input !flex !items-center gap-2 h-11">
+			<input
+				id="{uid}-angle"
+				class="flex-1 min-w-0 bg-transparent border-none outline-none shadow-none p-0 font-semibold"
+				type="text"
+				inputmode="decimal"
+				autocomplete="off"
+				placeholder="0"
+				value={scopeView.elevation.angle}
+				aria-invalid={!angleUsable}
+				aria-describedby="{uid}-angle-msg"
+				oninput={(e) => scopeView.setElevation({ angle: e.target.value })}
+			/>
+			{#if scopeView.elevation.unit === 'deg'}
+				<span class="text-sm shrink-0" aria-hidden="true">°</span>
 			{/if}
+		</div>
+		{#if angleUsable}
+			<p id="{uid}-angle-msg" class="text-xs text-surface-600-400">{m.scope_view_angle_hint()}</p>
+		{:else if scopeView.elevation.unit === 'deg'}
+			<p id="{uid}-angle-msg" class="text-xs text-error-500" role="alert">{m.scope_view_deg_invalid()}</p>
+		{:else}
+			<p id="{uid}-angle-msg" class="text-xs text-error-500" role="alert">{m.scope_view_cos_invalid()}</p>
+		{/if}
+	</section>
 
-			</div>
-
-		<!-- ── Scope Reticle ─────────────────────────────────────── -->
-		<ScopeReticle point={cantedPoint} />
+	<!-- 6 · Atmosphere -->
+	<div class="sm:col-start-1">
+		<ScopeAtmosphereCard
+			{atmosphere}
+			used={atmosphereUsed}
+			altitudeTooLow={shot.altitudeTooLow}
+			{noAirDensity}
+			onchange={weather.onchange}
+			weatherAvailable={weather.available}
+			weatherStatus={weather.status}
+			onweather={weather.request}
+		/>
 	</div>
 </div>

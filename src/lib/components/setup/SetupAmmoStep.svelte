@@ -1,0 +1,247 @@
+<script>
+	/**
+	 * Guided setup, step 2: ammunition (#150).
+	 *
+	 * The user picks a load from the library (src/lib/data/ammo.json), which fills the bullet fields
+	 * of the form, or enters the numbers from the box. "Edit" opens the fields filled from the pick.
+	 *
+	 * @prop {object}      form       - Bindable setup form (GuidedSetup).
+	 * @prop {object|null} pick       - Bindable: the library entry picked, or null.
+	 * @prop {boolean}     manual     - Bindable: the bullet fields are shown.
+	 * @prop {Function}    error(key) - The error message to show under a field, or ''.
+	 * @prop {boolean}     missing    - Next was pressed with bullet errors while the fields are hidden.
+	 */
+	import { tick } from 'svelte';
+	import { m } from '#lib/paraglide/messages.js';
+	import { Search, CircleCheck, Circle } from '@lucide/svelte';
+	import UnitField from '#lib/components/UnitField.svelte';
+	import TextField from '#lib/components/setup/TextField.svelte';
+	import { MAX_NAME_LENGTH } from '#lib/utils/storedProfiles.js';
+	import { formatNumber } from '#lib/utils/format.js';
+	import ammoData from '#lib/data/ammo.json';
+
+	let {
+		form = $bindable(),
+		pick = $bindable(null),
+		manual = $bindable(false),
+		error,
+		missing = false
+	} = $props();
+
+	const uid = $props.id();
+	let query = $state('');
+	let brandInput = $state(null);
+
+	const UNIT_LABELS = {
+		in: () => m.unit_in(),
+		mm: () => m.unit_mm(),
+		cm: () => m.unit_cm(),
+		gr: () => m.unit_gr(),
+		g: () => m.unit_g()
+	};
+
+	/** Case-insensitive, and "7.5x55" matches "75x55" or "7.5 x 55" (as the Ammo Library page). */
+	function normalize(s) {
+		return s.toLowerCase().replace(/[\s\W]+/g, '');
+	}
+
+	let matches = $derived.by(() => {
+		const q = normalize(query);
+		return q ? ammoData.filter((item) => normalize(item.brand).includes(q)) : ammoData;
+	});
+
+	function withUnit(value, unit) {
+		const key = String(unit).toLowerCase();
+		return `${formatNumber(value)} ${UNIT_LABELS[key]?.() ?? key}`;
+	}
+
+	function rowDetail(item) {
+		return m.setup_ammo_row_detail({
+			weight: withUnit(item.weight, item.weightUnit),
+			bc: formatNumber(item.ballisticCoefficient),
+			model: item.ballisticCoefficientProfile
+		});
+	}
+
+	/** Fills the bullet fields from a library entry, as ProfileForm does with the Ammo Library. */
+	function choose(item) {
+		pick = item;
+		manual = false;
+		form.bulletBrand = item.brand;
+		form.bulletDiameter = String(item.diameter);
+		form.bulletDiameterUnit = item.diameterUnit.toLowerCase();
+		form.bulletWeight = String(item.weight);
+		form.bulletWeightUnit = item.weightUnit.toLowerCase();
+		form.bc = String(item.ballisticCoefficient);
+		form.bcType = item.ballisticCoefficientProfile;
+		if (item.length) {
+			form.bulletLength = String(item.length);
+			form.bulletLengthUnit = item.lengthUnit.toLowerCase();
+		}
+	}
+
+	async function openFields(clear) {
+		if (clear) {
+			pick = null;
+			form.bulletBrand = '';
+			form.bulletDiameter = '';
+			form.bulletWeight = '';
+			form.bc = '';
+			form.bulletLength = '';
+		}
+		manual = true;
+		await tick();
+		brandInput?.focus();
+	}
+</script>
+
+<div class="flex flex-col gap-4">
+	<!-- Search -->
+	<label
+		class="input !flex !items-center gap-2 h-[46px] px-3 text-surface-600-400 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primary-500"
+	>
+		<Search class="size-[18px] shrink-0" aria-hidden="true" />
+		<input
+			type="search"
+			class="flex-1 min-w-0 bg-transparent border-none outline-none shadow-none p-0 text-[15px] text-surface-950-50"
+			placeholder={m.setup_ammo_search_placeholder()}
+			aria-label={m.setup_ammo_search()}
+			aria-controls="{uid}-list"
+			bind:value={query}
+			onkeydown={(e) => {
+				// Enter searches, it does not submit the step.
+				if (e.key === 'Enter') e.preventDefault();
+			}}
+		/>
+	</label>
+
+	<!-- Library -->
+	{#if matches.length === 0}
+		<p class="mx-1 text-sm text-surface-600-400" role="status">{m.ammo_selector_no_results()}</p>
+	{:else}
+		<ul
+			id="{uid}-list"
+			aria-label={m.ammo_selector_library()}
+			class="max-h-72 overflow-y-auto rounded-container border border-surface-200-800 divide-y divide-surface-200-800"
+		>
+			{#each matches as item (item)}
+				{@const selected = pick === item}
+				<li>
+					<button
+						type="button"
+						class="w-full min-h-14 flex items-center gap-3 px-3.5 py-2.5 text-left transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500 {selected
+							? 'preset-tonal-primary'
+							: 'hover:preset-tonal-surface'}"
+						aria-pressed={selected}
+						onclick={() => choose(item)}
+					>
+						<span class="flex-1 min-w-0">
+							<span class="block text-[15px] font-semibold break-words">{item.brand}</span>
+							<span class="block mt-0.5 text-[13px] text-surface-600-400">{rowDetail(item)}</span>
+						</span>
+						{#if selected}
+							<CircleCheck class="size-[22px] shrink-0 text-primary-600-400" aria-hidden="true" />
+						{:else}
+							<Circle class="size-[22px] shrink-0 text-surface-400-600" aria-hidden="true" />
+						{/if}
+					</button>
+				</li>
+			{/each}
+		</ul>
+	{/if}
+
+	<p class="mx-1 text-xs text-surface-600-400">{m.ammo_selector_disclaimer()}</p>
+
+	<!-- What the pick filled in -->
+	{#if pick && !manual}
+		<div class="card preset-tonal-primary p-4 flex flex-col gap-3" aria-live="polite">
+			<div class="flex items-start justify-between gap-3">
+				<p class="min-w-0 text-sm font-semibold break-words">{m.setup_ammo_filled({ brand: pick.brand })}</p>
+				<button
+					type="button"
+					class="btn btn-sm touch-hit min-w-11 -my-1 px-2 font-semibold underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
+					onclick={() => openFields(false)}
+				>
+					{m.common_edit()}
+				</button>
+			</div>
+			<dl class="grid grid-cols-2 min-[400px]:grid-cols-4 gap-x-3 gap-y-2">
+				<div>
+					<dt class="text-[11px] uppercase tracking-wide opacity-80">{m.setup_ammo_weight()}</dt>
+					<dd class="text-sm font-semibold">{withUnit(form.bulletWeight, form.bulletWeightUnit)}</dd>
+				</div>
+				<div>
+					<dt class="text-[11px] uppercase tracking-wide opacity-80">{m.setup_ammo_bc()}</dt>
+					<dd class="text-sm font-semibold">{formatNumber(Number(form.bc))}&nbsp;{form.bcType}</dd>
+				</div>
+				<div>
+					<dt class="text-[11px] uppercase tracking-wide opacity-80">{m.setup_ammo_diameter()}</dt>
+					<dd class="text-sm font-semibold">{withUnit(form.bulletDiameter, form.bulletDiameterUnit)}</dd>
+				</div>
+				<div>
+					<dt class="text-[11px] uppercase tracking-wide opacity-80">{m.setup_ammo_length()}</dt>
+					<dd class="text-sm font-semibold">
+						{form.bulletLength ? withUnit(form.bulletLength, form.bulletLengthUnit) : '—'}
+					</dd>
+				</div>
+			</dl>
+		</div>
+	{/if}
+
+	{#if !manual}
+		{#if missing}
+			<p class="mx-1 text-xs text-error-500" role="alert">{m.setup_ammo_missing()}</p>
+		{/if}
+		<button
+			type="button"
+			class="self-start min-h-11 px-1 text-sm font-semibold text-primary-700-300 underline underline-offset-2 rounded-base focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
+			onclick={() => openFields(true)}
+		>
+			{m.setup_ammo_not_listed()}
+		</button>
+	{:else}
+		<!-- The numbers from the box -->
+		<fieldset class="card preset-filled-surface-100-900 border border-surface-200-800 p-4">
+			<legend class="float-left w-full mb-4 text-sm font-semibold">{m.setup_ammo_box_legend()}</legend>
+			<div class="clear-left flex flex-col gap-4">
+				<TextField
+					label={m.profile_ammo_brand()}
+					hint={m.profile_ammo_brand_hint()}
+					placeholder={m.profile_ammo_brand_placeholder()}
+					maxlength={MAX_NAME_LENGTH}
+					invalid={error('bulletBrand')}
+					bind:value={form.bulletBrand}
+					bind:input={brandInput}
+				/>
+
+				<UnitField
+					label={m.profile_ammo_diameter()}
+					hint={m.profile_ammo_diameter_hint()}
+					invalid={error('bulletDiameter')}
+					bind:value={form.bulletDiameter}
+					bind:unit={form.bulletDiameterUnit}
+					units={[{ value: 'in', label: m.unit_in() }, { value: 'mm', label: m.unit_mm() }]}
+				/>
+
+				<UnitField
+					label={m.profile_ammo_weight()}
+					hint={m.profile_ammo_weight_hint()}
+					invalid={error('bulletWeight')}
+					bind:value={form.bulletWeight}
+					bind:unit={form.bulletWeightUnit}
+					units={[{ value: 'gr', label: m.unit_gr() }, { value: 'g', label: m.unit_g() }]}
+				/>
+
+				<UnitField
+					label={m.profile_ammo_bc()}
+					hint={m.profile_ammo_bc_hint()}
+					invalid={error('bc')}
+					bind:value={form.bc}
+					bind:unit={form.bcType}
+					units={[{ value: 'G1', label: 'G1' }, { value: 'G7', label: 'G7' }]}
+					placeholder="0.500"
+				/>
+			</div>
+		</fieldset>
+	{/if}
+</div>

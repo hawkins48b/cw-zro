@@ -1,4 +1,10 @@
+import { normalizeCompareEntries } from '#lib/utils/compareEntries.js';
+import { normalizeYAxisUnit } from '#lib/utils/yAxisUnit.js';
+import { storedObject, storedRange } from '#lib/utils/storedState.js';
 import { localStore } from './localStore.svelte.js';
+// Loads the profiles store first: it rewrites the entries' profile ids renumbered for links (#134)
+// before this store reads them.
+import './profiles.svelte.js';
 
 const defaults = {
 	entries: [],
@@ -8,30 +14,35 @@ const defaults = {
 
 const _store = localStore('zro-compare-traj', defaults);
 
+// The stored state, or an empty one when it is not an object (#120).
+const state = () => storedObject(_store.value);
+const readEntries = () => normalizeCompareEntries(state().entries);
+const readRange = () => storedRange(state().range);
+
 export const compareTrajectories = {
-	get entries() { return _store.value.entries; },
-	get range() { return _store.value.range; },
-	get yAxis() { return _store.value.yAxis ?? 'in'; },
+	get entries() { return readEntries(); },
+	get range() { return readRange(); },
+	get yAxis() { return normalizeYAxisUnit(state().yAxis); },
 
 	addEntry(profileId, zeroDist, zeroUnit) {
 		const id = crypto.randomUUID();
-		const entries = [..._store.value.entries, { id, profileId, zeroDist, zeroUnit }];
-		_store.value = { ..._store.value, entries };
+		const entries = [...readEntries(), { id, profileId, zeroDist, zeroUnit }];
+		_store.value = { ...state(), entries };
 	},
 	updateEntry(id, patch) {
-		const entries = _store.value.entries.map((e) =>
+		const entries = readEntries().map((e) =>
 			e.id === id ? { ...e, ...patch, id } : e
 		);
-		_store.value = { ..._store.value, entries };
+		_store.value = { ...state(), entries };
 	},
 	removeEntry(id) {
-		const entries = _store.value.entries.filter((e) => e.id !== id);
-		_store.value = { ..._store.value, entries };
+		const entries = readEntries().filter((e) => e.id !== id);
+		_store.value = { ...state(), entries };
 	},
 	setRange(patch) {
-		_store.value = { ..._store.value, range: { ..._store.value.range, ...patch } };
+		_store.value = { ...state(), range: { ...readRange(), ...patch } };
 	},
 	setYAxis(unit) {
-		_store.value = { ..._store.value, yAxis: unit };
+		_store.value = { ...state(), yAxis: unit };
 	}
 };

@@ -1,4 +1,4 @@
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 import { localStore } from './localStore.svelte.js';
 
 const store = localStore(
@@ -12,7 +12,11 @@ export const settings = {
 		return store.value;
 	},
 	toggleDarkMode() {
-		store.value = !store.value;
+		this.setDarkMode(!store.value);
+	},
+	/** Light (false) or dark (true) theme: the sidebar's Light / Dark buttons (#149). */
+	setDarkMode(dark) {
+		store.value = Boolean(dark);
 		applyDarkMode(store.value);
 	}
 };

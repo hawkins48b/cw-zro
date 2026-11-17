@@ -1,6 +1,9 @@
+import { MAX_NAME_LENGTH, cutText, shownProfile } from './storedProfiles.js';
+
 /**
  * Pure helper functions for profile list operations.
- * These mirror the logic in the profiles store and are testable without Svelte.
+ * The profiles store calls them on the usable stored list (storedProfiles.js), and they are
+ * testable without Svelte.
  */
 
 /**
@@ -50,8 +53,23 @@ export function getProfile(list, id) {
 	return list.find((p) => p.id === id) ?? null;
 }
 
+/** What a duplicated profile's name ends with. */
+const COPY_SUFFIX = ' - Copy';
+
 /**
- * Duplicates a profile, appending " - Copy" to its name.
+ * The name of a copy of a profile: the shown name, cut so that the name with " - Copy" fits in
+ * MAX_NAME_LENGTH (#141). Without the cut, a 60-character name lost its suffix on the next read,
+ * and the copy looked like the original.
+ * @param {object} profile
+ * @returns {string}
+ */
+export function copyName(profile) {
+	return cutText(shownProfile(profile).name, MAX_NAME_LENGTH - COPY_SUFFIX.length) + COPY_SUFFIX;
+}
+
+/**
+ * Duplicates a profile, appending " - Copy" to its name as the page shows it, so that a stored name
+ * that is not text cannot throw (#120).
  * @param {Array}  list
  * @param {string} id
  * @returns {{ list: Array, id: string | null }}
@@ -60,5 +78,18 @@ export function duplicateProfile(list, id) {
 	const src = getProfile(list, id);
 	if (!src) return { list, id: null };
 	const { id: _srcId, ...rest } = src;
-	return addProfile(list, { ...rest, name: `${rest.name} - Copy` });
+	return addProfile(list, { ...rest, name: copyName(src) });
+}
+
+/**
+ * The page to go back to from the ammo selector, read from its `return` query parameter. Only a
+ * profile page, with or without a locale prefix, is accepted: the value comes from the URL, and
+ * goto rejects a path that leaves the site or matches no route, which would leave the selection
+ * button doing nothing.
+ *
+ * @param {string|null} value
+ * @returns {string}
+ */
+export function safeReturnPath(value) {
+	return /^(\/(fr|de))?\/profiles(\/[\w-]+)?$/.test(value ?? '') ? value : '/profiles';
 }

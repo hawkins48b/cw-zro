@@ -1,21 +1,38 @@
 <script>
 	import { onMount } from 'svelte';
-	import { m } from '$lib/paraglide/messages.js';
-	import { activeProfile } from '$lib/stores/activeProfile.svelte.js';
-	import { ballistic } from '$lib/stores/ballistic.svelte.js';
-	import { settings } from '$lib/stores/settings.svelte.js';
-	import { calculateFullTrajectory } from '$lib/utils/ballisticCalculator.js';
-	import WindInput from '$lib/components/WindInput.svelte';
-	import AtmosphereCard from '$lib/components/AtmosphereCard.svelte';
+	import { m } from '#lib/paraglide/messages.js';
+	import { localizeHref } from '#lib/paraglide/runtime.js';
+	import { activeProfile } from '#lib/stores/activeProfile.svelte.js';
+	import { ballistic } from '#lib/stores/ballistic.svelte.js';
+	import { settings } from '#lib/stores/settings.svelte.js';
+	import { scopeView } from '#lib/stores/scopeView.svelte.js';
+	import { ballisticPageTrajectory, isUsableBallisticRange, scopeDistanceRow } from '#lib/utils/ballisticPage.js';
+	import { getElevationValue, getWindageValue, hasNoAirDensity } from '#lib/utils/ballisticCalculator.js';
+	import { clickValue, signedClickCount } from '#lib/utils/clicks.js';
+	import { formatLimit, formatNumber } from '#lib/utils/format.js';
 	import {
-		ChevronDown,
-		ChevronRight,
-		Download,
-		Columns3,
-		MapPin,
-		Waves
-	} from '@lucide/svelte';
+		formatUsedAtmosphere,
+		scopeAtmosphereParams,
+		usedScopeAtmosphere
+	} from '#lib/utils/scopeAtmosphere.js';
+	import {
+		chartTickAmount,
+		MAX_DISTANCE,
+		MIN_TABLE_STEP,
+		maxTableStep,
+		tableStep,
+		tableStepLimit
+	} from '#lib/utils/inputLimits.js';
+	import { shownProfile } from '#lib/utils/storedProfiles.js';
+	import ChipGroup from '#lib/components/ChipGroup.svelte';
+	import ScopeWindCard from '#lib/components/ScopeWindCard.svelte';
+	import ScopeAtmosphereCard from '#lib/components/ScopeAtmosphereCard.svelte';
+	import { useCurrentWeather } from '#lib/components/currentWeather.svelte.js';
+	import { Download, Columns3, MapPin, Waves } from '@lucide/svelte';
 	import { Unit } from 'js-ballistics';
+
+	const uid = $props.id();
+	const focusRing = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500';
 
 	// ── ApexCharts (lazy-loaded, browser-only) ──────────────────────
 	let ApexCharts = $state(null);
@@ -28,12 +45,33 @@
 	});
 
 	// ── Trajectory computation ───────────────────────────────────────
-	let trajectoryResult = $derived.by(() => {
-		const profile = activeProfile.profile;
-		if (!profile) return null;
-		const atmo = ballistic.atmosphere.useISA ? null : ballistic.atmosphere;
-		return calculateFullTrajectory(profile, ballistic.range, atmo, ballistic.wind);
-	});
+	// The range box shows the range message when the page does not calculate (#122).
+	let rangeUsable = $derived(isUsableBallisticRange(ballistic.range.distance));
+	// The step box shows the minimum under a step below it (#130), and the maximum, the range, over
+	// a step above it (#133). The table keeps tableStep, which reads a step above the range as the range.
+	let stepLimit = $derived(tableStepLimit(ballistic.range.step, ballistic.range.distance));
+	let chartStep = $derived(tableStep(ballistic.range.step, ballistic.range.distance));
+	// ── Atmosphere (#151, owner decision): ISA, Estimate or Accurate, as on the Scope View ──
+	let atmosphere = $derived(ballistic.atmosphere);
+	// "Use current weather here" (#152): nothing is asked or sent before a tap on the card's button.
+	const weather = useCurrentWeather(ballistic);
+	/** What the calculation is given: null is the standard atmosphere at sea level. */
+	let atmoParams = $derived(scopeAtmosphereParams(atmosphere));
+	/** What ISA and Estimate use, in the units of the boxes, for the line under the card. */
+	let atmosphereUsed = $derived(
+		formatUsedAtmosphere(usedScopeAtmosphere(atmosphere), {
+			number: formatNumber,
+			units: { hpa: m.unit_hpa(), inhg: m.unit_inhg(), c: m.unit_c(), f: m.unit_f() }
+		})
+	);
+	// Values within their limits whose air density is not above 0 give no result (#107), checked on
+	// the atmosphere actually used.
+	let noAirDensity = $derived(hasNoAirDensity(atmoParams));
+
+	let trajectory = $derived(
+		ballisticPageTrajectory(activeProfile.profile, ballistic.range, atmoParams, ballistic.storedWind)
+	);
+	let trajectoryResult = $derived(trajectory.result);
 
 	let tablePoints = $derived(trajectoryResult?.trajectory ?? []);
 	let chartPoints = $derived(trajectoryResult?.chartPoints ?? []);
@@ -47,7 +85,14 @@
 	const isMetric = $derived(ballistic.range.unit === 'm');
 	const distLabel = $derived(isMetric ? m.unit_m() : m.unit_yd());
 	const elevLabel = $derived(isMetric ? m.unit_cm() : m.unit_in());
-	const velLabel = $derived(isMetric ? m.unit_mps() : m.unit_fps());
+
+	// ── Header: active profile (#151), as the Scope View's profile bar ──
+	let shown = $derived(shownProfile(activeProfile.profile));
+	let profilesHref = $derived(localizeHref('/profiles'));
+
+	// ── Chart card (#151): Drop / Velocity switch, stored in ballistic.options.chartMode ──
+	let chartMode = $derived(ballistic.options.chartMode);
+	let velUnit = $derived(ballistic.options.velChartUnit ?? 'fps');
 
 	// ── Chart builders ───────────────────────────────────────────────
 	function resolveCSSColor(varName, fallback) {
@@ -73,11 +118,13 @@
 
 		const data = points.map((p) => ({
 			x: Math.round(p.distance.In(distUnit) * 10) / 10,
-			y: Math.round(p.targetDrop.In(dropUnit) * 10) / 10
+			y: Math.round(p.slantHeight.In(dropUnit) * 10) / 10
 		}));
 
 		const maxX = data.length > 0 ? data[data.length - 1].x : 0;
-		const tickAmount = step > 0 && maxX > 0 ? Math.round(maxX / step) : undefined;
+		// One tick per table step, capped: a small step on a long range asked ApexCharts for
+		// millions of ticks (#130).
+		const tickAmount = chartTickAmount(maxX, step);
 
 		const annotationPoints = [];
 
@@ -204,7 +251,9 @@
 		}));
 
 		const maxX = velData.length > 0 ? velData[velData.length - 1].x : 0;
-		const tickAmount = step > 0 && maxX > 0 ? Math.round(maxX / step) : undefined;
+		// One tick per table step, capped: a small step on a long range asked ApexCharts for
+		// millions of ticks (#130).
+		const tickAmount = chartTickAmount(maxX, step);
 
 		const series = [{ name: m.ballistic_vel_chart(), data: velData }];
 
@@ -262,6 +311,8 @@
 	}
 
 	// ── Chart effects ────────────────────────────────────────────────
+	// Only the chart of the selected mode is in the page; the other element is null, so its chart
+	// is destroyed and not built.
 	$effect(() => {
 		const ac = ApexCharts;
 		const el = elevChartEl;
@@ -276,7 +327,7 @@
 			farZero,
 			maxApex,
 			maxDrop,
-			parseFloat(ballistic.range.step) || 25
+			chartStep
 		);
 		const chart = new ac(el, opts);
 		chart.render();
@@ -286,16 +337,22 @@
 	$effect(() => {
 		const ac = ApexCharts;
 		const el = velChartEl;
-		if (!ac || !el || !ballistic.options.showVelocityChart) return;
+		if (!ac || !el) return;
 
-		const velUnit = ballistic.options.velChartUnit ?? 'fps';
-		const opts = buildVelChartOptions(chartPoints, settings.darkMode, isMetric, velUnit, soundSpeedFPS, parseFloat(ballistic.range.step) || 25);
+		const opts = buildVelChartOptions(chartPoints, settings.darkMode, isMetric, velUnit, soundSpeedFPS, chartStep);
 		const chart = new ac(el, opts);
 		chart.render();
 		return () => chart.destroy();
 	});
 
 	// ── Table columns ────────────────────────────────────────────────
+	// elevClicks and windClicks (#151, owner decision) are off by default. They count the clicks of
+	// the profile's click value and unit as the Scope View does (utils/clicks.js), signed like the
+	// angle columns: a negative elevation is dialled up.
+	let elevClickUnit = $derived(shown?.elevationClickUnit ?? 'MOA');
+	let windClickUnit = $derived(shown?.windageClickUnit ?? 'MOA');
+	let elevPerClick = $derived(clickValue(shown?.elevationClickValue));
+	let windPerClick = $derived(clickValue(shown?.windageClickValue));
 	const COLUMN_GROUPS = [
 		{
 			id: 'distance',
@@ -312,7 +369,8 @@
 				{ id: 'elevIn', label: () => m.ballistic_col_elev_in() },
 				{ id: 'elevCm', label: () => m.ballistic_col_elev_cm() },
 				{ id: 'elevMOA', label: () => m.ballistic_col_elev_moa() },
-				{ id: 'elevMRAD', label: () => m.ballistic_col_elev_mrad() }
+				{ id: 'elevMRAD', label: () => m.ballistic_col_elev_mrad() },
+				{ id: 'elevClicks', label: () => m.ballistic_col_elev_clicks() }
 			]
 		},
 		{
@@ -322,7 +380,8 @@
 				{ id: 'windIn', label: () => m.ballistic_col_wind_in() },
 				{ id: 'windCm', label: () => m.ballistic_col_wind_cm() },
 				{ id: 'windMOA', label: () => m.ballistic_col_wind_moa() },
-				{ id: 'windMRAD', label: () => m.ballistic_col_wind_mrad() }
+				{ id: 'windMRAD', label: () => m.ballistic_col_wind_mrad() },
+				{ id: 'windClicks', label: () => m.ballistic_col_wind_clicks() }
 			]
 		},
 		{
@@ -358,21 +417,21 @@
 			case 'rangeM':
 				return r1(point.distance.In(Unit.Meter));
 			case 'elevIn':
-				return r1(point.targetDrop.In(Unit.Inch));
+				return r1(point.slantHeight.In(Unit.Inch));
 			case 'elevCm':
-				return r1(point.targetDrop.In(Unit.Centimeter));
+				return r1(point.slantHeight.In(Unit.Centimeter));
 			case 'elevMOA':
-				return r1(point.dropAdjustment.In(Unit.MOA));
+				return r1(point.dropAngle.In(Unit.MOA));
 			case 'elevMRAD':
-				return r1(point.dropAdjustment.In(Unit.MRad));
+				return r1(point.dropAngle.In(Unit.MRad));
 			case 'windIn':
 				return r1(point.windage.In(Unit.Inch));
 			case 'windCm':
 				return r1(point.windage.In(Unit.Centimeter));
 			case 'windMOA':
-				return r1(point.windageAdjustment.In(Unit.MOA));
+				return r1(point.windageAngle.In(Unit.MOA));
 			case 'windMRAD':
-				return r1(point.windageAdjustment.In(Unit.MRad));
+				return r1(point.windageAngle.In(Unit.MRad));
 			case 'velFps':
 				return r0(point.velocity.In(Unit.FPS));
 			case 'velMps':
@@ -383,6 +442,10 @@
 				return r0(point.energy.In(Unit.Joule));
 			case 'time':
 				return Math.round(point.time * 100) / 100;
+			case 'elevClicks':
+				return signedClickCount(getElevationValue(point, elevClickUnit), elevPerClick) ?? '';
+			case 'windClicks':
+				return signedClickCount(getWindageValue(point, windClickUnit), windPerClick) ?? '';
 			default:
 				return '';
 		}
@@ -391,6 +454,16 @@
 	let visibleColumns = $derived(ballistic.options.visibleColumns ?? ['rangeYd', 'elevIn', 'elevMOA', 'velFps', 'energyFtlb', 'time']);
 	let activeColumns = $derived(ALL_COLUMNS.filter((c) => visibleColumns.includes(c.id)));
 	let showColumnSelector = $state(false);
+
+	// ── Row highlight (#151) ─────────────────────────────────────────
+	// The index in tablePoints of the row at the Scope View's target distance, or -1 (utils/ballisticPage.js).
+	let highlightIndex = $derived(
+		scopeDistanceRow(
+			tablePoints.map((p) => p.distance.In(isMetric ? Unit.Meter : Unit.Yard)),
+			scopeView.range,
+			isMetric ? 'm' : 'yd'
+		)
+	);
 
 	// ── CSV export ───────────────────────────────────────────────────
 	function exportCSV() {
@@ -412,329 +485,334 @@
 	<title>{m.ballistic_title()} — {m.app_name()}</title>
 </svelte:head>
 
+<!-- One stat tile: label, value with unit (or the unknown dash), note line. -->
+{#snippet stat(label, value, unit, note)}
+	<div class="rounded-container border border-surface-200-800 preset-filled-surface-100-900 px-4 py-3.5 min-w-0">
+		<p class="text-xs text-surface-600-400">{label}</p>
+		{#if value !== null}
+			<p class="mt-1 text-2xl font-bold tabular-nums leading-tight">
+				{value}<span class="ml-1 text-sm font-normal text-surface-600-400">{unit}</span>
+			</p>
+		{:else}
+			<p class="mt-1 text-2xl font-bold leading-tight text-surface-600-400">{m.ballistic_unknown()}</p>
+		{/if}
+		{#if note}
+			<p class="mt-0.5 text-xs text-surface-600-400">{note}</p>
+		{/if}
+	</div>
+{/snippet}
+
 {#if !activeProfile.profile}
 	<!-- No profile -->
 	<div class="py-12 text-center space-y-3">
-		<p class="text-surface-500-400">{m.ballistic_no_profile()}</p>
+		<p class="text-surface-600-400">{m.ballistic_no_profile()}</p>
 		<a href="/profiles" class="btn preset-tonal-primary">{m.nav_profiles()}</a>
 	</div>
 {:else}
-	<div class="space-y-6">
+	<!--
+		Below lg: one column (header, Distances, Wind, Atmosphere, stats, chart, table).
+		lg and up (where the app sidebar appears): conditions on the left, results on the right (#151).
+	-->
+	<div class="max-w-[1180px] mx-auto flex flex-col gap-4 lg:gap-5">
+		<!-- ═══ Header ═══════════════════════════════════════════════════ -->
+		<header class="flex flex-wrap items-center gap-x-4 gap-y-3 px-1 sm:px-0">
+			<div class="flex-[1_1_320px] min-w-0">
+				<!-- Below lg the app header already shows the title -->
+				<h1 class="sr-only lg:not-sr-only lg:text-[28px] lg:font-bold lg:tracking-tight">{m.ballistic_title()}</h1>
+				<p class="lg:mt-1 text-sm text-surface-600-400">{m.ballistic_intro()}</p>
+			</div>
+			<a
+				href={profilesHref}
+				class="flex items-center gap-2.5 min-h-11 max-w-full px-3.5 py-1.5 rounded-container border border-surface-200-800 preset-filled-surface-100-900 hover:border-primary-500 {focusRing}"
+			>
+				<span class="size-2 rounded-full shrink-0 bg-primary-500" aria-hidden="true"></span>
+				<span class="min-w-0 truncate text-sm font-semibold">
+					<span class="sr-only">{m.scope_view_active_profile()}:</span>
+					{shown?.name || m.scope_view_profile_unnamed()}{#if shown?.ammo}<span class="font-normal text-surface-600-400"> · {shown.ammo}</span>{/if}
+				</span>
+				<span class="text-[13px] font-semibold text-primary-700-300 shrink-0">{m.scope_view_profile_change()}</span>
+			</a>
+			<button
+				type="button"
+				class="btn h-11 border border-surface-300-700 hover:preset-tonal-surface font-semibold {focusRing}"
+				onclick={exportCSV}
+				disabled={tablePoints.length === 0}
+			>
+				<Download class="size-4" aria-hidden="true" />
+				{m.ballistic_export_csv()}
+			</button>
+		</header>
 
-		<!-- ═══ Conditions inputs ════════════════════════════════════════ -->
-		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+		<div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(300px,340px)_minmax(0,1fr)] lg:gap-5 lg:items-start">
+			<!-- ═══ Conditions (left column on lg) ══════════════════════════ -->
+			<div class="flex flex-col gap-3.5 min-w-0">
+				<!-- Distances -->
+				<section
+					class="card preset-filled-surface-100-900 border border-surface-200-800 px-3.5 py-3 space-y-3"
+					aria-labelledby="{uid}-dist-title"
+				>
+					<h2 id="{uid}-dist-title" class="text-sm font-semibold">{m.ballistic_distances()}</h2>
 
-			<!-- Range card -->
-			<div class="card preset-filled-surface-100-900 p-4 space-y-4">
-				<!-- Max distance -->
-				<div class="space-y-1.5">
-					<span class="text-sm font-medium">{m.ballistic_max_dist()}</span>
-					<div class="input !flex !items-center gap-2">
-						<input
-							class="flex-1 min-w-0 bg-transparent border-none outline-none shadow-none p-0"
-							type="text"
-							inputmode="decimal"
-							placeholder="500"
-							value={ballistic.range.distance}
-							oninput={(e) => ballistic.setRange({ distance: e.target.value })}
-						/>
-						<div class="flex items-center gap-1 shrink-0">
-							{#each [{ value: 'yd', label: m.unit_yd() }, { value: 'm', label: m.unit_m() }] as opt}
-								<button
-									type="button"
-									class="chip text-xs {ballistic.range.unit === opt.value
-										? 'preset-filled-primary-500'
-										: 'preset-tonal-surface'}"
-									onclick={() => ballistic.setRange({ unit: opt.value })}
-								>{opt.label}</button>
-							{/each}
+					<!-- Max distance -->
+					<div class="space-y-0.5">
+						<label for="{uid}-max" class="text-xs text-surface-600-400">{m.ballistic_max_dist()}</label>
+						<div class="input !flex !items-center gap-1 h-11">
+							<input
+								id="{uid}-max"
+								class="flex-1 w-8 min-w-0 bg-transparent border-none outline-none shadow-none p-0 font-semibold"
+								type="text"
+								inputmode="decimal"
+								autocomplete="off"
+								placeholder="500"
+								value={ballistic.range.distance}
+								aria-invalid={!rangeUsable}
+								aria-describedby={rangeUsable ? undefined : `${uid}-max-msg`}
+								oninput={(e) => ballistic.setRange({ distance: e.target.value })}
+							/>
+							<ChipGroup
+								label={m.scope_view_distance_unit()}
+								options={[
+									{ value: 'yd', label: m.unit_yd() },
+									{ value: 'm', label: m.unit_m() }
+								]}
+								value={ballistic.range.unit}
+								onselect={(unit) => ballistic.setRange({ unit })}
+							/>
 						</div>
+						{#if !rangeUsable}
+							<p id="{uid}-max-msg" class="text-xs text-error-500" role="alert">
+								{m.validation_range_above_zero({ max: formatLimit(MAX_DISTANCE), unit: distLabel })}
+							</p>
+						{/if}
 					</div>
-				</div>
 
-				<!-- Step -->
-				<div class="space-y-1.5">
-					<span class="text-sm font-medium">{m.ballistic_step()}</span>
-					<div class="input !flex !items-center gap-2">
-						<input
-							class="flex-1 min-w-0 bg-transparent border-none outline-none shadow-none p-0"
-							type="text"
-							inputmode="decimal"
-							placeholder="25"
-							value={ballistic.range.step}
-							oninput={(e) => ballistic.setRange({ step: e.target.value })}
-						/>
-						<span class="text-sm text-surface-500-400 shrink-0">{distLabel}</span>
+					<!-- Step -->
+					<div class="space-y-0.5">
+						<label for="{uid}-step" class="text-xs text-surface-600-400">{m.ballistic_step()}</label>
+						<div class="input !flex !items-center gap-1 h-11">
+							<input
+								id="{uid}-step"
+								class="flex-1 w-8 min-w-0 bg-transparent border-none outline-none shadow-none p-0 font-semibold"
+								type="text"
+								inputmode="decimal"
+								autocomplete="off"
+								placeholder="25"
+								value={ballistic.range.step}
+								aria-invalid={stepLimit !== null}
+								aria-describedby="{uid}-step-msg"
+								oninput={(e) => ballistic.setRange({ step: e.target.value })}
+							/>
+							<span class="text-sm text-surface-600-400 shrink-0">{distLabel}</span>
+						</div>
+						{#if stepLimit === 'min'}
+							<p id="{uid}-step-msg" class="text-xs text-error-500" role="alert">
+								{m.ballistic_step_min({ min: formatLimit(MIN_TABLE_STEP), unit: distLabel })}
+							</p>
+						{:else if stepLimit === 'max'}
+							<p id="{uid}-step-msg" class="text-xs text-error-500" role="alert">
+								{m.ballistic_step_max({ max: formatLimit(maxTableStep(ballistic.range.distance)), unit: distLabel })}
+							</p>
+						{:else}
+							<p id="{uid}-step-msg" class="text-xs text-surface-600-400">{m.ballistic_step_hint()}</p>
+						{/if}
 					</div>
-					<p class="text-xs text-surface-500-400">{m.ballistic_step_hint()}</p>
-				</div>
+				</section>
+
+				<!-- Wind -->
+				<ScopeWindCard
+					speed={ballistic.wind.speed}
+					speedUnit={ballistic.wind.speedUnit}
+					direction={ballistic.wind.direction}
+					preset={ballistic.windPreset}
+					onchange={(patch) => ballistic.setWind(patch)}
+					onpreset={(preset) => ballistic.applyWindPreset(preset)}
+				/>
+
+				<!-- Atmosphere -->
+				<ScopeAtmosphereCard
+					{atmosphere}
+					used={atmosphereUsed}
+					altitudeTooLow={trajectory.altitudeTooLow}
+					{noAirDensity}
+					onchange={weather.onchange}
+					weatherAvailable={weather.available}
+					weatherStatus={weather.status}
+					onweather={weather.request}
+				/>
 			</div>
 
-			<!-- Atmosphere -->
-			<AtmosphereCard
-				atmosphere={ballistic.atmosphere}
-				onchange={(patch) => ballistic.setAtmosphere(patch)}
-			/>
-
-			<!-- Wind (collapsible) -->
-			<div class="card preset-filled-surface-100-900">
-				<button
-					type="button"
-					class="flex items-center gap-2 w-full p-4 text-left"
-					onclick={() => ballistic.setOptions({ showWind: !ballistic.options.showWind })}
-				>
-					{#if ballistic.options.showWind}
-						<ChevronDown class="size-4 text-surface-500-400 shrink-0" />
-					{:else}
-						<ChevronRight class="size-4 text-surface-500-400 shrink-0" />
-					{/if}
-					<span class="text-sm font-medium">{m.ballistic_wind()}</span>
-					{#if parseFloat(ballistic.wind.speed) > 0}
-						<span class="ml-auto text-xs preset-tonal-primary chip">
-							{ballistic.wind.speed} {ballistic.wind.speedUnit === 'mph' ? m.unit_mph() : m.unit_mps()}
-						</span>
-					{/if}
-				</button>
-
-				{#if ballistic.options.showWind}
-					<div class="px-4 pb-4 border-t border-surface-200-800 pt-3">
-						<WindInput
-							speed={ballistic.wind.speed}
-							speedUnit={ballistic.wind.speedUnit}
-							direction={ballistic.wind.direction}
-							onchange={(patch) => ballistic.setWind(patch)}
-						/>
+			<!-- ═══ Results (right column on lg) ════════════════════════════ -->
+			<div class="@container flex flex-col gap-4 min-w-0">
+				<!-- Stats -->
+				{#if trajectoryResult}
+					<div class="grid grid-cols-2 @xl:grid-cols-4 gap-3">
+						{@render stat(m.ballistic_near_zero(), nearZero, distLabel, m.ballistic_stat_near_zero_note())}
+						{@render stat(m.ballistic_far_zero(), farZero, distLabel, m.ballistic_stat_far_zero_note())}
+						{@render stat(
+							m.ballistic_stat_highest(),
+							maxApex?.elevation ?? null,
+							elevLabel,
+							maxApex ? `${m.ballistic_at()} ${maxApex.distance} ${distLabel}` : ''
+						)}
+						{@render stat(
+							m.ballistic_stat_subsonic(),
+							subsonicDist,
+							distLabel,
+							subsonicDist !== null ? m.ballistic_stat_subsonic_note() : m.ballistic_stat_supersonic_note()
+						)}
 					</div>
 				{/if}
-			</div>
-		</div>
 
-		<!-- ═══ Elevation chart + trajectory summary ════════════════════ -->
-		<div class="space-y-2">
-			<div class="flex items-center justify-between">
-				<h2 class="font-semibold">{m.ballistic_elev_chart()}</h2>
-				<button
-					type="button"
-					class="chip text-xs {ballistic.options.showAnnotations ? 'preset-filled-primary-500' : 'preset-tonal-surface'}"
-					title={m.ballistic_annotations()}
-					onclick={() => ballistic.setOptions({ showAnnotations: !ballistic.options.showAnnotations })}
+				<!-- Bullet path chart -->
+				<section
+					class="card preset-filled-surface-100-900 border border-surface-200-800 p-4 space-y-2 min-w-0"
+					aria-labelledby="{uid}-chart-title"
 				>
-					<MapPin class="size-3 mr-1" />{m.ballistic_annotations()}
-				</button>
-			</div>
-			<div bind:this={elevChartEl}></div>
-
-			<!-- Chart legend -->
-			{#if ballistic.options.showAnnotations}
-				<div class="flex flex-wrap gap-x-5 gap-y-1 px-2 text-xs text-surface-500-400">
-					<span class="flex items-center gap-1.5">
-						<span class="inline-block w-5 border-t-2 border-dashed border-surface-400-600"></span>
-						{m.ballistic_legend_los()}
-					</span>
-				</div>
-			{/if}
-
-			<!-- Trajectory summary (inline below chart) -->
-			{#if trajectoryResult}
-				<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-					<!-- Near Zero -->
-					<div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-50-950">
-						<div class="size-7 rounded-full preset-tonal-success flex items-center justify-center shrink-0">
-							<MapPin class="size-3.5" />
-						</div>
-						<div class="min-w-0">
-							<p class="text-xs text-surface-500-400 uppercase tracking-wide leading-none mb-0.5">{m.ballistic_near_zero()}</p>
-							{#if nearZero !== null}
-								<p class="text-sm font-semibold tabular-nums leading-none">
-									{nearZero} <span class="text-xs font-normal text-surface-500-400">{distLabel}</span>
-								</p>
-							{:else}
-								<p class="text-xs text-surface-500-400">{m.ballistic_unknown()}</p>
-							{/if}
-						</div>
-					</div>
-
-					<!-- Far Zero -->
-					<div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-50-950">
-						<div class="size-7 rounded-full preset-tonal-primary flex items-center justify-center shrink-0">
-							<MapPin class="size-3.5" />
-						</div>
-						<div class="min-w-0">
-							<p class="text-xs text-surface-500-400 uppercase tracking-wide leading-none mb-0.5">{m.ballistic_far_zero()}</p>
-							{#if farZero !== null}
-								<p class="text-sm font-semibold tabular-nums leading-none">
-									{farZero} <span class="text-xs font-normal text-surface-500-400">{distLabel}</span>
-								</p>
-							{:else}
-								<p class="text-xs text-surface-500-400">{m.ballistic_unknown()}</p>
-							{/if}
-						</div>
-					</div>
-
-					<!-- Max Ordinate (apex) -->
-					<div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-50-950">
-						<div class="size-7 rounded-full preset-tonal-warning flex items-center justify-center shrink-0">
-							<MapPin class="size-3.5" />
-						</div>
-						<div class="min-w-0">
-							<p class="text-xs text-surface-500-400 uppercase tracking-wide leading-none mb-0.5">{m.ballistic_max_ord()}</p>
-							{#if maxApex !== null}
-								<p class="text-sm font-semibold tabular-nums leading-none">
-									{maxApex.elevation} <span class="text-xs font-normal text-surface-500-400">{elevLabel}</span>
-								</p>
-								<p class="text-xs text-surface-500-400 leading-none mt-0.5">{m.ballistic_at()} {maxApex.distance} {distLabel}</p>
-							{:else}
-								<p class="text-xs text-surface-500-400">{m.ballistic_unknown()}</p>
-							{/if}
-						</div>
-					</div>
-
-					<!-- Max Drop -->
-					<div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-50-950">
-						<div class="size-7 rounded-full preset-tonal-error flex items-center justify-center shrink-0">
-							<MapPin class="size-3.5" />
-						</div>
-						<div class="min-w-0">
-							<p class="text-xs text-surface-500-400 uppercase tracking-wide leading-none mb-0.5">{m.ballistic_max_drop()}</p>
-							{#if maxDrop !== null}
-								<p class="text-sm font-semibold tabular-nums leading-none">
-									{maxDrop.drop} <span class="text-xs font-normal text-surface-500-400">{elevLabel}</span>
-								</p>
-								<p class="text-xs text-surface-500-400 leading-none mt-0.5">{m.ballistic_at()} {maxDrop.distance} {distLabel}</p>
-							{:else}
-								<p class="text-xs text-surface-500-400">{m.ballistic_unknown()}</p>
-							{/if}
-						</div>
-					</div>
-
-					</div>
-			{/if}
-		</div>
-
-		<!-- ═══ Velocity chart (collapsible) ════════════════════════════ -->
-		<div class="card preset-filled-surface-100-900">
-			<div class="flex items-center gap-2 w-full p-4">
-				<button
-					type="button"
-					class="flex items-center gap-2 flex-1 text-left min-w-0"
-					onclick={() => ballistic.setOptions({ showVelocityChart: !ballistic.options.showVelocityChart })}
-				>
-					{#if ballistic.options.showVelocityChart}
-						<ChevronDown class="size-4 text-surface-500-400 shrink-0" />
-					{:else}
-						<ChevronRight class="size-4 text-surface-500-400 shrink-0" />
-					{/if}
-					<span class="text-sm font-medium">{m.ballistic_vel_chart()}</span>
-				</button>
-				{#if ballistic.options.showVelocityChart}
-					<div class="flex gap-1 shrink-0">
-						{#each [{ value: 'fps', label: m.unit_fps() }, { value: 'mps', label: m.unit_mps() }] as opt}
+					<div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+						<h2 id="{uid}-chart-title" class="flex-1 min-w-max text-[15px] font-semibold">{m.ballistic_chart_title()}</h2>
+						{#if chartMode === 'drop'}
 							<button
 								type="button"
-								class="chip text-xs {(ballistic.options.velChartUnit ?? 'fps') === opt.value
+								class="touch-hit chip text-xs {ballistic.options.showAnnotations
 									? 'preset-filled-primary-500'
-									: 'preset-tonal-surface'}"
-								onclick={() => ballistic.setOptions({ velChartUnit: opt.value })}
-							>{opt.label}</button>
-						{/each}
-					</div>
-				{/if}
-			</div>
-
-			{#if ballistic.options.showVelocityChart}
-				<div class="px-4 pb-4 border-t border-surface-200-800 pt-3 space-y-2">
-					<div bind:this={velChartEl}></div>
-					<div class="flex flex-wrap justify-center gap-x-6 gap-y-1 text-xs text-surface-500-400">
-						{#if soundSpeedFPS !== null}
-							<span>
-								{m.ballistic_speed_of_sound()}:
-								{Math.round((ballistic.options.velChartUnit ?? 'fps') === 'mps' ? soundSpeedFPS / 3.28084 : soundSpeedFPS)}
-								{(ballistic.options.velChartUnit ?? 'fps') === 'mps' ? m.unit_mps() : m.unit_fps()}
-							</span>
+									: 'preset-tonal-surface'} {focusRing}"
+								aria-pressed={ballistic.options.showAnnotations}
+								onclick={() => ballistic.setOptions({ showAnnotations: !ballistic.options.showAnnotations })}
+							>
+								<MapPin class="size-3 mr-1" aria-hidden="true" />{m.ballistic_annotations()}
+							</button>
+						{:else}
+							<ChipGroup
+								label={m.ballistic_vel_unit()}
+								options={[
+									{ value: 'fps', label: m.unit_fps() },
+									{ value: 'mps', label: m.unit_mps() }
+								]}
+								value={velUnit}
+								onselect={(value) => ballistic.setOptions({ velChartUnit: value })}
+							/>
 						{/if}
-						{#if subsonicDist !== null}
-							<span class="flex items-center gap-1">
-								<Waves class="size-3" />{m.ballistic_subsonic_dist()}: {subsonicDist} {distLabel}
-							</span>
-						{/if}
+						<ChipGroup
+							variant="segmented"
+							label={m.ballistic_chart_mode()}
+							options={[
+								{ value: 'drop', label: m.ballistic_chart_drop() },
+								{ value: 'velocity', label: m.ballistic_vel_chart() }
+							]}
+							value={chartMode}
+							onselect={(mode) => ballistic.setOptions({ chartMode: mode })}
+						/>
 					</div>
-				</div>
-			{/if}
-		</div>
 
-		<!-- ═══ Data table (full width, no card) ════════════════════════ -->
-		<div class="space-y-3">
-			<div class="flex items-center gap-2 flex-wrap">
-				<h2 class="font-semibold flex-1">{m.ballistic_table()}</h2>
-
-				<!-- Column selector toggle -->
-				<button
-					type="button"
-					class="btn btn-sm {showColumnSelector ? 'preset-filled-primary-500' : 'preset-tonal-surface'}"
-					title={m.ballistic_columns()}
-					onclick={() => (showColumnSelector = !showColumnSelector)}
-				>
-					<Columns3 class="size-4" />
-				</button>
-
-				<!-- Export CSV -->
-				<button
-					type="button"
-					class="btn btn-sm preset-tonal-surface"
-					title={m.ballistic_export_csv()}
-					onclick={exportCSV}
-					disabled={tablePoints.length === 0}
-				>
-					<Download class="size-4" />
-				</button>
-			</div>
-
-			<!-- Column toggles -->
-			{#if showColumnSelector}
-				<div class="space-y-2">
-					{#each COLUMN_GROUPS as group}
-						<div class="space-y-1">
-							<p class="text-xs font-medium text-surface-500-400 uppercase tracking-wide">{group.label()}</p>
-							<div class="flex flex-wrap gap-1.5">
-								{#each group.columns as col}
-									<button
-										type="button"
-										class="chip text-xs {visibleColumns.includes(col.id) ? 'preset-filled-primary-500' : 'preset-tonal-surface'}"
-										onclick={() => ballistic.toggleColumn(col.id)}
-									>{col.label()}</button>
-								{/each}
+					{#if chartPoints.length === 0}
+						<p class="text-sm text-surface-600-400 py-10 text-center">{m.ballistic_no_result()}</p>
+					{:else if chartMode === 'drop'}
+						<div bind:this={elevChartEl}></div>
+						{#if ballistic.options.showAnnotations}
+							<div class="flex flex-wrap gap-x-5 gap-y-1 px-2 text-xs text-surface-600-400">
+								<span class="flex items-center gap-1.5">
+									<span class="inline-block w-5 border-t-2 border-dashed border-surface-400-600" aria-hidden="true"></span>
+									{m.ballistic_legend_los()}
+								</span>
 							</div>
+						{/if}
+					{:else}
+						<div bind:this={velChartEl}></div>
+						<div class="flex flex-wrap justify-center gap-x-6 gap-y-1 text-xs text-surface-600-400">
+							{#if soundSpeedFPS !== null}
+								<span>
+									{m.ballistic_speed_of_sound()}:
+									{Math.round(velUnit === 'mps' ? soundSpeedFPS / 3.28084 : soundSpeedFPS)}
+									{velUnit === 'mps' ? m.unit_mps() : m.unit_fps()}
+								</span>
+							{/if}
+							{#if subsonicDist !== null}
+								<span class="flex items-center gap-1">
+									<Waves class="size-3" aria-hidden="true" />{m.ballistic_subsonic_dist()}: {subsonicDist} {distLabel}
+								</span>
+							{/if}
 						</div>
-					{/each}
-				</div>
-			{/if}
+					{/if}
+				</section>
 
-			<!-- Table -->
-			{#if tablePoints.length === 0}
-				<p class="text-sm text-surface-500-400 py-4 text-center">{m.ballistic_no_result()}</p>
-			{:else}
-				<div class="overflow-x-auto">
-					<table class="table text-sm">
-						<thead>
-							<tr>
-								{#each activeColumns as col}
-									<th class="text-xs whitespace-nowrap">{col.label()}</th>
-								{/each}
-							</tr>
-						</thead>
-						<tbody>
-							{#each tablePoints as point}
-								<tr>
-									{#each activeColumns as col}
-										<td class="tabular-nums whitespace-nowrap">{getCellValue(point, col.id)}</td>
-									{/each}
-								</tr>
+				<!-- Data table -->
+				<section
+					class="card preset-filled-surface-100-900 border border-surface-200-800 overflow-hidden min-w-0"
+					aria-labelledby="{uid}-table-title"
+				>
+					<div class="flex items-center gap-3 px-4 py-3 border-b border-surface-200-800">
+						<h2 id="{uid}-table-title" class="flex-1 text-[15px] font-semibold">{m.ballistic_table()}</h2>
+						<button
+							type="button"
+							class="btn btn-sm h-9 {showColumnSelector
+								? 'preset-filled-primary-500'
+								: 'border border-surface-300-700 hover:preset-tonal-surface'} {focusRing}"
+							aria-expanded={showColumnSelector}
+							aria-controls="{uid}-columns"
+							onclick={() => (showColumnSelector = !showColumnSelector)}
+						>
+							<Columns3 class="size-4" aria-hidden="true" />
+							{m.ballistic_columns()}
+						</button>
+					</div>
+
+					<!-- Column picker -->
+					{#if showColumnSelector}
+						<div id="{uid}-columns" class="px-4 py-3 space-y-2 border-b border-surface-200-800">
+							{#each COLUMN_GROUPS as group (group.id)}
+								<div class="space-y-1" role="group" aria-labelledby="{uid}-group-{group.id}">
+									<p id="{uid}-group-{group.id}" class="text-xs font-medium text-surface-600-400 uppercase tracking-wide">
+										{group.label()}
+									</p>
+									<div class="flex flex-wrap gap-1.5">
+										{#each group.columns as col (col.id)}
+											<button
+												type="button"
+												class="touch-hit chip text-xs {visibleColumns.includes(col.id)
+													? 'preset-filled-primary-500'
+													: 'preset-tonal-surface'} {focusRing}"
+												aria-pressed={visibleColumns.includes(col.id)}
+												onclick={() => ballistic.toggleColumn(col.id)}
+											>{col.label()}</button>
+										{/each}
+									</div>
+								</div>
 							{/each}
-						</tbody>
-					</table>
-				</div>
-			{/if}
-		</div>
+						</div>
+					{/if}
 
+					<!-- Table -->
+					{#if tablePoints.length === 0}
+						<p class="text-sm text-surface-600-400 py-6 text-center">{m.ballistic_no_result()}</p>
+					{:else}
+						<div class="overflow-x-auto">
+							<table class="table text-sm">
+								<thead>
+									<tr class="bg-surface-200-800/50">
+										{#each activeColumns as col (col.id)}
+											<th scope="col" class="text-xs whitespace-nowrap text-surface-600-400">{col.label()}</th>
+										{/each}
+									</tr>
+								</thead>
+								<tbody>
+									{#each tablePoints as point, i}
+										<tr class={i === highlightIndex ? 'preset-tonal-primary font-semibold' : ''}>
+											{#each activeColumns as col (col.id)}
+												<td class="tabular-nums whitespace-nowrap">{getCellValue(point, col.id)}</td>
+											{/each}
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
+						{#if highlightIndex >= 0}
+							<p class="px-4 py-2 text-xs text-surface-600-400 border-t border-surface-200-800">
+								{m.ballistic_table_highlight()}
+							</p>
+						{/if}
+					{/if}
+				</section>
+			</div>
+		</div>
 	</div>
 {/if}

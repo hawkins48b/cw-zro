@@ -1,0 +1,68 @@
+import { UNew, Unit, Wind } from 'js-ballistics';
+import { isNumberOrText } from './storedWind.js';
+import { readDecimal } from './decimal.js';
+import { MAX_WIND_DIRECTION_DEGREES, halfTurn } from './windDirection.js';
+
+/**
+ * Fastest wind the engine is given, in m/s: about 224 mph (owner decision on #116).
+ *
+ * A finite speed can hang the engine as surely as Infinity. From about 400000 mph, winds at 0° and
+ * 90° ran until killed while 45° did not, and at 1e140 all three did. Some speeds between those
+ * return, so a check for overflow would not be enough. Up to 4000 mph nothing hung, in the standard atmosphere on loads
+ * from 60 to 4000 fps and BC 0.02 to 2. That is all this limit shows: a wind under it can still hang
+ * on an absurd atmosphere or BC, as Remaining gaps in docs/ballistics-model.md lists.
+ */
+const MAX_WIND_SPEED_MPS = 100;
+
+/**
+ * The winds array of a Shot, from the wind of a screen or of storage. Call this before the engine.
+ *
+ * A NaN or infinite direction, or an infinite speed, gives a NaN wind vector. The zero solve still
+ * returns a finite elevation, so hasFiniteElevation does not see it, and fire then never ends, which
+ * try/catch cannot stop.
+ *
+ * | Speed                                     | Direction                   | Result                 |
+ * |-------------------------------------------|-----------------------------|------------------------|
+ * | Empty, text, 0, negative, null, missing   | Anything                    | [], no wind            |
+ * | Array, object, boolean                    | Anything                    | null                   |
+ * | Above MAX_WIND_SPEED_MPS, or infinite     | Anything                    | null                   |
+ * | Above 0                                   | Empty or whitespace string  | One wind from 0°       |
+ * | Above 0                                   | Text or not finite          | null                   |
+ * | Above 0                                   | Not a number or string      | null                   |
+ * | Above 0                                   | Over 1e6 degrees either way | null                   |
+ * | Above 0                                   | Finite number or string     | One wind from there    |
+ *
+ * The direction is where the wind comes from, clockwise from the target, and the engine is given
+ * that angle plus half a turn (owner decision on #106, see windDirection.js). So 0° is a headwind,
+ * 90° a wind from the right, which drifts the bullet left.
+ *
+ * Only an empty box counts as 0°, to match its placeholder and the dial (owner decision on #116).
+ * Since #106 that is a headwind.
+ * A missing direction does not: the box always sends a string, so null or undefined is a damaged
+ * value. Only a number or a string is read at all: parseFloat alone would read the array [90] as 90,
+ * and throw on an object that cannot become text. A stored speed of any other shape gives no result
+ * rather than no wind, because the page can still show it as a speed (owner decision on #116). Text is read as parseFloat reads it, as the dial
+ * does, so '90abc' stays 90, except that a comma reads as a decimal point: '1,5' is 1.5, not 1
+ * (readDecimal, owner decision on #117). ScopeWindCard and WindDial read the box with the same function, so the
+ * dial, the badge and the result agree.
+ *
+ * @param {object|null} [wind] - { speed, speedUnit: 'mph'|'mps', direction }
+ * @returns {Wind[]|null} the winds of the shot, or null when no shot can be calculated
+ */
+export function shotWinds(wind) {
+	if (!wind || wind.speed === null || wind.speed === undefined) return [];
+	if (!isNumberOrText(wind.speed)) return null;
+	const speed = readDecimal(wind.speed);
+	if (!(speed > 0)) return [];
+
+	const velocity = wind.speedUnit === 'mps' ? UNew.MPS(speed) : UNew.MPH(speed);
+	if (!(velocity.In(Unit.MPS) <= MAX_WIND_SPEED_MPS)) return null;
+
+	const { direction } = wind;
+	if (!isNumberOrText(direction)) return null;
+	const isEmpty = typeof direction === 'string' && direction.trim() === '';
+	const degrees = isEmpty ? 0 : readDecimal(direction);
+	if (!(Math.abs(degrees) <= MAX_WIND_DIRECTION_DEGREES)) return null;
+
+	return [new Wind({ velocity, directionFrom: UNew.Degree(halfTurn(degrees)) })];
+}

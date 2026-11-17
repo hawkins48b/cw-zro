@@ -1,27 +1,30 @@
 <script>
-	import { m } from '$lib/paraglide/messages.js';
-	import { activeProfile } from '$lib/stores/activeProfile.svelte.js';
+	import { m } from '#lib/paraglide/messages.js';
+	import { activeProfile } from '#lib/stores/activeProfile.svelte.js';
 	import { ChevronDown, ChevronRight, Download, Loader } from '@lucide/svelte';
+	import { downloadDopeCard } from '#lib/utils/dopeCardDownload.js';
+	import PrecisionCardGenerator from '#lib/components/PrecisionCardGenerator.svelte';
 
 	// ── Download state ────────────────────────────────────────────────
 	let loading = $state({ imperial: false, metric: false });
+	// The outcome of the last download: a card the profile gives no data for is not saved (#91),
+	// and a failed build or save has its own message (#123). See downloadDopeCard.
+	let outcome = $state(null);
 
 	async function download(type) {
 		const profile = activeProfile.profile;
 		if (!profile || loading[type]) return;
 		loading[type] = true;
+		outcome = null;
 		try {
-			if (type === 'imperial') {
-				const { generateImperialDopeCard } = await import('$lib/utils/dopeCardImperial.js');
-				const pdfDoc = await generateImperialDopeCard(profile);
-				await savePDF(pdfDoc, 'mid-range-dope-card-imperial.pdf');
-			} else {
-				const { generateMetricDopeCard } = await import('$lib/utils/dopeCardMetric.js');
-				const pdfDoc = await generateMetricDopeCard(profile);
-				await savePDF(pdfDoc, 'mid-range-dope-card-metric.pdf');
-			}
-		} catch (e) {
-			console.error('Dope card generation failed:', e);
+			// Loaded on demand, inside downloadDopeCard so that a failed load counts as a failure.
+			const generate = async (p) =>
+				type === 'imperial'
+					? (await import('#lib/utils/dopeCardImperial.js')).generateImperialDopeCard(p)
+					: (await import('#lib/utils/dopeCardMetric.js')).generateMetricDopeCard(p);
+			outcome = await downloadDopeCard(generate, profile, (pdfDoc) =>
+				savePDF(pdfDoc, `mid-range-dope-card-${type}.pdf`)
+			);
 		} finally {
 			loading[type] = false;
 		}
@@ -48,7 +51,7 @@
 
 {#if !activeProfile.profile}
 	<div class="py-12 text-center space-y-3">
-		<p class="text-surface-500-400">{m.dope_no_profile()}</p>
+		<p class="text-surface-600-400">{m.dope_no_profile()}</p>
 		<a href="/profiles" class="btn preset-tonal-primary">{m.nav_profiles()}</a>
 	</div>
 {:else}
@@ -63,9 +66,9 @@
 				onclick={() => (expanded = !expanded)}
 			>
 				{#if expanded}
-					<ChevronDown class="size-4 text-surface-500-400 shrink-0" />
+					<ChevronDown class="size-4 text-surface-600-400 shrink-0" />
 				{:else}
-					<ChevronRight class="size-4 text-surface-500-400 shrink-0" />
+					<ChevronRight class="size-4 text-surface-600-400 shrink-0" />
 				{/if}
 				<span class="font-medium">{m.dope_midrange_title()}</span>
 			</button>
@@ -103,9 +106,18 @@
 							{m.dope_metric()}
 						</button>
 					</div>
+
+					{#if outcome === 'no-data'}
+						<p class="text-sm text-warning-800-200" role="alert">{m.dope_no_result()}</p>
+					{:else if outcome === 'failed'}
+						<p class="text-sm text-error-500" role="alert">{m.dope_save_failed()}</p>
+					{/if}
 				</div>
 			{/if}
 		</div>
+
+		<!-- Precision dope card (#157): A6 booklet, any saved profile -->
+		<PrecisionCardGenerator save={savePDF} />
 
 	</div>
 {/if}

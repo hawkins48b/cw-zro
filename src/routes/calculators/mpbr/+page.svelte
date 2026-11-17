@@ -1,12 +1,14 @@
 <script>
 	import { onMount } from 'svelte';
-	import { m } from '$lib/paraglide/messages.js';
-	import { activeProfile } from '$lib/stores/activeProfile.svelte.js';
-	import { mpbr } from '$lib/stores/mpbr.svelte.js';
-	import { settings } from '$lib/stores/settings.svelte.js';
-	import { calculateMPBR } from '$lib/utils/ballisticCalculator.js';
+	import { m } from '#lib/paraglide/messages.js';
+	import { activeProfile } from '#lib/stores/activeProfile.svelte.js';
+	import { mpbr } from '#lib/stores/mpbr.svelte.js';
+	import { settings } from '#lib/stores/settings.svelte.js';
+	import { calculateMPBR } from '#lib/utils/ballisticCalculator.js';
+	import { isUsableZeroDistance, MAX_ZERO_DISTANCE } from '#lib/utils/zeroDistance.js';
+	import { formatLimit } from '#lib/utils/format.js';
 	import { goto } from '$app/navigation';
-	import { profiles } from '$lib/stores/profiles.svelte.js';
+	import { profiles } from '#lib/stores/profiles.svelte.js';
 	import { Calculator, MapPin, Crosshair, Ruler, TrendingUp, Info, ChevronDown, BookmarkPlus } from '@lucide/svelte';
 	import { Unit } from 'js-ballistics';
 
@@ -60,13 +62,19 @@
 		return color || fallback;
 	}
 
+	/**
+	 * Room above the plot for the Max. Ordinate label, in px (#128). With the apex at the top of the
+	 * plot (20 in or 40 cm targets on the default profile), the label reached 5 px above it.
+	 */
+	const MAX_ORD_LABEL_ROOM = 12;
+
 	function buildChartOptions(result, dark, annotations) {
 		const distUnitEnum = result.useMetric ? Unit.Meter : Unit.Yard;
 		const elevUnitEnum = result.useMetric ? Unit.Centimeter : Unit.Inch;
 
 		const data = result.trajectory.map((p) => ({
 			x: Math.round(p.distance.In(distUnitEnum) * 10) / 10,
-			y: Math.round(p.targetDrop.In(elevUnitEnum) * 10) / 10
+			y: Math.round(p.slantHeight.In(elevUnitEnum) * 10) / 10
 		}));
 		const maxX = data.length > 0 ? data[data.length - 1].x : 0;
 
@@ -78,6 +86,15 @@
 		const yaxisAnnotations = [];
 		const xaxisAnnotations = [];
 		const pointAnnotations = [];
+
+		// A point label is centred on its marker by default. Near either end of
+		// the x-axis that pushes it over the y-axis ticks or past the plot edge,
+		// so anchor it on the side that faces into the plot instead (#100).
+		const pointLabelAnchor = (x) => {
+			if (maxX > 0 && x < maxX * 0.15) return { textAnchor: 'start' };
+			if (maxX > 0 && x > maxX * 0.85) return { textAnchor: 'end' };
+			return { textAnchor: 'middle' };
+		};
 
 		if (annotations) {
 			// Target zone band (±halfTarget around LoS)
@@ -106,7 +123,14 @@
 						text: m.mpbr_point_blank(),
 						borderColor: cPrimary,
 						style: { color: '#fff', background: cPrimary, fontSize: '11px' },
-						position: 'bottom'
+						// Horizontal and anchored at the band's left edge, inside the
+						// plot. Vertical (the default) is drawn to the left of the
+						// edge, over the y-axis ticks when the band starts at 0 (#100).
+						position: 'bottom',
+						orientation: 'horizontal',
+						textAnchor: 'start',
+						offsetX: 6,
+						offsetY: -8
 					}
 				});
 			}
@@ -121,7 +145,8 @@
 						text: m.mpbr_near_zero(),
 						borderColor: cSuccess,
 						style: { color: '#fff', background: cSuccess, fontSize: '11px' },
-						offsetY: -10
+						offsetY: -10,
+						...pointLabelAnchor(result.nearZero)
 					}
 				});
 			}
@@ -136,7 +161,8 @@
 						text: m.mpbr_far_zero(),
 						borderColor: cPrimary,
 						style: { color: '#fff', background: cPrimary, fontSize: '11px' },
-						offsetY: -10
+						offsetY: -10,
+						...pointLabelAnchor(result.farZero)
 					}
 				});
 			}
@@ -151,7 +177,8 @@
 						text: m.mpbr_max_ord(),
 						borderColor: cWarning,
 						style: { color: '#fff', background: cWarning, fontSize: '11px' },
-						offsetY: -10
+						offsetY: -10,
+						...pointLabelAnchor(result.maxOrdinate.distance)
 					}
 				});
 			}
@@ -173,7 +200,10 @@
 			grid: {
 				borderColor: dark ? '#374151' : '#e5e7eb',
 				strokeDashArray: 3,
-				padding: { left: 10, right: 20, top: 0, bottom: 0 }
+				// The apex is the highest point of the curve, so it is often at the top of the plot,
+				// and its label is drawn above it. Room above the plot keeps that label inside the
+				// chart (#128). The plot is 12 px shorter; no value changes.
+				padding: { left: 10, right: 20, top: annotations && result.maxOrdinate ? MAX_ORD_LABEL_ROOM : 0, bottom: 0 }
 			},
 			xaxis: {
 				type: 'numeric',
@@ -239,7 +269,7 @@
 
 {#if !activeProfile.profile}
 	<div class="py-12 text-center space-y-3">
-		<p class="text-surface-500-400">{m.mpbr_no_profile()}</p>
+		<p class="text-surface-600-400">{m.mpbr_no_profile()}</p>
 		<a href="/profiles" class="btn preset-tonal-primary">{m.nav_profiles()}</a>
 	</div>
 {:else}
@@ -279,9 +309,9 @@
 							hasCalculated = false;
 						}}
 					/>
-					<span class="text-sm text-surface-500-400 shrink-0">{elevLabel}</span>
+					<span class="text-sm text-surface-600-400 shrink-0">{elevLabel}</span>
 				</div>
-				<p class="text-xs text-surface-500-400">{m.mpbr_target_size_hint()}</p>
+				<p class="text-xs text-surface-600-400">{m.mpbr_target_size_hint()}</p>
 			</div>
 
 			<!-- Calculate button -->
@@ -306,7 +336,7 @@
 		<div>
 			<button
 				type="button"
-				class="flex items-center gap-2 w-full text-sm text-surface-500-400 hover:text-surface-700-300"
+				class="flex items-center gap-2 w-full text-sm text-surface-600-400 hover:text-surface-700-300"
 				onclick={() => (showInfo = !showInfo)}
 			>
 				<Info class="size-4 shrink-0" />
@@ -318,7 +348,7 @@
 					<p>{m.mpbr_about_definition()}</p>
 					<p>{m.mpbr_about_zero()}</p>
 					<p>{m.mpbr_about_beyond()}</p>
-					<p class="text-xs text-surface-500-400">{m.mpbr_about_ideal()}</p>
+					<p class="text-xs text-surface-600-400">{m.mpbr_about_ideal()}</p>
 				</div>
 			{/if}
 		</div>
@@ -336,9 +366,9 @@
 						<Crosshair class="size-3.5" />
 					</div>
 					<div class="min-w-0">
-						<p class="text-xs text-surface-500-400 uppercase tracking-wide leading-none mb-0.5">{m.mpbr_optimal_zero()}</p>
+						<p class="text-xs text-surface-600-400 uppercase tracking-wide leading-none mb-0.5">{m.mpbr_optimal_zero()}</p>
 						<p class="text-sm font-semibold tabular-nums leading-none">
-							{mpbrResult.optimalZero} <span class="text-xs font-normal text-surface-500-400">{distLabel}</span>
+							{mpbrResult.optimalZero} <span class="text-xs font-normal text-surface-600-400">{distLabel}</span>
 						</p>
 					</div>
 				</div>
@@ -349,13 +379,13 @@
 						<MapPin class="size-3.5" />
 					</div>
 					<div class="min-w-0">
-						<p class="text-xs text-surface-500-400 uppercase tracking-wide leading-none mb-0.5">{m.mpbr_near_zero()}</p>
+						<p class="text-xs text-surface-600-400 uppercase tracking-wide leading-none mb-0.5">{m.mpbr_near_zero()}</p>
 						{#if mpbrResult.nearZero !== null}
 							<p class="text-sm font-semibold tabular-nums leading-none">
-								{mpbrResult.nearZero} <span class="text-xs font-normal text-surface-500-400">{distLabel}</span>
+								{mpbrResult.nearZero} <span class="text-xs font-normal text-surface-600-400">{distLabel}</span>
 							</p>
 						{:else}
-							<p class="text-xs text-surface-500-400">{m.mpbr_unknown()}</p>
+							<p class="text-xs text-surface-600-400">{m.mpbr_unknown()}</p>
 						{/if}
 					</div>
 				</div>
@@ -366,13 +396,13 @@
 						<MapPin class="size-3.5" />
 					</div>
 					<div class="min-w-0">
-						<p class="text-xs text-surface-500-400 uppercase tracking-wide leading-none mb-0.5">{m.mpbr_far_zero()}</p>
+						<p class="text-xs text-surface-600-400 uppercase tracking-wide leading-none mb-0.5">{m.mpbr_far_zero()}</p>
 						{#if mpbrResult.farZero !== null}
 							<p class="text-sm font-semibold tabular-nums leading-none">
-								{mpbrResult.farZero} <span class="text-xs font-normal text-surface-500-400">{distLabel}</span>
+								{mpbrResult.farZero} <span class="text-xs font-normal text-surface-600-400">{distLabel}</span>
 							</p>
 						{:else}
-							<p class="text-xs text-surface-500-400">{m.mpbr_unknown()}</p>
+							<p class="text-xs text-surface-600-400">{m.mpbr_unknown()}</p>
 						{/if}
 					</div>
 				</div>
@@ -383,9 +413,9 @@
 						<Ruler class="size-3.5" />
 					</div>
 					<div class="min-w-0">
-						<p class="text-xs text-surface-500-400 uppercase tracking-wide leading-none mb-0.5">{m.mpbr_min_pbr()}</p>
+						<p class="text-xs text-surface-600-400 uppercase tracking-wide leading-none mb-0.5">{m.mpbr_min_pbr()}</p>
 						<p class="text-sm font-semibold tabular-nums leading-none">
-							{mpbrResult.mpbrMin} <span class="text-xs font-normal text-surface-500-400">{distLabel}</span>
+							{mpbrResult.mpbrMin} <span class="text-xs font-normal text-surface-600-400">{distLabel}</span>
 						</p>
 					</div>
 				</div>
@@ -396,9 +426,9 @@
 						<Ruler class="size-3.5" />
 					</div>
 					<div class="min-w-0">
-						<p class="text-xs text-surface-500-400 uppercase tracking-wide leading-none mb-0.5">{m.mpbr_max_pbr()}</p>
+						<p class="text-xs text-surface-600-400 uppercase tracking-wide leading-none mb-0.5">{m.mpbr_max_pbr()}</p>
 						<p class="text-sm font-semibold tabular-nums leading-none">
-							{mpbrResult.mpbrMax} <span class="text-xs font-normal text-surface-500-400">{distLabel}</span>
+							{mpbrResult.mpbrMax} <span class="text-xs font-normal text-surface-600-400">{distLabel}</span>
 						</p>
 					</div>
 				</div>
@@ -409,14 +439,14 @@
 						<TrendingUp class="size-3.5" />
 					</div>
 					<div class="min-w-0">
-						<p class="text-xs text-surface-500-400 uppercase tracking-wide leading-none mb-0.5">{m.mpbr_max_ord()}</p>
+						<p class="text-xs text-surface-600-400 uppercase tracking-wide leading-none mb-0.5">{m.mpbr_max_ord()}</p>
 						{#if mpbrResult.maxOrdinate}
 							<p class="text-sm font-semibold tabular-nums leading-none">
-								{mpbrResult.maxOrdinate.elevation} <span class="text-xs font-normal text-surface-500-400">{elevLabel}</span>
+								{mpbrResult.maxOrdinate.elevation} <span class="text-xs font-normal text-surface-600-400">{elevLabel}</span>
 							</p>
-							<p class="text-xs text-surface-500-400 leading-none mt-0.5">{m.mpbr_at()} {mpbrResult.maxOrdinate.distance} {distLabel}</p>
+							<p class="text-xs text-surface-600-400 leading-none mt-0.5">{m.mpbr_at()} {mpbrResult.maxOrdinate.distance} {distLabel}</p>
 						{:else}
-							<p class="text-xs text-surface-500-400">{m.mpbr_unknown()}</p>
+							<p class="text-xs text-surface-600-400">{m.mpbr_unknown()}</p>
 						{/if}
 					</div>
 				</div>
@@ -438,7 +468,11 @@
 				<div bind:this={chartEl}></div>
 			</div>
 
-			<!-- Save MPBR zero button -->
+			<!-- Save MPBR zero button. A zero past MAX_ZERO_DISTANCE (a huge target) would give no
+			     result anywhere else, so it is not offered (#93). -->
+			{#if !isUsableZeroDistance(mpbrResult.optimalZero)}
+				<p class="text-sm text-warning-800-200">{m.mpbr_zero_out_of_range({ max: formatLimit(MAX_ZERO_DISTANCE) })}</p>
+			{:else}
 			<button
 				type="button"
 				class="btn preset-tonal-primary gap-2"
@@ -454,14 +488,15 @@
 				<BookmarkPlus class="size-5" />
 				{m.mpbr_save_zero()}
 			</button>
+			{/if}
 
 		{:else if !calculating && hasCalculated}
 			<!-- Calculation returned no result -->
-			<p class="text-sm text-surface-500-400 text-center py-8">{m.mpbr_no_result()}</p>
+			<p class="text-sm text-surface-600-400 text-center py-8">{m.mpbr_no_result()}</p>
 
 		{:else if !calculating}
 			<!-- Not yet calculated -->
-			<p class="text-sm text-surface-500-400 text-center py-8">{m.mpbr_hint()}</p>
+			<p class="text-sm text-surface-600-400 text-center py-8">{m.mpbr_hint()}</p>
 		{/if}
 
 	</div>
