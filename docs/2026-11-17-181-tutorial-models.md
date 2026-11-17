@@ -87,3 +87,13 @@ Not verified:
 ## Follow-up: sharp bullet tip
 
 At the owner's request the bullet's ogive now ends in a sharp point instead of a 0.8 mm flat meplat (`scripts/models/weapons.js`). `bullet.glb` is 41,540 bytes and 1,920 triangles (was 43,272 and 2,016), so all models are 467,092 bytes and 8,584 triangles. As with the base of the boat tail, the 48 triangles at the point have no area; they draw nothing.
+
+## Follow-up: target cover, spotting scope back, sandbag
+
+After the owner looked at the models in the viewer:
+
+- **Black square on the target.** It was the `hard-cover` node, a steel plate over the lower right corner. glTF has no hidden flag, so every viewer drew it. It is removed from `ipsc-target.glb` (129 triangles, 11,980 bytes). A tutorial that needs a hard cover can draw one.
+- **Spotting scope open at the back.** The body and the objective are surfaces of revolution, which are open at their ends, so from behind you saw into the tube. The body now has end caps, the objective a back cap, and its glass fills the mouth up to the wall (692 triangles, 34,868 bytes). A spec casts a ray from behind and checks it hits the body's back cap.
+- **New model `sandbag.glb`.** A front rest bag, about 26 × 15 × 20 cm, with a groove along Z for the rifle's fore-end, and an empty `rest` node at the bottom of the groove, 0.12 m above the ground (1,664 triangles, 31,200 bytes). Placement for the rifle is in [Tutorial models](development.md#tutorial-models). Nobody has checked yet that the rifle looks right on it; #182 places them together.
+
+All twelve models are 498,632 bytes. `npm run test:run`: 5028 passed, 1 todo.

@@ -99,12 +99,13 @@ Conventions, for every model:
 | `tree-broadleaf`, `tree-birch` | Foot of the trunk | `trunk` > `branch-<n>` > `leaves-<n>-<k>`, and `leaves-top`. Branch nodes are not rotated: a small rotation about X or Z sways a branch from its base, with its leaves | 1064, 880 | 93,044, 76,740 |
 | `tree-conifer` | Foot of the trunk | `trunk` > `branch-<n>` (limbs, origin on the trunk) > `leaves-<n>` (foliage cone) | 522 | 35,160 |
 | `grass` | Middle of the tuft, on the ground | One mesh, `grass`, for instancing: 7 blades, double-sided, normals up | 21 | 2,720 |
-| `ipsc-target` | Ground, under the target | `target` (origin at the middle of the bottom edge of the face, 0.8 m up) > `board`, `zone-a`, `zone-c`, `zone-d` (one plane, no overlap), `hard-cover` (visible: hide it when not wanted); `stand`. 46 × 76 cm, zones only roughly the classic layout | 141 | 13,532 |
+| `ipsc-target` | Ground, under the target | `target` (origin at the middle of the bottom edge of the face, 0.8 m up) > `board`, `zone-a`, `zone-c`, `zone-d` (one plane, no overlap); `stand`. No hard cover (glTF cannot hide a node). 46 × 76 cm, zones only roughly the classic layout | 129 | 11,980 |
 | `bullet` | Middle of the base, nose at -Z | `ogive`, `bearing-surface` (6 helical engravings, 1:10" twist), `boat-tail`. .30 calibre, 31.2 mm, sharp point (no meplat) | 1920 | 41,540 |
-| `spotting-scope` | Ground, between the tripod legs | `tripod`, `head` (pan about Y) > `scope-body` (tilt about X) > `objective`, `focus-ring` (Z), `eyepiece` (45°) | 632 | 32,976 |
+| `spotting-scope` | Ground, between the tripod legs | `tripod`, `head` (pan about Y) > `scope-body` (tilt about X) > `objective`, `focus-ring` (Z), `eyepiece` (45°). Body and objective closed at both ends | 692 | 34,868 |
+| `sandbag` | Ground, middle of the bag | `bag` (front rest, about 26 × 15 × 20 cm, groove along Z), `rest` (empty, bottom of the groove, 0.12 m up). Lay the rifle's fore-end underside on `rest`: it is about 0.052 m below the bore axis, 0.3 m in front of the bolt face | 1664 | 31,200 |
 | `flag` | Foot of the pole | `pole` (3 m), `cloth` (90 × 45 cm, 16 × 8 quads, double-sided; origin at the top of its hoist edge, hangs out along +X: point +X downwind) | 396 | 11,516 |
 
-All eleven files together are 467,092 bytes (the test keeps the total under 750 KiB, each file under 150 KiB and 2500 triangles, the grass at 32). The counts are from `npm run models:build`, which prints them. GLTFExporter is written for the browser: the script gives it a small `FileReader` on Node's `Blob`, and it needs no canvas since there is no texture.
+All twelve files together are 498,632 bytes (the test keeps the total under 750 KiB, each file under 150 KiB and 2500 triangles, the grass at 32). The counts are from `npm run models:build`, which prints them. GLTFExporter is written for the browser: the script gives it a small `FileReader` on Node's `Blob`, and it needs no canvas since there is no texture.
 
 #### Model viewer (dev only)
 

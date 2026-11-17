@@ -4,6 +4,7 @@
  * ground.
  */
 import * as THREE from 'three';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { box, group, latheZ, material, part, rod, slab, tube } from './kit.js';
 
 /** Height of the target's bottom edge above the ground. */
@@ -31,15 +32,14 @@ const rect = (x0, y0, x1, y1) => [
  * Each zone is its own mesh, in one plane, without overlaps, so a ray hits exactly one.
  *
  * Nodes: target (origin at the middle of the bottom edge of the face, TARGET_BOTTOM above the
- * ground) with board (the cardboard, behind the zones), zone-a, zone-c, zone-d, hard-cover (a steel
- * plate over the lower right corner: hide it when not wanted); stand (two laths and a foot).
+ * ground) with board (the cardboard, behind the zones), zone-a, zone-c, zone-d; stand (two laths and
+ * a foot). No hard cover: glTF cannot hide a node, so every viewer drew it as a black square.
  */
 export function ipscTarget() {
 	const card = material('cardboard', 0xb08d5b, { roughness: 0.95 });
 	const zoneD = material('zone-d', 0xc4a06a, { roughness: 0.95 });
 	const zoneC = material('zone-c', 0xceac78, { roughness: 0.95 });
 	const zoneA = material('zone-a', 0xdcbf8f, { roughness: 0.95 });
-	const black = material('cover', 0x1d1d1f, { metalness: 0.4, roughness: 0.6 });
 	const wood = material('wood', 0x9b7a4f, { roughness: 0.9 });
 
 	const bodyD = [
@@ -100,8 +100,7 @@ export function ipscTarget() {
 		[zoneC, face(head, [headA])]
 	]);
 	const d = part('zone-d', [[zoneD, face(bodyD, [bodyC])]]);
-	const cover = part('hard-cover', [[black, box(0.24, 0.2, 0.004, 0.12, 0.1, 0.004)]]);
-	const target = group('target', { at: [0, TARGET_BOTTOM, 0], children: [board, a, c, d, cover] });
+	const target = group('target', { at: [0, TARGET_BOTTOM, 0], children: [board, a, c, d] });
 
 	const stand = part('stand', [
 		[wood, box(0.035, TARGET_BOTTOM + 0.5, 0.018, -0.12, (TARGET_BOTTOM + 0.5) / 2, -0.013)],
@@ -153,7 +152,10 @@ export function spottingScope() {
 					20
 				)
 			],
-			[glass, new THREE.CircleGeometry(0.042, 20).rotateY(Math.PI).translate(0, 0, 0.003)]
+			// The glass fills the mouth up to the wall (r 0.048 there), so no gap shows into the tube.
+			[glass, new THREE.CircleGeometry(0.047, 20).rotateY(Math.PI).translate(0, 0, 0.003)],
+			// Back of the objective, where it meets the narrower body: closed, facing +Z.
+			[green, new THREE.CircleGeometry(0.038, 20).translate(0, 0, 0.14)]
 		],
 		{ at: [0, 0, -0.2] }
 	);
@@ -179,6 +181,9 @@ export function spottingScope() {
 					20
 				)
 			],
+			// End caps: a lathe is open at both ends, so the back showed the inside of the tube.
+			[green, new THREE.CircleGeometry(0.036, 20).rotateY(Math.PI).translate(0, 0, -0.06)],
+			[green, new THREE.CircleGeometry(0.03, 20).translate(0, 0, 0.14)],
 			// Foot on the head
 			[black, box(0.03, 0.04, 0.08, 0, -0.04, 0)]
 		],
@@ -195,6 +200,50 @@ export function spottingScope() {
 	);
 
 	return group('spotting-scope', { children: [tripod, head] });
+}
+
+/** Height above the ground of the bottom of the sandbag's groove, where the rifle's fore-end rests. */
+export const SANDBAG_REST = 0.12;
+
+/** Height of the sandbag's top, and the depth of its groove on the centre line. */
+const SANDBAG_HEIGHT = 0.15;
+const GROOVE = SANDBAG_HEIGHT - SANDBAG_REST;
+
+/**
+ * Front rest sandbag, about 26 cm wide (X), 20 cm long (Z, along the rifle) and 15 cm high, with a
+ * groove along Z on top for the rifle's fore-end. A rounded box (superellipsoid), flat where it sits
+ * on the ground. Nodes: bag (origin on the ground, at the middle), rest (empty, at the bottom of the
+ * groove, SANDBAG_REST above the ground). To lay the rifle on it, put the fore-end's underside on
+ * `rest`: in rifle.glb it is about 0.052 m below the bore axis, 0.3 m in front of the bolt face.
+ */
+export function sandbag() {
+	const canvas = material('canvas', 0x7d6b4f, { roughness: 0.95 });
+	const W = 0.26;
+	const D = 0.2;
+	const g = new THREE.BoxGeometry(2, 2, 2, 16, 8, 12);
+	g.deleteAttribute('normal');
+	g.deleteAttribute('uv');
+	const p = g.attributes.position;
+	const n = 4; // superellipsoid exponent: a box with well rounded edges
+	const floor = -0.9; // below this (in -1..1) the bag is flat on the ground
+	for (let i = 0; i < p.count; i++) {
+		const x = p.getX(i);
+		const y = p.getY(i);
+		const z = p.getZ(i);
+		const k = (Math.abs(x) ** n + Math.abs(y) ** n + Math.abs(z) ** n) ** (1 / n);
+		const w = z / k;
+		const u = (x / k) * (1 + 0.04 * (1 - w * w)); // a little fuller in the middle, like a filled bag
+		const v = Math.max(y / k, floor);
+		let py = ((v - floor) / (1 - floor)) * SANDBAG_HEIGHT;
+		// Groove along Z in the top half, deepest on the centre line (GROOVE there, at v = 1).
+		if (v > 0) py -= GROOVE * Math.exp(-((((u * W) / 2) / 0.045) ** 2)) * v;
+		p.setXYZ(i, (u * W) / 2, py, (w * D) / 2);
+	}
+	const geometry = mergeVertices(g);
+	geometry.computeVertexNormals();
+	const bag = part('bag', [[canvas, geometry]]);
+	const rest = group('rest', { at: [0, SANDBAG_REST, 0] });
+	return group('sandbag', { children: [bag, rest] });
 }
 
 /**

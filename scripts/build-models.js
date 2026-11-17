@@ -20,7 +20,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { triangles } from './models/kit.js';
-import { flag, ipscTarget, spottingScope } from './models/range.js';
+import { flag, ipscTarget, sandbag, spottingScope } from './models/range.js';
 import { grass, treeBirch, treeBroadleaf, treeConifer } from './models/nature.js';
 import { bullet, holoSight, rifle, scope } from './models/weapons.js';
 
@@ -36,6 +36,7 @@ export const MODELS = Object.freeze({
 	'ipsc-target': ipscTarget,
 	bullet,
 	'spotting-scope': spottingScope,
+	sandbag,
 	flag
 });
 

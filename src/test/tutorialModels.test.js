@@ -16,7 +16,7 @@ import path from 'node:path';
 import * as THREE from 'three';
 import { MODELS, buildModel, modelPath } from '../../scripts/build-models.js';
 import { SCOPE_RING_HEIGHT } from '../../scripts/models/weapons.js';
-import { TARGET_BOTTOM } from '../../scripts/models/range.js';
+import { SANDBAG_REST, TARGET_BOTTOM } from '../../scripts/models/range.js';
 import { MODULE_FILE, VIEWER_PATH, listModels, modelViewer, viewerHtml } from '../../tools/model-viewer/plugin.js';
 
 const root = process.cwd();
@@ -224,7 +224,9 @@ describe('named nodes and conventions', () => {
 
 	it('ipsc target: A, C and D zones in one plane facing +Z, 46 × 76 cm, on a stand', () => {
 		const nodes = json('ipsc-target');
-		for (const n of ['target', 'board', 'zone-a', 'zone-c', 'zone-d', 'hard-cover', 'stand']) expect(nodes.has(n), n).toBe(true);
+		for (const n of ['target', 'board', 'zone-a', 'zone-c', 'zone-d', 'stand']) expect(nodes.has(n), n).toBe(true);
+		// No hard cover: glTF cannot hide a node, so every viewer drew it as a black square.
+		expect([...nodes.keys()].some((n) => n.includes('cover'))).toBe(false);
 		const object = MODELS['ipsc-target']();
 		object.updateMatrixWorld(true);
 		const face = new THREE.Box3();
@@ -281,6 +283,42 @@ describe('named nodes and conventions', () => {
 		const object = MODELS['spotting-scope']();
 		expect(/** @type {THREE.Object3D} */ (object.getObjectByName('scope-body')).parent?.name).toBe('head');
 		expect(new THREE.Box3().setFromObject(object).min.y).toBeCloseTo(0, 3);
+	});
+
+	it('spotting scope: the body is closed at the back (a ray from behind hits its back cap)', () => {
+		const object = MODELS['spotting-scope']();
+		object.updateMatrixWorld(true);
+		const body = /** @type {THREE.Object3D} */ (object.getObjectByName('scope-body'));
+		// Low and to the side of the axis, under the eyepiece; meshes are one-sided, so the inside of
+		// an open tube would not be hit.
+		const from = body.localToWorld(new THREE.Vector3(0.01, -0.015, 1));
+		const hits = new THREE.Raycaster(from, new THREE.Vector3(0, 0, -1)).intersectObject(object, true);
+		expect(hits.length).toBeGreaterThan(0);
+		expect(hits[0].object.name.startsWith('scope-body')).toBe(true);
+		expect(body.worldToLocal(hits[0].point.clone()).z).toBeCloseTo(0.14, 6);
+	});
+
+	it('sandbag: on the ground, about 26 × 15 × 20 cm, groove along Z with the rest at its bottom', () => {
+		const nodes = json('sandbag');
+		for (const n of ['bag', 'rest']) expect(nodes.has(n), n).toBe(true);
+		expect(nodes.get('rest').translation).toEqual([0, SANDBAG_REST, 0]);
+		const object = MODELS.sandbag();
+		object.updateMatrixWorld(true);
+		const box = new THREE.Box3().setFromObject(object);
+		expect(box.min.y).toBeCloseTo(0, 9);
+		const size = box.getSize(new THREE.Vector3());
+		expect(size.x).toBeGreaterThan(0.25);
+		expect(size.x).toBeLessThan(0.28);
+		expect(size.z).toBeCloseTo(0.2, 6);
+		const topAt = (x) => {
+			const hits = new THREE.Raycaster(new THREE.Vector3(x, 1, 0), new THREE.Vector3(0, -1, 0)).intersectObject(object, true);
+			return hits[0].point.y;
+		};
+		expect(topAt(0)).toBeCloseTo(SANDBAG_REST, 3);
+		// The groove's walls rise on both sides, higher than the rifle's 5 cm wide fore-end needs.
+		expect(topAt(0.025)).toBeGreaterThan(SANDBAG_REST + 0.005);
+		expect(topAt(-0.025)).toBeCloseTo(topAt(0.025), 6);
+		expect(topAt(0.09)).toBeGreaterThan(SANDBAG_REST + 0.02);
 	});
 
 	it('flag: pole and a subdivided cloth hanging along +X from the pole top', () => {

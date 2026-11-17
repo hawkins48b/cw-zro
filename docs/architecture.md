@@ -255,7 +255,7 @@ The input handling is written out six times: in `calculateShotPoint`, `calculate
 
 **Web and mobile builds share `build/`.** The second one overwrites the first.
 
-Every build also carries the tutorial models, `build/models/*.glb`, 467,092 bytes ([Tutorial models](development.md#tutorial-models)). No page loads them yet. The dev-only model viewer is in no build.
+Every build also carries the tutorial models, `build/models/*.glb`, 498,632 bytes ([Tutorial models](development.md#tutorial-models)). No page loads them yet. The dev-only model viewer is in no build.
 
 ## Layout by screen width
 
