@@ -570,7 +570,6 @@
 	"dope_precision_badge": "A6 PDF",
 	"dope_precision_desc": "A pocket booklet: a profile summary, one page per 100 with elevation, pressure, temperature and wind corrections, and a worksheet to add them up.",
 	"dope_precision_guide_link": "How to read the card",
-	"dope_precision_profile": "Profile",
 	"dope_precision_requirements": "Profile requirements",
 	"dope_precision_req_met": "Met:",
 	"dope_precision_req_not_met": "Not met:",
@@ -900,8 +899,7 @@
 	"ballistic_columns_count": "Columns · {shown} of {total}",
 
 	"dope_intro": "Printable cards of clicks per distance to keep with your rifle. Pick a card, check the profile, download the PDF.",
-	"dope_midrange_badge": "PDF",
-	"dope_midrange_for": "For",
+	"dope_midrange_badge": "A4 PDF",
 
 	"compare_intro": "Put several profiles on one chart. Give each line its own zero to see where the loads part ways.",
 	"compare_on_the_chart": "On the chart",

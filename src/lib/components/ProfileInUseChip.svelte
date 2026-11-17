@@ -5,12 +5,11 @@
 	 * (ResponsiveDialog). A tap selects a row, "Use this profile" puts it in use (activeProfile store);
 	 * Cancel, Escape or the scrim change nothing. With no profile at all the dialog links to New profile.
 	 *
-	 * @prop {string} [label]   - Small line above the name (default "Active profile"); `inline`: the
-	 *                            word before the name (e.g. "For"). Already translated.
-	 * @prop {'card'|'compact'|'inline'} [variant] - card (default): bordered button, min 48 px, label
-	 *                            above the name, as on Scope View and MPBR. compact: one line, 44 px,
-	 *                            for page headers (hub, Ballistic). inline: tinted row inside a card
-	 *                            (Dope Cards mid-range card), "Change" as a text button.
+	 * @prop {string} [label]   - Small line above the name (default "Active profile"). Already
+	 *                            translated.
+	 * @prop {'card'|'compact'} [variant] - card (default): bordered button, min 48 px, label above
+	 *                            the name, as on Scope View, MPBR and Dope Cards. compact: one line,
+	 *                            44 px, for page headers (hub, Ballistic).
 	 * @prop {string} [class]   - Extra classes on the outer element (width, margins).
 	 */
 	import { m } from '#lib/paraglide/messages.js';
@@ -75,45 +74,27 @@
 	></span>
 {/snippet}
 
-{#if variant === 'inline'}
-	<div class="flex items-center gap-2.5 min-h-11 pl-3 pr-1 rounded-base bg-surface-50-950 text-[13px] {cls}">
-		{@render dot()}
-		<span class="flex-1 min-w-0 break-words">
-			{#if label}{label}{' '}{/if}<strong class="font-semibold">{@render name()}</strong>
+<button
+	type="button"
+	class="flex items-center gap-2.5 max-w-full text-left rounded-container border border-surface-200-800 preset-filled-surface-100-900 hover:border-primary-500 {focusRing} {variant ===
+	'compact'
+		? 'h-11 px-3.5'
+		: 'w-full min-h-12 px-3 py-1.5'} {cls}"
+	aria-haspopup="dialog"
+	aria-label={buttonLabel}
+	onclick={openPicker}
+>
+	{@render dot()}
+	{#if variant === 'compact'}
+		<span class="min-w-0 truncate text-sm font-semibold">{@render name()}</span>
+	{:else}
+		<span class="flex-1 min-w-0">
+			<span class="block text-[11px] text-surface-600-400">{label ?? m.scope_view_active_profile()}</span>
+			<span class="block text-sm font-semibold truncate">{@render name()}</span>
 		</span>
-		<button
-			type="button"
-			class="shrink-0 min-h-11 px-2.5 rounded-base font-semibold text-primary-700-300 hover:underline underline-offset-2 {focusRing}"
-			aria-haspopup="dialog"
-			aria-label={buttonLabel}
-			onclick={openPicker}
-		>
-			{actionText}
-		</button>
-	</div>
-{:else}
-	<button
-		type="button"
-		class="flex items-center gap-2.5 max-w-full text-left rounded-container border border-surface-200-800 preset-filled-surface-100-900 hover:border-primary-500 {focusRing} {variant ===
-		'compact'
-			? 'h-11 px-3.5'
-			: 'w-full min-h-12 px-3 py-1.5'} {cls}"
-		aria-haspopup="dialog"
-		aria-label={buttonLabel}
-		onclick={openPicker}
-	>
-		{@render dot()}
-		{#if variant === 'compact'}
-			<span class="min-w-0 truncate text-sm font-semibold">{@render name()}</span>
-		{:else}
-			<span class="flex-1 min-w-0">
-				<span class="block text-[11px] text-surface-600-400">{label ?? m.scope_view_active_profile()}</span>
-				<span class="block text-sm font-semibold truncate">{@render name()}</span>
-			</span>
-		{/if}
-		<span class="shrink-0 text-[13px] font-semibold text-primary-700-300">{actionText}</span>
-	</button>
-{/if}
+	{/if}
+	<span class="shrink-0 text-[13px] font-semibold text-primary-700-300">{actionText}</span>
+</button>
 
 {#if open}
 	<ResponsiveDialog title={m.profile_picker_title()} onclose={close} width="sm:max-w-[460px]">

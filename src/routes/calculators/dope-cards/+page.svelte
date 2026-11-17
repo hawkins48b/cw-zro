@@ -10,23 +10,28 @@
 	// ── Download state ────────────────────────────────────────────────
 	let loading = $state({ imperial: false, metric: false });
 	// The outcome of the last download: a card the profile gives no data for is not saved (#91),
-	// and a failed build or save has its own message (#123). See downloadDopeCard.
-	let outcome = $state(null);
+	// and a failed build or save has its own message (#123). See downloadDopeCard. Kept with its
+	// profile, so the message goes when the page's profile selector puts another one in use (#170).
+	let outcomePick = $state(null);
+	let outcome = $derived(
+		outcomePick && outcomePick.id === String(activeProfile.profile?.id ?? '') ? outcomePick.value : null
+	);
 
 	async function download(type) {
 		const profile = activeProfile.profile;
 		if (!profile || loading[type]) return;
 		loading[type] = true;
-		outcome = null;
+		outcomePick = null;
 		try {
 			// Loaded on demand, inside downloadDopeCard so that a failed load counts as a failure.
 			const generate = async (p) =>
 				type === 'imperial'
 					? (await import('#lib/utils/dopeCardImperial.js')).generateImperialDopeCard(p)
 					: (await import('#lib/utils/dopeCardMetric.js')).generateMetricDopeCard(p);
-			outcome = await downloadDopeCard(generate, profile, (pdfDoc) =>
+			const value = await downloadDopeCard(generate, profile, (pdfDoc) =>
 				savePDF(pdfDoc, `mid-range-dope-card-${type}.pdf`)
 			);
+			outcomePick = { id: String(profile.id), value };
 		} finally {
 			loading[type] = false;
 		}
@@ -62,10 +67,16 @@
 	</div>
 {:else}
 	<div class="flex flex-col gap-3 sm:gap-4 lg:gap-5">
-		<!-- Header: title on desktop (the app header shows it below lg) and intro from sm -->
-		<header class="max-sm:sr-only">
-			<h1 class="sr-only lg:not-sr-only lg:text-[28px] lg:font-bold lg:tracking-tight">{m.dope_title()}</h1>
-			<p class="lg:mt-1 text-sm text-surface-600-400">{m.dope_intro()}</p>
+		<!--
+			Header: title on desktop (the app header shows it below lg), intro from sm, and the page's
+			one profile selector (#170): both cards use the profile in use, so neither has its own.
+		-->
+		<header class="flex flex-wrap items-center gap-x-4 gap-y-3">
+			<div class="max-sm:sr-only flex-[1_1_320px] min-w-0">
+				<h1 class="sr-only lg:not-sr-only lg:text-[28px] lg:font-bold lg:tracking-tight">{m.dope_title()}</h1>
+				<p class="lg:mt-1 text-sm text-surface-600-400">{m.dope_intro()}</p>
+			</div>
+			<ProfileInUseChip class="sm:flex-[0_1_300px]" />
 		</header>
 
 		<div class="flex flex-col gap-2.5 md:grid md:grid-cols-[minmax(260px,300px)_minmax(0,1fr)] md:items-start md:gap-5 lg:grid-cols-[minmax(300px,360px)_minmax(0,1fr)]">
@@ -99,8 +110,6 @@
 					class="{expanded ? 'flex' : 'hidden'} sm:flex flex-col gap-3.5 border-t border-surface-200-800 sm:border-0 px-4 py-4 sm:px-[18px] sm:pt-3 sm:pb-[18px]"
 				>
 					<p class="text-sm leading-relaxed text-surface-600-400">{m.dope_midrange_desc()}</p>
-
-					<ProfileInUseChip variant="inline" label={m.dope_midrange_for()} />
 
 					<div class="grid grid-cols-2 gap-2.5">
 						<button
@@ -140,7 +149,7 @@
 				</div>
 			</section>
 
-			<!-- Precision dope card (#157): A6 booklet, any saved profile -->
+			<!-- Precision dope card (#157): A6 booklet of the profile in use -->
 			<div class="min-w-0">
 				<PrecisionCardGenerator save={savePDF} />
 			</div>

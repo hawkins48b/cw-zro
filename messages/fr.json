@@ -570,7 +570,6 @@
 	"dope_precision_badge": "PDF A6",
 	"dope_precision_desc": "Un carnet de poche : un résumé du profil, une page tous les 100 avec les corrections d'élévation, de pression, de température et de vent, et une feuille de calcul pour les additionner.",
 	"dope_precision_guide_link": "Comment lire l'abaque",
-	"dope_precision_profile": "Profil",
 	"dope_precision_requirements": "Exigences du profil",
 	"dope_precision_req_met": "Exigence remplie :",
 	"dope_precision_req_not_met": "Exigence non remplie :",
@@ -900,8 +899,7 @@
 	"ballistic_columns_count": "Colonnes · {shown} sur {total}",
 
 	"dope_intro": "Des abaques imprimables des clics par distance, à garder avec votre fusil. Choisissez un abaque, vérifiez le profil, téléchargez le PDF.",
-	"dope_midrange_badge": "PDF",
-	"dope_midrange_for": "Pour",
+	"dope_midrange_badge": "PDF A4",
 
 	"compare_intro": "Placez plusieurs profils sur un même graphique. Donnez à chaque ligne son propre zéro pour voir où les munitions se séparent.",
 	"compare_on_the_chart": "Sur le graphique",

@@ -570,7 +570,6 @@
 	"dope_precision_badge": "A6-PDF",
 	"dope_precision_desc": "Ein Heft für die Tasche: eine Profilübersicht, eine Seite pro 100 mit den Korrekturen für Höhe, Luftdruck, Temperatur und Wind, und ein Rechenblatt zum Zusammenzählen.",
 	"dope_precision_guide_link": "So lesen Sie die Karte",
-	"dope_precision_profile": "Profil",
 	"dope_precision_requirements": "Anforderungen an das Profil",
 	"dope_precision_req_met": "Erfüllt:",
 	"dope_precision_req_not_met": "Nicht erfüllt:",
@@ -900,8 +899,7 @@
 	"ballistic_columns_count": "Spalten · {shown} von {total}",
 
 	"dope_intro": "Druckbare Karten mit den Klicks pro Distanz, zum Mitführen beim Gewehr. Wählen Sie eine Karte, prüfen Sie das Profil und laden Sie das PDF herunter.",
-	"dope_midrange_badge": "PDF",
-	"dope_midrange_for": "Für",
+	"dope_midrange_badge": "A4-PDF",
 
 	"compare_intro": "Stellen Sie mehrere Profile in einem Diagramm dar. Geben Sie jeder Linie ihren eigenen Nullpunkt, um zu sehen, wo die Munitionen auseinandergehen.",
 	"compare_on_the_chart": "Im Diagramm",

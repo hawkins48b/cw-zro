@@ -67,7 +67,7 @@ Configuration is in [`vite.config.js`](../vite.config.js). There is no `svelte.c
 | `/calculators/trajectory-validation` | Velocity or BC from an observation |
 | `/calculators/compare-trajectories` | Compare chart |
 | `/calculators/compare-trajectories/add` | Choose a profile to compare |
-| `/calculators/dope-cards` | PDF cards: the mid-range card (imperial, metric) and the precision dope card generator ([`PrecisionCardGenerator.svelte`](../src/lib/components/PrecisionCardGenerator.svelte), [#157](https://github.com/hawkins48b/cw-zro/issues/157)) |
+| `/calculators/dope-cards` | PDF cards: the mid-range card (imperial, metric) and the precision dope card generator ([`PrecisionCardGenerator.svelte`](../src/lib/components/PrecisionCardGenerator.svelte), [#157](https://github.com/hawkins48b/cw-zro/issues/157)); both use the profile in use, one `ProfileInUseChip` in the header ([#170](https://github.com/hawkins48b/cw-zro/issues/170)) |
 | `/calculators/dope-cards/precision-guide` | How to read the precision dope card (①–⑥, wind quarters, printing) |
 | `/profiles` | Profiles: picker list (tap to use), summary of the profile in use, Import, Export all ([#166](2026-11-17-166-profiles-redesign.md)) |
 | `/profiles/new`, `/profiles/[id]` | Profile editor in five sections ([`ProfileForm`](../src/lib/components/ProfileForm.svelte)) |
@@ -188,7 +188,7 @@ Since the Calculators round of [#166](2026-11-17-166-calculators-redesign.md) th
 
 | Component | Role |
 |-----------|------|
-| [`ProfileInUseChip`](../src/lib/components/ProfileInUseChip.svelte) | The profile in use with Change, on every calculator, the hub (from 640 px) and the Scope View (round 4). Variants: `card` (bordered, 48 px, label above the name; Scope View style), `compact` (one line, 44 px, page headers), `inline` (tinted row in a card, Dope Cards mid-range card). Change opens `ResponsiveDialog` with `ProfilePicker` and `ProfileSummaryCard`; "Use this profile" calls `activeProfile.setActive` |
+| [`ProfileInUseChip`](../src/lib/components/ProfileInUseChip.svelte) | The profile in use with Change, on every calculator, the hub (from 640 px) and the Scope View (round 4). Variants: `card` (bordered, 48 px, label above the name; Scope View style) (also the Dope Cards header, one selector for both cards, #170), `compact` (one line, 44 px, page headers). Change opens `ResponsiveDialog` with `ProfilePicker` and `ProfileSummaryCard`; "Use this profile" calls `activeProfile.setActive` |
 | [`calc/ApplyChangeCard`](../src/lib/components/calc/ApplyChangeCard.svelte) | Before → after with a save button, then a status line or an "already at this value" line. MPBR "Use this zero in your profile" and Validation "Apply to profile"; the page saves through `profiles.update` and stays |
 | [`compare/CompareAddPicker`](../src/lib/components/compare/CompareAddPicker.svelte) | Compare "Add a profile": picker with "On chart" badges, preselects the newest profile not on the chart, confirm button; adds with `compareTrajectories.addEntry` on the profile's zero. On the `/add` page (phone, tablet) and in an inline panel on desktop |
 
