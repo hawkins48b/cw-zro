@@ -15,7 +15,6 @@
 	import { Unit } from 'js-ballistics';
 	import { Plus, X } from '@lucide/svelte';
 	import ChipGroup from '#lib/components/ChipGroup.svelte';
-	import CompareAddPicker from '#lib/components/compare/CompareAddPicker.svelte';
 
 	// ── ApexCharts (lazy-loaded, browser-only) ───────────────────────
 	let ApexCharts = $state(null);
@@ -249,9 +248,7 @@
 			}))
 	);
 
-	// ── Add profile (#166) ───────────────────────────────────────────
-	// Desktop: an inline panel, open at first when the chart is empty. Below lg: the /add page.
-	let addOpen = $state(compareTrajectories.entries.length === 0);
+	// ── Add profile (#166, #193): one button, phone in the "On the chart" row, sm and up in the header ──
 	const addHref = localizeHref('/calculators/compare-trajectories/add');
 
 	const uid = $props.id();
@@ -266,25 +263,12 @@
 	<title>{m.compare_title()} — {m.app_name()}</title>
 </svelte:head>
 
-{#snippet addButton(cls)}
-	<!-- Below lg: the Add page; lg and up: the inline panel -->
-	<a
-		href={addHref}
-		class="lg:hidden btn h-11 px-3.5 gap-1.5 preset-filled-primary-500 text-sm font-semibold {focusRing} {cls}"
-	>
+{#snippet addButton()}
+	<!-- The one way to add a line (#193): the Add a profile page, on every device -->
+	<a href={addHref} class="btn h-11 px-3.5 sm:px-4 gap-1.5 preset-filled-primary-500 text-sm font-semibold {focusRing}">
 		<Plus class="size-[18px]" strokeWidth={2.5} aria-hidden="true" />
 		{m.compare_add_profile()}
 	</a>
-	<button
-		type="button"
-		class="hidden lg:inline-flex btn h-11 px-4 gap-1.5 preset-filled-primary-500 text-sm font-semibold {focusRing} {cls}"
-		aria-expanded={addOpen}
-		aria-controls="{uid}-add"
-		onclick={() => (addOpen = !addOpen)}
-	>
-		<Plus class="size-[18px]" strokeWidth={2.5} aria-hidden="true" />
-		{m.compare_add_profile()}
-	</button>
 {/snippet}
 
 <div class="flex flex-col gap-3 sm:gap-4 lg:gap-5">
@@ -300,7 +284,7 @@
 				<h1 class="sr-only lg:not-sr-only lg:text-[28px] lg:font-bold lg:tracking-tight">{m.compare_title()}</h1>
 				<p class="lg:mt-1 text-sm text-surface-600-400">{m.compare_intro()}</p>
 			</div>
-			<div class="max-sm:hidden">{@render addButton('')}</div>
+			<div class="max-sm:hidden">{@render addButton()}</div>
 		</header>
 
 		<!--
@@ -309,29 +293,6 @@
 		-->
 		<div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:gap-5">
 			<div class="max-sm:contents sm:flex-[1_1_340px] sm:max-w-full lg:max-w-[420px] flex flex-col gap-3.5 min-w-0">
-				<!-- Desktop: Add a profile, inline -->
-				{#if addOpen}
-					<section
-						id="{uid}-add"
-						aria-labelledby="{uid}-add-title"
-						class="hidden lg:flex flex-col gap-2.5 card preset-filled-surface-100-900 border border-surface-300-700 p-4"
-					>
-						<div class="flex items-center gap-2">
-							<h2 id="{uid}-add-title" class="flex-1 text-[15px] font-semibold">{m.compare_pick_profile()}</h2>
-							<button
-								type="button"
-								class="btn-icon size-9 rounded-base text-surface-600-400 hover:preset-tonal-surface {focusRing}"
-								aria-label={m.common_close()}
-								title={m.common_close()}
-								onclick={() => (addOpen = false)}
-							>
-								<X class="size-[18px]" aria-hidden="true" />
-							</button>
-						</div>
-						<CompareAddPicker listClass="max-h-72 overflow-y-auto" onadded={() => (addOpen = false)} />
-					</section>
-				{/if}
-
 				<!-- On the chart -->
 				<section aria-labelledby="{uid}-entries-title" class="order-1 flex flex-col gap-2 min-w-0">
 					<div class="flex items-center gap-2 px-1 sm:px-0">
@@ -343,7 +304,7 @@
 								{resolvedEntries.length}
 							</span>
 						{/if}
-						<div class="sm:hidden">{@render addButton('')}</div>
+						<div class="sm:hidden">{@render addButton()}</div>
 					</div>
 
 					{#if resolvedEntries.length > 0}
@@ -486,9 +447,6 @@
 						<p class="text-sm text-surface-600-400">
 							{resolvedEntries.length === 0 ? m.compare_no_entries() : m.ballistic_no_result()}
 						</p>
-						{#if resolvedEntries.length === 0}
-							{@render addButton('')}
-						{/if}
 					</div>
 				{/if}
 			</section>

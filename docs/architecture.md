@@ -194,7 +194,7 @@ Since the Calculators round of [#166](2026-11-17-166-calculators-redesign.md) th
 |-----------|------|
 | [`ProfileInUseChip`](../src/lib/components/ProfileInUseChip.svelte) | The profile in use with Change, on every calculator, the hub (from 640 px) and the Scope View (round 4). Variants: `card` (bordered, 48 px, label above the name; Scope View style) (also the Dope Cards header, one selector for both cards, #170), `compact` (one line, 44 px, page headers). Change opens `ResponsiveDialog` with `ProfilePicker` and `ProfileSummaryCard`; "Use this profile" calls `activeProfile.setActive` |
 | [`calc/ApplyChangeCard`](../src/lib/components/calc/ApplyChangeCard.svelte) | Before → after with a save button, then a status line or an "already at this value" line. MPBR "Use this zero in your profile" and Validation "Apply to profile"; the page saves through `profiles.update` and stays |
-| [`compare/CompareAddPicker`](../src/lib/components/compare/CompareAddPicker.svelte) | Compare "Add a profile": picker with "On chart" badges, preselects the newest profile not on the chart, confirm button; adds with `compareTrajectories.addEntry` on the profile's zero. On the `/add` page (phone, tablet) and in an inline panel on desktop |
+| [`compare/CompareAddPicker`](../src/lib/components/compare/CompareAddPicker.svelte) | Compare "Add a profile": picker with "On chart" badges, preselects the newest profile not on the chart, confirm button; adds with `compareTrajectories.addEntry` on the profile's zero. Only on the `/add` page, which the one Add profile button of Compare opens on every device (#193) |
 
 The view logic is in `utils/`, tested without Svelte:
 
