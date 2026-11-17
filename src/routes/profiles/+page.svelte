@@ -6,6 +6,7 @@
 	 */
 	import { m } from '#lib/paraglide/messages.js';
 	import { localizeHref } from '#lib/paraglide/runtime.js';
+	import { NEW_PROFILE_PATH } from '#lib/utils/setupSteps.js';
 	import { profiles, importProfiles } from '#lib/stores/profiles.svelte.js';
 	import { activeProfile, deleteProfile } from '#lib/stores/activeProfile.svelte.js';
 	import { Plus, Upload, Download, Copy, Trash2 } from '@lucide/svelte';
@@ -97,7 +98,7 @@
 
 {#snippet newProfileButton(cls)}
 	<a
-		href={localizeHref('/profiles/new')}
+		href={localizeHref(NEW_PROFILE_PATH)}
 		class="btn preset-filled-primary-500 gap-2 font-semibold {focusRing} {cls}"
 	>
 		<Plus class="size-[18px]" strokeWidth={2.5} aria-hidden="true" />

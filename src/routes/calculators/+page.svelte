@@ -1,6 +1,7 @@
 <script>
 	import { m } from '#lib/paraglide/messages.js';
 	import { localizeHref } from '#lib/paraglide/runtime.js';
+	import { NEW_PROFILE_PATH } from '#lib/utils/setupSteps.js';
 	import {
 		ChartSplineIcon,
 		Table2Icon,
@@ -110,7 +111,7 @@
 					<span class="hidden sm:inline">{m.calc_hub_intro_change()}</span>
 				{:else}
 					{m.calc_hub_no_profile()}
-					<a href={localizeHref('/profiles/new')} class="font-semibold text-primary-700-300 underline underline-offset-2 hover:no-underline rounded-sm {focusRing}">{m.calc_hub_create_profile()}</a>
+					<a href={localizeHref(NEW_PROFILE_PATH)} class="font-semibold text-primary-700-300 underline underline-offset-2 hover:no-underline rounded-sm {focusRing}">{m.calc_hub_create_profile()}</a>
 				{/if}
 			</p>
 		</div>

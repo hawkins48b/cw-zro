@@ -77,9 +77,12 @@
 		form.bulletWeightUnit = item.weightUnit.toLowerCase();
 		form.bc = String(item.ballisticCoefficient);
 		form.bcType = item.ballisticCoefficientProfile;
+		// The length belongs to the bullet: a pick without one does not keep the previous pick's (#177).
 		if (item.length) {
 			form.bulletLength = String(item.length);
 			form.bulletLengthUnit = item.lengthUnit.toLowerCase();
+		} else {
+			form.bulletLength = '';
 		}
 	}
 
@@ -163,7 +166,9 @@
 				</button>
 			{:else}
 				<!-- The numbers from the box -->
-				<fieldset class="card preset-filled-surface-100-900 border border-surface-200-800 p-4">
+				<!-- min-w-0: a fieldset is at least as wide as its content (min-inline-size: min-content), and
+					the unit fields' inputs and chips made it wider than a 360 px screen (#177). -->
+				<fieldset class="card min-w-0 preset-filled-surface-100-900 border border-surface-200-800 p-4">
 					<legend class="float-left w-full mb-4 text-sm font-semibold">{m.setup_ammo_box_legend()}</legend>
 					<div class="clear-left flex flex-col gap-4">
 						<TextField

@@ -696,6 +696,13 @@
 	"setup_velocity_intro": "Celle de votre chronographe, ou celle de la boîte si vous n'en avez pas.",
 	"setup_field_velocity": "Vitesse initiale",
 	"setup_field_velocity_hint": "Vitesse du projectile à la sortie du canon. La boîte l'indique pour un canon d'essai : avec le vôtre, elle peut être différente.",
+	"setup_step_advanced": "Avancé",
+	"setup_next_advanced": "Suivant : avancé",
+	"setup_advanced_title": "Réglages avancés (facultatif)",
+	"setup_advanced_intro": "La dérive gyroscopique et la sensibilité thermique de la poudre rendent les tirs lointains plus précis. Passez cette étape si vous n'avez pas les valeurs : vous pourrez les ajouter plus tard dans le profil.",
+	"setup_advanced_length_from_pick": "Longueur reprise de la munition choisie",
+	"setup_skip": "Passer",
+	"setup_full_form": "Utiliser le formulaire complet",
 
 	"profiles_tap_intro": "Touchez un profil pour l'utiliser. Le profil utilisé s'applique à tous les écrans.",
 	"profiles_import": "Importer",

@@ -59,7 +59,7 @@ Configuration is in [`vite.config.js`](../vite.config.js). There is no `svelte.c
 |-------|------|
 | `/` | Start page (splash): goes on to `/welcome` when there is no usable profile, else to `/scope-view` ([#150](https://github.com/hawkins48b/cw-zro/issues/150), [`startPath`](../src/lib/utils/firstRun.js)) |
 | `/welcome` | First-run Welcome screen, without navigation. Opened while a profile exists, it goes on to `/scope-view` |
-| `/setup` | Guided profile setup in three steps, without navigation. Saves through the profile form's validation and builder ([`setupProfileData`](../src/lib/utils/profileValidation.js)); nothing is stored before the last step |
+| `/setup` | Guided profile setup in four steps, the fourth (spin drift, temperature sensitivity) optional with Skip (#177), without navigation. Every "+ New profile" link opens it (`NEW_PROFILE_PATH` in [`setupSteps.js`](../src/lib/utils/setupSteps.js)); outside the first run, step 1 links the full form (`/profiles/new`). Saves through the profile form's validation and builder ([`setupProfileData`](../src/lib/utils/profileValidation.js)); nothing is stored before the last step. Once saved: Scope View on first run, else back to the page it was opened from ([`setupSavedTarget`](../src/lib/utils/setupSteps.js)) |
 | `/scope-view` | Scope view |
 | `/calculators` | Calculator list |
 | `/calculators/ballistic` | Trajectory table and charts |
@@ -70,7 +70,7 @@ Configuration is in [`vite.config.js`](../vite.config.js). There is no `svelte.c
 | `/calculators/dope-cards` | PDF cards: the mid-range card (imperial, metric) and the precision dope card generator ([`PrecisionCardGenerator.svelte`](../src/lib/components/PrecisionCardGenerator.svelte), [#157](https://github.com/hawkins48b/cw-zro/issues/157)); both use the profile in use, one `ProfileInUseChip` in the header ([#170](https://github.com/hawkins48b/cw-zro/issues/170)) |
 | `/calculators/dope-cards/precision-guide` | How to read the precision dope card (①–⑥, wind quarters, printing) |
 | `/profiles` | Profiles: picker list (tap to use), summary of the profile in use, Import, Export all ([#166](2026-11-17-166-profiles-redesign.md)) |
-| `/profiles/new`, `/profiles/[id]` | Profile editor in five sections ([`ProfileForm`](../src/lib/components/ProfileForm.svelte)) |
+| `/profiles/new`, `/profiles/[id]` | Profile editor in five sections; `/profiles/new` is the full form, linked from the guided setup (#177) ([`ProfileForm`](../src/lib/components/ProfileForm.svelte)) |
 | `/profiles/ammo-selector` | Ammunition library: select, then "Use this ammunition" |
 | `/settings` | Settings, General: Display (theme, language), Data, About links, Danger zone with Clear all data ([#166](2026-11-17-166-settings-redesign.md)) |
 | `/settings/about` | About: identity, Provided by Chocolate Warfare, This copy, Open source, Calculation engine |
@@ -265,9 +265,9 @@ Page frame (#169): the layout gives every page the same frame, so pages set no w
 
 The width decides this, not the platform. Since [#149](2026-11-16-149-nav-hub-profiles.md) the three are plain `<nav>` elements in [`+layout.svelte`](../src/routes/+layout.svelte), built from one item list and shown by CSS breakpoints (`sm`, `lg`); Skeleton's `Navigation` component is no longer used. An item is active on its page and on the pages under it, compared on the path without `/fr` or `/de`, so it is marked in every language; `/` counts as Scope View. The link of the page itself has `aria-current="page"`, a section the page is in `aria-current="true"`.
 
-The guided setup (`/setup`, [`GuidedSetup`](../src/lib/components/GuidedSetup.svelte)) has no navigation at any width. On phones it is full screen with a sticky footer; from 640 px it has a top bar and one centred card holding the progress, the step and Back / Next, 680 px wide and 760 px from 1024 px, where the ammunition step is in two columns (#166).
+The guided setup (`/setup`, [`GuidedSetup`](../src/lib/components/GuidedSetup.svelte)) has no navigation at any width. Since #177 it has four steps, and on phones nothing in it is wider than the screen: the progress labels wrap, the bullet fieldset has `min-w-0`, the step body scrolls only up and down, and the root clips sideways as a last guard. On phones it is full screen with a sticky footer; from 640 px it has a top bar and one centred card holding the progress, the step and Back / Next, 680 px wide and 760 px from 1024 px, where the ammunition step is in two columns (#166).
 
-On the profile editor routes (`/profiles/new`, `/profiles/[id]`) the layout hides its header under 1024 px and the phone tab bar: the editor has its own header and a pinned Cancel / Save bar. On every `/profiles/...` sub-page the desktop sidebar lists the profiles (rifle · ammunition) and "+ New profile" under Profiles (#166).
+On the profile editor routes (`/profiles/new`, `/profiles/[id]`) the layout hides its header under 1024 px and the phone tab bar: the editor has its own header and a pinned Cancel / Save bar. On every `/profiles/...` sub-page the desktop sidebar lists the profiles (rifle · ammunition) and "+ New profile" under Profiles (#166), which opens the guided setup since #177.
 
 Settings (#166, Settings round): the desktop sidebar always lists General, About, Privacy and Licences under Settings, each matched on its exact path; on General the Settings item gets `aria-current="true"` and the sub-item `"page"`. On `/settings/...` the layout header is hidden from 768 px, where the Settings pane holds the title (see [Settings components](#settings-components)).
 

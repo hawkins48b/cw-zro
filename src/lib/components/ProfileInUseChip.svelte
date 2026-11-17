@@ -14,6 +14,7 @@
 	 */
 	import { m } from '#lib/paraglide/messages.js';
 	import { localizeHref } from '#lib/paraglide/runtime.js';
+	import { NEW_PROFILE_PATH } from '#lib/utils/setupSteps.js';
 	import { Plus } from '@lucide/svelte';
 	import { profiles } from '#lib/stores/profiles.svelte.js';
 	import { activeProfile } from '#lib/stores/activeProfile.svelte.js';
@@ -101,7 +102,7 @@
 		{#if shownProfiles.length === 0}
 			<p class="text-sm leading-relaxed text-surface-600-400">{m.profile_picker_empty()}</p>
 			<a
-				href={localizeHref('/profiles/new')}
+				href={localizeHref(NEW_PROFILE_PATH)}
 				class="btn preset-filled-primary-500 h-12 gap-2 font-semibold {focusRing}"
 				onclick={close}
 			>

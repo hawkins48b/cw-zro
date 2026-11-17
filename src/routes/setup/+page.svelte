@@ -1,10 +1,12 @@
 <script>
-	// Guided profile setup (#150). The layout renders this route without navigation.
+	// Guided profile setup (#150). The layout renders this route without navigation. Since #177 every
+	// "+ New profile" link opens it too; the full profile form stays at /profiles/new.
 	import { goto, afterNavigate } from '$app/navigation';
 	import { localizeHref, deLocalizeHref } from '#lib/paraglide/runtime.js';
 	import { m } from '#lib/paraglide/messages.js';
-	import GuidedSetup, { STEP_FIELDS } from '#lib/components/GuidedSetup.svelte';
-	import { setupProfileData, validateProfile } from '#lib/utils/profileValidation.js';
+	import GuidedSetup from '#lib/components/GuidedSetup.svelte';
+	import { setupProfileData } from '#lib/utils/profileValidation.js';
+	import { FULL_FORM_PATH, setupSavedTarget, setupStepErrors } from '#lib/utils/setupSteps.js';
 	import { profiles } from '#lib/stores/profiles.svelte.js';
 	import { activeProfile } from '#lib/stores/activeProfile.svelte.js';
 	import { isFirstRun } from '#lib/utils/firstRun.js';
@@ -17,22 +19,27 @@
 
 	let saved = false;
 
-	/** The profile form's errors, kept to the fields of this step (no spin drift, no temperature). */
-	function validateStep(step, form) {
-		const all = validateProfile(form, false, false);
-		return Object.fromEntries(STEP_FIELDS[step].filter((key) => all[key]).map((key) => [key, all[key]]));
+	// First run (no usable profile yet): no "Use the full form" link, so it stays the guided path of #150.
+	const firstRunAtOpen = isFirstRun(profiles.list);
+
+	/** The profile form's errors, kept to the fields of this step; step 4 follows its switches. */
+	function validateStep(step, form, advanced) {
+		return setupStepErrors(step, form, advanced);
 	}
 
 	/** Nothing is stored before this: leaving the setup midway saves nothing. */
-	function save(form) {
+	function save(form, advanced) {
 		if (saved) return;
-		const data = setupProfileData(form);
+		const data = setupProfileData(form, advanced?.spinDrift, advanced?.tempSensitivity);
 		// Every step was checked with the same validation, so this does not happen; store nothing.
 		if (!data) return;
+		// Before the profile is added: is this the first one?
+		const target = setupSavedTarget({ firstRun: isFirstRun(profiles.list), fromPath });
 		saved = true;
 		const id = profiles.add(data);
 		activeProfile.setActive(id);
-		goto(localizeHref('/scope-view'), { replace: true });
+		if (target.back) history.back();
+		else goto(localizeHref(target.path), { replace: true });
 	}
 
 	/** Back on step 1. */
@@ -54,4 +61,9 @@
 	<title>{m.profiles_new()} — {m.app_name()}</title>
 </svelte:head>
 
-<GuidedSetup onValidateStep={validateStep} onSave={save} onExit={exit} />
+<GuidedSetup
+	onValidateStep={validateStep}
+	onSave={save}
+	onExit={exit}
+	fullFormHref={firstRunAtOpen ? '' : localizeHref(FULL_FORM_PATH)}
+/>

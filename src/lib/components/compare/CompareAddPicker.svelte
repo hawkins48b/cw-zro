@@ -14,6 +14,7 @@
 	 */
 	import { m } from '#lib/paraglide/messages.js';
 	import { localizeHref } from '#lib/paraglide/runtime.js';
+	import { NEW_PROFILE_PATH } from '#lib/utils/setupSteps.js';
 	import { Plus } from '@lucide/svelte';
 	import { profiles } from '#lib/stores/profiles.svelte.js';
 	import { compareTrajectories } from '#lib/stores/compareTrajectories.svelte.js';
@@ -53,7 +54,7 @@
 
 {#if shownProfiles.length === 0}
 	<p class="text-sm text-surface-600-400">{m.compare_no_profiles()}</p>
-	<a href={localizeHref('/profiles/new')} class="btn preset-tonal-primary self-start {focusRing}">{m.profiles_new()}</a>
+	<a href={localizeHref(NEW_PROFILE_PATH)} class="btn preset-tonal-primary self-start {focusRing}">{m.profiles_new()}</a>
 {:else}
 	<ProfilePicker
 		profiles={shownProfiles}

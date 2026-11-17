@@ -696,6 +696,13 @@
 	"setup_velocity_intro": "Von Ihrem Chronographen oder von der Packung, falls Sie keinen haben.",
 	"setup_field_velocity": "Mündungsgeschwindigkeit",
 	"setup_field_velocity_hint": "Geschwindigkeit des Geschosses beim Verlassen des Laufs. Die Packung nennt sie für einen Testlauf; bei Ihrem Lauf kann sie abweichen.",
+	"setup_step_advanced": "Erweitert",
+	"setup_next_advanced": "Weiter: Erweitert",
+	"setup_advanced_title": "Erweitert (optional)",
+	"setup_advanced_intro": "Spin-Drift und Temperaturempfindlichkeit des Pulvers machen weite Schüsse genauer. Überspringen Sie diesen Schritt, wenn Sie die Werte nicht haben: Sie können sie später im Profil ergänzen.",
+	"setup_advanced_length_from_pick": "Von der gewählten Munition übernommen",
+	"setup_skip": "Überspringen",
+	"setup_full_form": "Vollständiges Formular verwenden",
 
 	"profiles_tap_intro": "Tippen Sie auf ein Profil, um es zu verwenden. Das aktive Profil gilt für alle Ansichten.",
 	"profiles_import": "Importieren",

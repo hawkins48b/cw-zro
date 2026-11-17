@@ -201,8 +201,68 @@ describe('setupProfileData (guided setup)', () => {
 		expect(setupProfileData(form)).toBeNull();
 	});
 
-	it('checks no spin drift or temperature field: the setup does not ask for them', () => {
+	it('checks no spin drift or temperature field with both switches off (step 4 skipped)', () => {
 		const form = { ...withPick({ ...EMPTY_FORM, ...STEP_1, ...STEP_3 }, m193), barrelTwist: '', temperature: 'x' };
 		expect(setupProfileData(form)).not.toBeNull();
+		expect(setupProfileData(form, false, false)).toEqual(setupProfileData(form));
+	});
+
+	// Step 4 (#177): spin drift and temperature sensitivity, as the profile form stores them.
+	const STEP_4_SPIN = { barrelTwist: '7', barrelTwistUnit: 'in' };
+	const STEP_4_TEMP = { temperature: '15', temperatureUnit: 'c', tempModifier: '-1,2' };
+
+	it('stores spin drift with the twist and the length of the library pick', () => {
+		const form = { ...withPick({ ...EMPTY_FORM, ...STEP_1, ...STEP_3 }, m193), ...STEP_4_SPIN };
+		const data = setupProfileData(form, true, false);
+		expect(data).toEqual(buildProfileData(form, true, false));
+		expect(data).toEqual(legacyBuild(form, true, false));
+		expect(data).toMatchObject({
+			spinDrift: true,
+			tempSensitivity: false,
+			barrelTwist: '7',
+			barrelTwistUnit: 'in',
+			bulletLength: String(m193.length),
+			bulletLengthUnit: m193.lengthUnit.toLowerCase()
+		});
+		expect(calculateShotPoint({ ...data, id: 'x' }, { distance: 300, unit: 'm' }, null, null)).not.toBeNull();
+	});
+
+	it('stores temperature sensitivity, a comma read as a decimal point', () => {
+		const form = { ...withPick({ ...EMPTY_FORM, ...STEP_1, ...STEP_3 }, m193), ...STEP_4_TEMP };
+		const data = setupProfileData(form, false, true);
+		expect(data).toEqual(buildProfileData(form, false, true));
+		expect(data).toMatchObject({ spinDrift: false, tempSensitivity: true, temperature: '15', temperatureUnit: 'c', tempModifier: '-1.2' });
+	});
+
+	it('stores both switches on together', () => {
+		const form = { ...withPick({ ...EMPTY_FORM, ...STEP_1, ...STEP_3 }, m193), ...STEP_4_SPIN, ...STEP_4_TEMP };
+		expect(setupProfileData(form, true, true)).toEqual(buildProfileData(form, true, true));
+		expect(setupProfileData(form, true, true)).toMatchObject({ spinDrift: true, tempSensitivity: true });
+	});
+
+	it('keeps the step 4 values as typed when skipped, as the profile form does with its switches off', () => {
+		const form = { ...withPick({ ...EMPTY_FORM, ...STEP_1, ...STEP_3 }, m193), ...STEP_4_SPIN, ...STEP_4_TEMP };
+		const data = setupProfileData(form, false, false);
+		expect(data).toEqual(legacyBuild(form, false, false));
+		expect(data).toMatchObject({ spinDrift: false, tempSensitivity: false, barrelTwist: '7', tempModifier: '-1.2' });
+	});
+
+	it.each([
+		['no twist', { barrelTwist: '' }, true, false],
+		['a twist out of range', { barrelTwist: '1000' }, true, false],
+		['no bullet length (manual ammunition)', { bulletLength: '' }, true, false],
+		['a bullet length that is not a number', { bulletLength: 'long' }, true, false],
+		['no temperature', { temperature: '' }, false, true],
+		['a modifier that is not a number', { tempModifier: 'abc' }, false, true]
+	])('stores nothing with %s and its switch on', (_, change, spinDrift, tempSensitivity) => {
+		const form = { ...withPick({ ...EMPTY_FORM, ...STEP_1, ...STEP_3 }, m193), ...STEP_4_SPIN, ...STEP_4_TEMP, ...change };
+		expect(setupProfileData(form, spinDrift, tempSensitivity)).toBeNull();
+		// Skipped, the same form is stored.
+		expect(setupProfileData(form, false, false)).not.toBeNull();
+	});
+
+	it('reads only true as a switch that is on', () => {
+		const form = { ...withPick({ ...EMPTY_FORM, ...STEP_1, ...STEP_3 }, m193), barrelTwist: '' };
+		expect(setupProfileData(form, 'yes', 1)).toMatchObject({ spinDrift: false, tempSensitivity: false });
 	});
 });

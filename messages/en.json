@@ -696,6 +696,13 @@
 	"setup_velocity_intro": "From your chronograph, or the box if you have none.",
 	"setup_field_velocity": "Muzzle velocity",
 	"setup_field_velocity_hint": "Speed of the bullet as it leaves the barrel. The box gives it for a test barrel; yours may differ.",
+	"setup_step_advanced": "Advanced",
+	"setup_next_advanced": "Next: advanced",
+	"setup_advanced_title": "Advanced (optional)",
+	"setup_advanced_intro": "Spin drift and powder temperature sensitivity make long shots more exact. Skip this step if you do not have the numbers: you can add them later in the profile.",
+	"setup_advanced_length_from_pick": "Filled in from the ammunition you picked",
+	"setup_skip": "Skip",
+	"setup_full_form": "Use the full form",
 
 	"profiles_tap_intro": "Tap a profile to use it. The one in use drives every screen.",
 	"profiles_import": "Import",

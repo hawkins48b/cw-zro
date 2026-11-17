@@ -11,6 +11,7 @@
 	import { profiles } from '#lib/stores/profiles.svelte.js';
 	import { shownProfile } from '#lib/utils/storedProfiles.js';
 	import { profileName } from '#lib/components/profile/profileLabels.js';
+	import { NEW_PROFILE_PATH } from '#lib/utils/setupSteps.js';
 
 	let { children } = $props();
 
@@ -63,7 +64,8 @@
 			const ammo = p.bulletBrand?.trim();
 			return { href: `/profiles/${p.id}`, label: ammo ? `${profileName(p)} · ${ammo}` : profileName(p) };
 		});
-		items.push({ href: '/profiles/new', label: `+ ${m.profiles_new()}` });
+		// #177: "+ New profile" opens the guided setup.
+		items.push({ href: NEW_PROFILE_PATH, label: `+ ${m.profiles_new()}` });
 		return items;
 	});
 
