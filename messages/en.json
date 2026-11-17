@@ -623,7 +623,7 @@
 	"dope_guide_wind_legend_clicks": "Correction where a ring meets a direction",
 	"dope_guide_wind_caption": "4 m/s from 2 o'clock: follow the 4 ring to the II line, 11 clicks.",
 	"dope_guide_wind_side": "Wind from the right (between XII and VI): dial right. From the left (between VI and XII): same correction, dial left.",
-	"dope_guide_wind_rays": "Each line has one number per ring, in order from the centre out. On the two inner rings, the numbers of the 15°, 45° and 75° lines sit just outside their ring, so that they do not overlap.",
+	"dope_guide_wind_rays": "Each line has one number per ring, in order from the centre out. On the inner ring, the numbers of the 15°, 45° and 75° lines sit just outside their ring, so that they do not overlap.",
 	"dope_guide_wind_between": "Between two rings, take the middle.",
 	"dope_guide_wind_mph": "With wind in mph, the rings are 5, 10, 15 and 20 mph. Distances follow the zero, in m or yd, whatever the units of wind, pressure and temperature.",
 	"dope_guide_clock_caption": "Which line to read for each direction",

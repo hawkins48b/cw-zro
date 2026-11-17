@@ -623,7 +623,7 @@
 	"dope_guide_wind_legend_clicks": "Korrektur, wo ein Ring eine Richtung trifft",
 	"dope_guide_wind_caption": "4 m/s aus 2 Uhr: dem Ring 4 bis zur Linie II folgen, 11 Klicks.",
 	"dope_guide_wind_side": "Wind von rechts (zwischen XII und VI): nach rechts korrigieren. Von links (zwischen VI und XII): gleiche Korrektur, nach links.",
-	"dope_guide_wind_rays": "Jede Linie hat einen Wert pro Ring, von der Mitte nach außen. Auf den zwei inneren Ringen stehen die Werte der Linien 15°, 45° und 75° knapp außerhalb ihres Rings, damit sie sich nicht überdecken.",
+	"dope_guide_wind_rays": "Jede Linie hat einen Wert pro Ring, von der Mitte nach außen. Auf dem inneren Ring stehen die Werte der Linien 15°, 45° und 75° knapp außerhalb ihres Rings, damit sie sich nicht überdecken.",
 	"dope_guide_wind_between": "Zwischen zwei Ringen die Mitte nehmen.",
 	"dope_guide_wind_mph": "Mit Wind in mph haben die Ringe 5, 10, 15 und 20 mph. Die Distanzen folgen der Einschiessentfernung, in m oder yd, unabhängig von den Einheiten für Wind, Luftdruck und Temperatur.",
 	"dope_guide_clock_caption": "Welche Linie für welche Richtung",

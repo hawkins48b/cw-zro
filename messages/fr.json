@@ -623,7 +623,7 @@
 	"dope_guide_wind_legend_clicks": "Correction au croisement d'un anneau et d'une direction",
 	"dope_guide_wind_caption": "4 m/s venant de 2 heures : suivez l'anneau 4 jusqu'à la ligne II, 11 clics.",
 	"dope_guide_wind_side": "Vent de droite (entre XII et VI) : corrigez à droite. De gauche (entre VI et XII) : même correction, à gauche.",
-	"dope_guide_wind_rays": "Chaque ligne porte une valeur par anneau, dans l'ordre du centre vers l'extérieur. Sur les deux anneaux intérieurs, les valeurs des lignes 15°, 45° et 75° sont juste à l'extérieur de leur anneau, pour ne pas se chevaucher.",
+	"dope_guide_wind_rays": "Chaque ligne porte une valeur par anneau, dans l'ordre du centre vers l'extérieur. Sur l'anneau intérieur, les valeurs des lignes 15°, 45° et 75° sont juste à l'extérieur de leur anneau, pour ne pas se chevaucher.",
 	"dope_guide_wind_between": "Entre deux anneaux, prenez le milieu.",
 	"dope_guide_wind_mph": "Avec le vent en mph, les anneaux sont de 5, 10, 15 et 20 mph. Les distances suivent le zéro, en m ou en yd, quelles que soient les unités du vent, de la pression et de la température.",
 	"dope_guide_clock_caption": "Quelle ligne lire pour chaque direction",

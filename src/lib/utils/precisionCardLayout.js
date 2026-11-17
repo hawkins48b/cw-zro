@@ -175,14 +175,15 @@ export const RANGE = Object.freeze({
 		valueSize: 11,
 		/**
 		 * How far past its ring a value sits, by ring, on the rays between the hours (15°, 45°, 75°):
-		 * on the inner rings the rays are too close for a value on each, so every other value sits
-		 * just outside the ring. Values on I, II and III sit on the ring.
+		 * on the inner ring the rays are too close for a value on each, so every other value sits
+		 * just outside the ring. From the second ring on (#174), and on I, II and III, values sit on
+		 * the ring.
 		 */
-		stagger: Object.freeze([22, 12, 0, 0]),
+		stagger: Object.freeze([22, 0, 0, 0]),
 		/** From the centre of a text to its baseline, as a share of its size. */
 		baselineDrop: 5.3 / 15,
-		/** The white halo behind a value: padding on each side, and its top above the baseline, as a share of the size. */
-		halo: Object.freeze({ padding: 2, top: 0.8 }),
+		/** The white halo behind a value: padding on each side (1 since #174, so neighbours on the second ring stay clear), and its top above the baseline, as a share of the size. */
+		halo: Object.freeze({ padding: 1, top: 0.8 }),
 		unit: Object.freeze({ x: 36, y: 45, size: 12 })
 	}),
 	footer: Object.freeze({ boxX: 18, boxTop: 526, boxHeight: 19, padding: 6, baseline: 539, size: 12, gap: 10 })

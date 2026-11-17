@@ -14,6 +14,7 @@ Living documents. They describe the current state of `develop`.
 
 ## Delivery documentation
 
+- [2026-11-17: Precision card wind dial second ring lined up](2026-11-17-174-dial-ring2.md): owner request; ring 2 values on the ring on every ray (stagger `[22, 0, 0, 0]`), halo padding 2 → 1 px so long-range MOA values stay clear; guide text says the inner ring only; not checked on paper
 - [2026-11-17: Accurate atmosphere = station pressure](2026-11-17-172-accurate-station.md): #172 Accurate shows station pressure, temperature, humidity (no QNH / Station, no altitude); engine altitude fixed at 5000 m in Accurate (needs approval); saved QNH states converted once with their altitude (shift ≤ 1.6 cm at 1500 m); weather fill converts locally, request unchanged; 5 keys removed; security review PASS; not checked in a browser
 - [2026-11-17: Ballistic elevation angle](2026-11-17-173-ballistic-angle.md): #173 shared `ElevationAngleCard` on Ballistic and Scope View; `calculateFullTrajectory` applies the cosine rule, rows along the line of sight, equal to `calculateShotPoint`; table limit cosine ≥ 1e-6 (needs approval); angle saved with the Ballistic state, old states 0°; no result change at 0°; security review PASS; not checked in a browser
 - [2026-11-17: Hide − / + with a mouse](2026-11-17-171-stepper-mouse.md): #171 `pointer-fine` variant (`@media (pointer: fine)`, owner choice over width) hides every StepButton; StepperField box padding without them; phones and tablets keep them; no calculated result changed; security review PASS; not checked in a browser
