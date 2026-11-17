@@ -74,7 +74,7 @@ and commit the three PDFs. The output has no date or id, so an unchanged layout 
 
 ### Tutorial models
 
-The 3D models of the ballistic tutorial (epic [#180](https://github.com/hawkins48b/cw-zro/issues/180), [#181](https://github.com/hawkins48b/cw-zro/issues/181)) are binary glTF files in `static/models/`, copied into every build like any static file. No app page loads them yet: the tutorial route comes with #182. [`scripts/build-models.js`](../scripts/build-models.js) draws them from three.js geometry and plain materials (no third-party model, no texture, no download) and writes them with three's `GLTFExporter`; the shapes are in [`scripts/models/`](../scripts/models/). After changing a shape, run:
+The 3D models of the ballistic tutorial (epic [#180](https://github.com/hawkins48b/cw-zro/issues/180), [#181](https://github.com/hawkins48b/cw-zro/issues/181)) are binary glTF files in `static/models/`, copied into every build like any static file. The 3D tutorial's scene ([`src/lib/tutorial/scene.js`](../src/lib/tutorial/scene.js), #182) loads them from `/models/<name>.glb` (`modelPath` in [`tutorialScene.js`](../src/lib/utils/tutorialScene.js)). [`scripts/build-models.js`](../scripts/build-models.js) draws them from three.js geometry and plain materials (no third-party model, no texture, no download) and writes them with three's `GLTFExporter`; the shapes are in [`scripts/models/`](../scripts/models/). After changing a shape, run:
 
 ```bash
 npm run models:build
@@ -111,7 +111,33 @@ All twelve files together are 498,632 bytes (the test keeps the total under 750 
 
 `npm run dev`, then http://localhost:5173/dev/models: the models of `static/models`, orbit (drag), zoom (wheel), pan (right drag), a wireframe switch, grid and axes, the node tree with the triangles of each node, the file size, and the origin of a clicked node. Reload after `npm run models:build`.
 
-It is not a SvelteKit route. A Vite plugin, [`tools/model-viewer/plugin.js`](../tools/model-viewer/plugin.js), added in `vite.config.js` with `apply: 'serve'`, answers exactly `GET` and `HEAD /dev/models` in the dev server with a page that loads [`tools/model-viewer/main.js`](../tools/model-viewer/main.js) through Vite. So `npm run build` and `build:mobile` have neither the page nor its code, and no app code imports three. SvelteKit limits what Vite serves to `src/`, `node_modules/` and its own folders; the plugin adds `main.js` alone to that list, so the rest of `tools/` and `scripts/` stay refused (403). The page is the plugin's, not SvelteKit's, so the app's Content-Security-Policy does not apply to it.
+It is not a SvelteKit route. A Vite plugin, [`tools/model-viewer/plugin.js`](../tools/model-viewer/plugin.js), added in `vite.config.js` with `apply: 'serve'`, answers exactly `GET` and `HEAD /dev/models` in the dev server with a page that loads [`tools/model-viewer/main.js`](../tools/model-viewer/main.js) through Vite. So `npm run build` and `build:mobile` have neither the page nor its code. In the app, only the 3D tutorial's [`scene.js`](../src/lib/tutorial/scene.js) imports three (#182), and only the tutorial route loads it, with `await import()`, in the web and desktop builds; the mobile build has no tutorial and no three.js (see [3D tutorial](architecture.md#3d-tutorial)). SvelteKit limits what Vite serves to `src/`, `node_modules/` and its own folders; the plugin adds `main.js` alone to that list, so the rest of `tools/` and `scripts/` stay refused (403). The page is the plugin's, not SvelteKit's, so the app's Content-Security-Policy does not apply to it.
+
+### Tutorials of the 3D tutorial
+
+A tutorial (#182, one per child issue of epic [#180](https://github.com/hawkins48b/cw-zro/issues/180)) is a data file in [`src/lib/tutorial/tutorials/`](../src/lib/tutorial/tutorials/), added to `TUTORIALS` in [`registry.js`](../src/lib/tutorial/registry.js). The first is [`sceneTour.js`](../src/lib/tutorial/tutorials/sceneTour.js). The file holds message keys, never text: add each key to `messages/en.json`, `fr.json` and `de.json`.
+
+```js
+export default {
+	id: 'scene-tour',               // kebab-case, unique
+	titleKey: 'tutorial_tour_title',
+	descKey: 'tutorial_tour_desc',
+	steps: [
+		{
+			id: 'optic',                // unique in the tutorial
+			titleKey: '…', textKey: '…', // a blank line in the text starts a paragraph
+			camera: 'target',           // a preset: shooter, optic, side, target
+			// or, instead of camera, a pose: offset in metres from an anchor, looking at it
+			pose: { anchor: 'optic', offset: [0.35, 0.15, 0.3], fov: 45 }, // anchors: shooter, rifle, optic, muzzle, target
+			highlight: { model: 'target', node: 'zone-a' }, // models: rifle, optic, target, sandbag; node: a named node of the model
+			values: ['distance', 'slope'], // overlay: distance, slope, wind, drop, windage, time
+			action: 'fire'              // run when the step opens
+		}
+	]
+};
+```
+
+All step fields but `id`, `titleKey` and `textKey` are optional; a step without camera or pose leaves the camera where it is. `tutorialRegistry.test.js` checks every registered tutorial with `tutorialProblems` (the format above) and its message keys in the three catalogs, and that every file of `tutorials/` is registered. A step that needs something new in the scene (a value, an action, an anchor, a model) adds it to the lists in `registry.js`, to the page ([`ballistic-tutorial/+page.svelte`](../src/routes/calculators/ballistic-tutorial/+page.svelte): `valueLine`, `applyStep`) and to the scene's API (`createTutorialScene` returns `update`, `setCamera`, `setPose`, `highlight`, `fire`, `clearShot`, `dispose`). Put any number the scene needs in `utils/` with a test, as [`tutorialScene.js`](../src/lib/utils/tutorialScene.js) does; `scene.js` is the only module that may import three.js, and only the tutorial route may import it, with `await import()` behind `if (__MOBILE_BUILD__) return;` (`tutorialModels.test.js`). After a change, run `npm run build:mobile` and check that `build/_app/immutable/bundle.*.js` has no `WebGLRenderer`, then `npm run build` again.
 
 ### Included software list
 

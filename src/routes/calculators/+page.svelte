@@ -8,11 +8,13 @@
 		RulerDimensionLineIcon,
 		ChartLineIcon,
 		ChartScatterIcon,
+		GraduationCapIcon,
 		ChevronRightIcon
 	} from '@lucide/svelte';
 	import { activeProfile } from '#lib/stores/activeProfile.svelte.js';
 	import { shownProfile } from '#lib/utils/storedProfiles.js';
 	import ProfileInUseChip from '#lib/components/ProfileInUseChip.svelte';
+	import { isTutorialAvailable, withoutUnavailableTutorial } from '#lib/utils/tutorialAvailability.js';
 
 	// Calculators hub (#149): two groups, the everyday tools first. #166: from sm a card grid with
 	// the profile chip (Change opens the picker) in the header; phones keep the list and the intro line.
@@ -20,7 +22,8 @@
 		{ href: '/calculators/ballistic', labelKey: 'calc_ballistic', descKey: 'calc_ballistic_desc', icon: ChartSplineIcon },
 		{ href: '/calculators/dope-cards', labelKey: 'calc_dope_cards', descKey: 'calc_dope_cards_desc', icon: Table2Icon }
 	];
-	const moreTools = [
+	// The 3D tutorial is not in the Capacitor apps (#182): withoutUnavailableTutorial.
+	const moreTools = withoutUnavailableTutorial([
 		{ href: '/calculators/mpbr', labelKey: 'calc_mpbr', descKey: 'calc_mpbr_desc', icon: RulerDimensionLineIcon },
 		{ href: '/calculators/compare-trajectories', labelKey: 'calc_compare', descKey: 'calc_compare_desc', icon: ChartLineIcon },
 		{
@@ -29,8 +32,15 @@
 			descKey: 'calc_trajectory_validation_desc',
 			icon: ChartScatterIcon,
 			advanced: true
+		},
+		// 3D ballistic tutorial (#182): under More tools, no badge (owner decision of 2026-11-17).
+		{
+			href: '/calculators/ballistic-tutorial',
+			labelKey: 'tutorial_title',
+			descKey: 'tutorial_hub_desc',
+			icon: GraduationCapIcon
 		}
-	];
+	], isTutorialAvailable());
 
 	// The active profile as the page shows it (#120): rifle, then ammo when there is one.
 	let shown = $derived(shownProfile(activeProfile.profile));

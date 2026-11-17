@@ -12,6 +12,7 @@
 	import { shownProfile } from '#lib/utils/storedProfiles.js';
 	import { profileName } from '#lib/components/profile/profileLabels.js';
 	import { NEW_PROFILE_PATH } from '#lib/utils/setupSteps.js';
+	import { isTutorialAvailable, withoutUnavailableTutorial } from '#lib/utils/tutorialAvailability.js';
 
 	let { children } = $props();
 
@@ -30,7 +31,9 @@
 				{ href: '/calculators/dope-cards', labelKey: 'calc_dope_cards' },
 				{ href: '/calculators/mpbr', labelKey: 'calc_mpbr' },
 				{ href: '/calculators/compare-trajectories', labelKey: 'calc_compare' },
-				{ href: '/calculators/trajectory-validation', labelKey: 'calc_trajectory_validation' }
+				{ href: '/calculators/trajectory-validation', labelKey: 'calc_trajectory_validation' },
+				// Not in the Capacitor apps (#182).
+				...withoutUnavailableTutorial([{ href: '/calculators/ballistic-tutorial', labelKey: 'tutorial_title' }], isTutorialAvailable())
 			]
 		},
 		{ href: '/profiles', labelKey: 'nav_profiles', shortKey: 'nav_profiles', icon: ListIcon },
@@ -98,6 +101,8 @@
 		if (path.startsWith('/profiles')) return m.profiles_title();
 		if (path.startsWith('/calculators/compare-trajectories/add')) return m.compare_pick_profile();
 		if (path.startsWith('/calculators/compare-trajectories')) return m.compare_title();
+		// Before /calculators/ballistic, which it starts with (#182).
+		if (path.startsWith('/calculators/ballistic-tutorial')) return m.tutorial_title();
 		if (path.startsWith('/calculators/ballistic')) return m.ballistic_title();
 		if (path.startsWith('/calculators/mpbr')) return m.calc_mpbr();
 		if (path.startsWith('/calculators/trajectory-validation')) return m.traj_val_title();

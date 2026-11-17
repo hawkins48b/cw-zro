@@ -45,7 +45,10 @@ const csp = {
 
 export default defineConfig({
 	define: {
-		__APP_VERSION__: JSON.stringify(pkg.version)
+		__APP_VERSION__: JSON.stringify(pkg.version),
+		// The mobile build leaves the 3D tutorial out (#182, owner decision of 2026-11-17): the page
+		// imports its three.js scene only when this is false, so the single mobile bundle has none.
+		__MOBILE_BUILD__: JSON.stringify(isCapacitor)
 	},
 	plugins: [
 		tailwindcss(),

@@ -17,7 +17,7 @@ Versions are those locked in `package-lock.json` on `develop`.
 | Ballistics | `js-ballistics`, pinned by owner decision ([#77](https://github.com/hawkins48b/cw-zro/issues/77)), with its WebAssembly engine bclibc (LGPL-3.0) | 3.1.0 (bclibc 2.0.0) |
 | Charts | ApexCharts, lazy-loaded, pinned on an exact version by owner decision ([#75](https://github.com/hawkins48b/cw-zro/issues/75)); licence text checked by a test (#164) | 8.8.1 |
 | PDF | `pdf-lib` | 1.17.1 |
-| 3D | three.js, pinned on an exact version; only the tutorial models' build script and the dev viewer use it so far (#181) | 0.187.0 |
+| 3D | three.js, pinned on an exact version: the tutorial models' build script and the dev viewer (#181), and the 3D tutorial's scene (#182), loaded lazily on that route only, in the web and desktop builds; the mobile build has none | 0.187.0 |
 | Translations | Paraglide | 3.1.0 |
 | Tests | Vitest, jsdom | 5.1.0, 31.0.0 |
 | Mobile | Capacitor | 8.6.0 |
@@ -70,6 +70,7 @@ Configuration is in [`vite.config.js`](../vite.config.js). There is no `svelte.c
 | `/calculators/compare-trajectories` | Compare chart |
 | `/calculators/compare-trajectories/add` | Choose a profile to compare |
 | `/calculators/dope-cards` | PDF cards: the mid-range card (imperial, metric) and the precision dope card generator ([`PrecisionCardGenerator.svelte`](../src/lib/components/PrecisionCardGenerator.svelte), [#157](https://github.com/hawkins48b/cw-zro/issues/157)); both use the profile in use, one `ProfileInUseChip` in the header ([#170](https://github.com/hawkins48b/cw-zro/issues/170)) |
+| `/calculators/ballistic-tutorial` | 3D ballistic tutorial ([#182](https://github.com/hawkins48b/cw-zro/issues/182), epic [#180](https://github.com/hawkins48b/cw-zro/issues/180)): profile and warning, then the three.js scene, its settings and the tutorial player. Web and desktop only: the mobile app lists no link to it and shows "Not available in the mobile app" on a direct visit. See [3D tutorial](#3d-tutorial) |
 | `/calculators/dope-cards/precision-guide` | How to read the precision dope card (①–⑥, wind quarters, printing) |
 | `/profiles` | Profiles: picker list (tap to use), summary of the profile in use, Import, Export all ([#166](2026-11-17-166-profiles-redesign.md)) |
 | `/profiles/new`, `/profiles/[id]` | Profile editor in five sections; `/profiles/new` is the full form, linked from the guided setup (#177) ([`ProfileForm`](../src/lib/components/ProfileForm.svelte)) |
@@ -240,6 +241,23 @@ Since [#152](https://github.com/hawkins48b/cw-zro/issues/152) (owner decisions o
 - **Stale answers.** Leaving the page, or leaving the Accurate mode, aborts the request and drops a late answer. A change to a box while the request runs does not stop it: the answer then replaces the three boxes.
 - **Where it shows.** [`isCurrentWeatherAvailable`](../src/lib/utils/currentWeather.js): web and mobile, with `navigator.geolocation`, `fetch` and `AbortController`. Not on the desktop build, detected by its `app:` scheme or an `Electron/` user agent ([`isDesktopApp`](../src/lib/utils/platform.js) since #166); the desktop app also refuses the location permission ([`permissions.js`](../electron/permissions.js), unchanged).
 
+### 3D tutorial
+
+The page [`ballistic-tutorial/+page.svelte`](../src/routes/calculators/ballistic-tutorial/+page.svelte) (#182) starts on step 1 on every visit: `TutorialIntro` (profile, CPU/GPU warning, the WebGL check of [`webgl.js`](../src/lib/utils/webgl.js): a WebGL 2 context on a throwaway canvas, released at once; three.js 0.187 has no WebGL 1). "Open the 3D scene" shows step 2.
+
+| Piece | Where | Role |
+|-------|-------|------|
+| State | [`ballisticTutorial.svelte.js`](../src/lib/stores/ballisticTutorial.svelte.js), key `zro-ballistic-tutorial` | Its own state, not the Ballistic page's nor the Scope View's (owner decision of 2026-11-17): target distance along the line of sight, shooter altitude and target elevation, atmosphere and wind (the Scope View store's API, so `ScopeWindCard`, `ScopeAtmosphereCard` and `useCurrentWeather` take it), scene weather and quality. Readers in [`storedTutorial.js`](../src/lib/utils/storedTutorial.js). First state: 300 in the profile's zero unit (m and m/s, or yd, ft and mph), Medium quality, or Low on phones (`pointer: coarse` and under 768 px) |
+| Trajectory | [`tutorialPath.js`](../src/lib/utils/tutorialPath.js) | `tutorialGeometry` turns distance and target elevation into the uphill or downhill angle (asin of elevation over distance); `tutorialTrajectory` calls `calculateFullTrajectory` with that angle (#173), so the drop at the target is the Ballistic table's, and turns the rows into scene metres. See [Angles](ballistics-model.md#angles) in the ballistics model |
+| Scene logic | [`tutorialScene.js`](../src/lib/utils/tutorialScene.js) | Plain numbers: layout, terrain heights, quality presets, wind sway, weather looks, tree and grass placement, camera poses |
+| Scene | [`src/lib/tutorial/scene.js`](../src/lib/tutorial/scene.js) | The only module that imports three.js. The page loads it with `await import()` once step 2 has its container. See below |
+| Tutorials | [`src/lib/tutorial/registry.js`](../src/lib/tutorial/registry.js), one data file per tutorial in `tutorials/` | The step format and the list. See [Tutorials](development.md#tutorials-of-the-3d-tutorial) |
+| UI | [`components/tutorial/`](../src/lib/components/tutorial/) | `TutorialIntro`, `TutorialScene` (the canvas box, overlays, camera chips, Fire), `TutorialReticle` (the reticle through the optic, drawn in mrad over the camera's field of view), `TutorialRangeCard`, `TutorialDisplayCard`, `TutorialPlayer`. They compute nothing |
+
+**Not in the Capacitor apps** (owner decision of 2026-11-17 on #182). The mobile build is one JS file that inlines dynamic imports, so the scene would have put three.js (about 655 kB) on every screen of the mobile app: with it, the bundle grew from 2,390,810 to 3,116,237 bytes. So [`isTutorialAvailable`](../src/lib/utils/tutorialAvailability.js) is false in the mobile build (`__MOBILE_BUILD__`, defined in `vite.config.js` from `BUILD_TARGET=capacitor`) and wherever the Capacitor bridge reports Android or iOS. The hub card and the sidebar entry are then left out, and the page shows "Not available in the mobile app" with a pointer to the web version and the desktop app. The page returns before the scene's `import()` when `__MOBILE_BUILD__` is true, so the bundler drops it as dead code: the mobile bundle has no `WebGLRenderer`, `GLTFLoader` or `/models/` path, and is 2,454,294 bytes (63,484 more than before #182: the page, its components, store, path helper and messages). This replaces the epic's (#180) "works in Capacitor": web and Electron keep the tutorial. The `.glb` files are still copied into the mobile build, unused.
+
+The scene loads 11 of the 12 models of `static/models` (all but the spotting scope) from `/models/<name>.glb`, as the precision card fetches `/pdf/`. The rifle lies on the sandbag, pitched by the slope; the optic is the scope (`mil-dot`, `mrad`, `moa`) or the holographic sight (`red-dot`). The ground goes from the shooter to the target's ground, with flat pads and a berm behind the target; grass is one `InstancedMesh` whose vertex shader bends it with the wind; trees and two flags line the range, and their branches, leaves and cloth move each frame. Settings changes are applied piece by piece: wind and weather at once, terrain, grass and trees 180 ms after the last change. Rendering stops while the tab is hidden or the scene is off screen, and on leaving the page `dispose()` frees geometries, materials, textures, the renderer and its context, the controls, the observers and the listeners. A lost WebGL context shows "The 3D scene stopped" with Restart.
+
 ### Where shots are built
 
 The input handling is written out six times: in `calculateShotPoint`, `calculateFullTrajectory` and `calculateMPBR`, in `computeTrajectory` in each mid-range dope card file, and in `computePrecisionCard` ([`precisionCard.js`](../src/lib/utils/precisionCard.js), #157). A change to how an input is read has to be made in all of them, and they do not all apply the same options. See the [table of screens](ballistics-model.md#which-screen-uses-what).
@@ -249,14 +267,14 @@ The input handling is written out six times: in `calculateShotPoint`, `calculate
 | Target | Command | Output | Difference |
 |--------|---------|--------|------------|
 | Web | `npm run build` | `build/` | Split in chunks: 92 JS files, ApexCharts and dope cards load on demand. The ApexCharts chunk is 950 kB, 280 kB gzipped (8.8.1; 605 kB and 165 kB on 5.16.0) |
-| Mobile | `npm run build:mobile` | `build/` | `BUILD_TARGET=capacitor` sets `bundleStrategy: 'single'`: 1 JS file |
+| Mobile | `npm run build:mobile` | `build/` | `BUILD_TARGET=capacitor` sets `bundleStrategy: 'single'`: 1 JS file, which inlines dynamic imports. It also sets `__MOBILE_BUILD__`, which leaves the 3D tutorial's scene and three.js out (#182) |
 | Desktop | `npm run electron:build` | `dist-electron/` | The web build, served from `app://-` by `electron-serve` |
 
 **Aborted ApexCharts request on a reload** ([#99](https://github.com/hawkins48b/cw-zro/issues/99)). The Ballistic, MPBR, Trajectory Validation and Compare pages import ApexCharts in `onMount`, so its chunk is requested after the page has rendered. If the page is reloaded, or left, before that response arrives, the browser cancels the request of the document it unloads, and lists it as aborted (`net::ERR_ABORTED`). The new document requests the chunk again and draws the charts. Reproduced on 2026-11-11 with a production build behind a static host with an `index.html` fallback, in Chromium, by delaying the chunk 400 ms and reloading `/calculators/ballistic` as soon as the page had text: the first request is aborted, the second completes and the chart renders, with no page error. Reloading after the chunk has loaded aborts nothing. The earlier smoke tests (#71, #72) reloaded as soon as the page showed text, which is that race. The chunk path is absolute (`/_app/immutable/...`), so a deep URL does not change it. A start without a locale in the URL and a stored language other than English ([#96](https://github.com/hawkins48b/cw-zro/issues/96)) aborts the requests of the first document the same way, because `hooks.client.js` replaces the page; ApexCharts is not among them, since that document never mounts a page. Neither costs more than a repeated download.
 
 **Web and mobile builds share `build/`.** The second one overwrites the first.
 
-Every build also carries the tutorial models, `build/models/*.glb`, 498,632 bytes ([Tutorial models](development.md#tutorial-models)). No page loads them yet. The dev-only model viewer is in no build.
+Every build also carries the tutorial models, `build/models/*.glb`, 498,632 bytes ([Tutorial models](development.md#tutorial-models)), which the 3D tutorial loads (#182). In the web build, three.js and the scene are one chunk of 655,138 bytes (163,132 gzipped) that only the tutorial route imports, with `import()`; `tutorialModels.test.js` checks that only `scene.js` imports three and only that route imports `scene.js`, lazily. The dev-only model viewer is in no build.
 
 ## Layout by screen width
 
@@ -316,6 +334,8 @@ In the mobile web views the app's own origin is `https://localhost` on Android, 
 | `object-src` | `'none'` | |
 | `base-uri` | `'self'` | |
 | `form-action` | `'none'` | No form is submitted anywhere |
+
+The 3D tutorial (#182) needs nothing more either: its models are fetched from the app's origin (`connect-src 'self'`), they have no texture, so GLTFLoader makes no `blob:` URL and starts no worker, and three.js compiles its shaders with WebGL, not `eval`. The one texture the scene makes, a soft dot for sprites and snow, is drawn on a canvas, with no URL.
 
 ApexCharts 8.8.1 needs nothing more ([#75](https://github.com/hawkins48b/cw-zro/issues/75)): no `eval`, no inline script, no other host. Its two `fetch` calls embed fonts in chart exports, and the app hides the toolbar, so none runs.
 

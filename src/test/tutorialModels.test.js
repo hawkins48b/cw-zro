@@ -347,8 +347,12 @@ describe('three', () => {
 		expect(THREE.REVISION).toBe(pkg.dependencies.three.split('.')[1]);
 	});
 
-	it('is imported by no app code yet, nor are the model scripts or the viewer', () => {
-		const offenders = [];
+	// Since #182, src/lib/tutorial/scene.js is the one module that imports three, and the tutorial
+	// route loads it with import() only, so three stays in that route's lazy chunk.
+	it('is imported by the tutorial scene only, which only the tutorial route loads, lazily; no app code imports the model scripts or the viewer', () => {
+		const threeImports = [];
+		const sceneImports = [];
+		const toolImports = [];
 		const walk = (dir) => {
 			for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
 				const file = path.join(dir, entry.name);
@@ -356,12 +360,36 @@ describe('three', () => {
 					if (!['test', 'paraglide'].includes(entry.name)) walk(file);
 				} else if (/\.(js|svelte)$/.test(entry.name)) {
 					const text = fs.readFileSync(file, 'utf-8');
-					if (/from ['"]three['"/]|import\(['"]three|scripts\/models|scripts\/build-models|model-viewer/.test(text)) offenders.push(path.relative(root, file));
+					const rel = path.relative(root, file);
+					if (/from ['"]three['"/]|import\(['"]three/.test(text)) threeImports.push(rel);
+					if (/tutorial\/scene(\.js)?['"]/.test(text)) {
+						const lazy = /await import\(['"]#lib\/tutorial\/scene\.js['"]\)/.test(text);
+						const stat = /from ['"][^'"]*tutorial\/scene(\.js)?['"]/.test(text);
+						sceneImports.push({ rel, lazy, stat });
+					}
+					if (/scripts\/models|scripts\/build-models|model-viewer/.test(text)) toolImports.push(rel);
 				}
 			}
 		};
 		walk(path.join(root, 'src'));
-		expect(offenders).toEqual([]);
+		expect(threeImports).toEqual(['src/lib/tutorial/scene.js']);
+		expect(sceneImports).toEqual([{ rel: 'src/routes/calculators/ballistic-tutorial/+page.svelte', lazy: true, stat: false }]);
+		expect(toolImports).toEqual([]);
+	});
+
+	// The Capacitor apps have no tutorial (#182, owner decision of 2026-11-17): vite.config.js sets
+	// __MOBILE_BUILD__ for BUILD_TARGET=capacitor, and the page returns before the scene's import when
+	// it is true, so the mobile build drops the import as dead code (checked on the build output when
+	// this was written: no three.js in the mobile bundle).
+	it('is left out of the mobile build: the scene import sits behind __MOBILE_BUILD__', () => {
+		const config = fs.readFileSync(path.join(root, 'vite.config.js'), 'utf-8');
+		expect(config).toMatch(/__MOBILE_BUILD__: JSON\.stringify\(isCapacitor\)/);
+		const page = fs.readFileSync(path.join(root, 'src/routes/calculators/ballistic-tutorial/+page.svelte'), 'utf-8');
+		const guard = page.indexOf('if (__MOBILE_BUILD__) return;');
+		const load = page.indexOf("await import('#lib/tutorial/scene.js')");
+		expect(guard).toBeGreaterThan(0);
+		expect(load).toBeGreaterThan(guard);
+		expect(page.match(/await import\(['"]#lib\/tutorial\/scene\.js['"]\)/g)).toHaveLength(1);
 	});
 });
 
