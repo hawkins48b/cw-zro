@@ -17,7 +17,8 @@
  *   length, whatever the profile's spin drift switch says, when both are within their limits.
  *   Otherwise the engine gets no twist and the card prints no spin drift.
  * - Wind: a full crosswind (engine angle 90°) at each ring speed, minus the windage of the shot
- *   without wind (the spin drift), at the page distance.
+ *   without wind (the spin drift), at the page distance. Each ray of the dial (#159: every 15°,
+ *   from 15° to 90° off the line of fire) prints that windage times the sine of its angle.
  * - The flight stops at the engine's limits: rows past the end of the reference flight give no
  *   page, and a cell whose own flight ended before its distance stays empty (null).
  *
@@ -64,8 +65,18 @@ export const PRECISION_EXTRA_STEPS = Object.freeze([25, 50, 75]);
 /** The only zero distance the card takes, in m or yd. */
 export const PRECISION_ZERO = 100;
 
-/** Wind dial factors: I (30° off the line of fire), II (60°) and III (full crosswind). */
-export const WIND_FACTORS = Object.freeze({ I: 0.5, II: 0.866, III: 1 });
+/**
+ * The rays of the wind dial, in degrees off the line of fire (#159): every 15°, the half hours of
+ * the clock between them. 30° is I, 60° II and 90° III (a full crosswind).
+ */
+export const WIND_ANGLES = Object.freeze([15, 30, 45, 60, 75, 90]);
+
+/**
+ * The share of a full crosswind's windage on a ray: the sine of its angle (0.259, 0.5, 0.707,
+ * 0.866, 0.966, 1).
+ * @param {number} angle - degrees off the line of fire
+ */
+export const windFactor = (angle) => Math.sin((angle * Math.PI) / 180);
 
 /** The columns of each unit system, from precisionCardFormat.js. */
 export { PRECISION_UNITS };
@@ -203,7 +214,8 @@ const tenthOf = (value) => roundHalfAway(value * 10) / 10;
  * @property {{ value: number, direction: 'left'|'right'|null }|null} spinDrift - ⑤, the direction
  *   to dial; null without spin drift; direction null for 0
  * @property {number} time - time of flight, s
- * @property {{ speed: number, I: number|null, II: number|null, III: number|null }[]} wind - ⑥
+ * @property {{ speed: number, values: (number|null)[] }[]} wind - ⑥, one ring per speed; values
+ *   has one value per ray of WIND_ANGLES, null past the flight
  * @property {number} clickSize - one elevation click at this distance, in sizeUnit
  */
 export function computePrecisionCard(profile, options) {
@@ -377,14 +389,9 @@ export function computePrecisionCard(profile, options) {
 			const noWind = row.windageAngle.In(windageUnit);
 			const wind = columns.wind.speeds.map((speed, i) => {
 				const r = windRows[i].get(d);
-				if (!r) return { speed, I: null, II: null, III: null };
+				if (!r) return { speed, values: WIND_ANGLES.map(() => null) };
 				const full = Math.abs(r.windageAngle.In(windageUnit) - noWind);
-				return {
-					speed,
-					I: windageMagnitude(full * WIND_FACTORS.I),
-					II: windageMagnitude(full * WIND_FACTORS.II),
-					III: windageMagnitude(full * WIND_FACTORS.III)
-				};
+				return { speed, values: WIND_ANGLES.map((angle) => windageMagnitude(full * windFactor(angle))) };
 			});
 
 			return {

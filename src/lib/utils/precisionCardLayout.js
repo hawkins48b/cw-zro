@@ -143,8 +143,13 @@ export const RANGE = Object.freeze({
 		radii: Object.freeze([50, 100, 150, 200]),
 		axisTop: 24,
 		axisRight: 236,
-		/** Clock positions, degrees clockwise from XII, and the label of each. */
-		rays: Object.freeze({ I: 30, II: 60, III: 90 }),
+		/**
+		 * The rays, degrees clockwise from XII (#159): the angles of WIND_ANGLES in precisionCard.js,
+		 * in the same order. 90° is the III axis; the others are drawn as thin lines.
+		 */
+		rays: Object.freeze([15, 30, 45, 60, 75, 90]),
+		/** Thin rays end this far past the outer ring. */
+		rayOverhang: 20,
 		clockLabels: Object.freeze([
 			Object.freeze({ text: 'XII', x: 24, y: 17 }),
 			Object.freeze({ text: 'I', x: 140, y: 44 }),
@@ -152,10 +157,29 @@ export const RANGE = Object.freeze({
 			Object.freeze({ text: 'III', x: 250, y: 246 })
 		]),
 		clockSize: 18,
+		/** The angle of I, II and III, small: after I and II (x the left end), under III (x the centre). */
+		clockAngles: Object.freeze([
+			Object.freeze({ text: '30°', x: 146, y: 44, align: 'left' }),
+			Object.freeze({ text: '60°', x: 235, y: 128, align: 'left' }),
+			Object.freeze({ text: '90°', x: 250, y: 260, align: 'center' })
+		]),
+		clockAngleSize: 10,
+		/** The labels of the rays between the hours, centred this far from the centre on their ray. */
+		halfRays: Object.freeze([15, 45, 75]),
+		halfRayRadius: 232,
+		halfRaySize: 12,
 		ringLabelSize: 15,
-		valueSize: 15,
-		/** From the centre of a value to its baseline. */
-		baselineDrop: 5.3,
+		valueSize: 11,
+		/**
+		 * How far past its ring a value sits, by ring, on the rays between the hours (15°, 45°, 75°):
+		 * on the inner rings the rays are too close for a value on each, so every other value sits
+		 * just outside the ring. Values on I, II and III sit on the ring.
+		 */
+		stagger: Object.freeze([22, 12, 0, 0]),
+		/** From the centre of a text to its baseline, as a share of its size. */
+		baselineDrop: 5.3 / 15,
+		/** The white halo behind a value: padding on each side, and its top above the baseline, as a share of the size. */
+		halo: Object.freeze({ padding: 2, top: 0.8 }),
 		unit: Object.freeze({ x: 36, y: 45, size: 12 })
 	}),
 	footer: Object.freeze({ boxX: 18, boxTop: 526, boxHeight: 19, padding: 6, baseline: 539, size: 12, gap: 10 })
@@ -187,6 +211,20 @@ export function dialPoint(angle, radius) {
 		x: origin.x + centre.x + radius * Math.sin(rad),
 		y: origin.y + centre.y - radius * Math.cos(rad)
 	};
+}
+
+/**
+ * The centre of the value of ring `ring` (0 = inner) on the ray `ray` (index in RANGE.dial.rays),
+ * in page px: where the ring meets the ray, or just outside the ring on a ray between the hours
+ * of a staggered ring.
+ * @param {number} ring
+ * @param {number} ray
+ */
+export function dialValuePoint(ring, ray) {
+	const dl = RANGE.dial;
+	const angle = dl.rays[ray];
+	const offset = dl.halfRays.includes(angle) ? dl.stagger[ring] : 0;
+	return dialPoint(angle, dl.radii[ring] + offset);
 }
 
 // ── Worksheet ──────────────────────────────────────────────────────────────────

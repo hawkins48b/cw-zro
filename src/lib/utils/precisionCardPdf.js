@@ -25,7 +25,7 @@ import {
 	WIDTH,
 	WORKSHEET,
 	coverCell,
-	dialPoint,
+	dialValuePoint,
 	extraCell,
 	painter,
 	precisionTemplatePath,
@@ -247,18 +247,20 @@ function fillRange(p, ctx, page, number) {
 	p.text(timeText, RIGHT, s.baseline, { size: s.size, bold: true, align: 'right' });
 
 	// ⑥ Wind dial
+	// One value per ray and ring (#159), on a white halo; staggered on the inner rings
+	// (dialValuePoint).
 	const dl = RANGE.dial;
-	const size = correction === 'angle' ? 12 : dl.valueSize;
+	const size = dl.valueSize;
+	const halo = dl.halo;
 	page.wind.forEach((ring, i) => {
-		const r = dl.radii[i];
-		for (const key of /** @type {const} */ (['I', 'II', 'III'])) {
-			const text = formatCorrection(ring[key], correction, { magnitude: true });
-			const at = dialPoint(dl.rays[key], r);
+		ring.values.forEach((value, ray) => {
+			const text = formatCorrection(value, correction, { magnitude: true });
+			const at = dialValuePoint(i, ray);
 			const w = p.width(text, size, true);
-			const y = at.y + size * (dl.baselineDrop / dl.valueSize);
-			p.rect(at.x - w / 2 - 2, y - size * 0.8, w + 4, size, { fill: COLORS.white });
+			const y = at.y + size * dl.baselineDrop;
+			p.rect(at.x - w / 2 - halo.padding, y - size * halo.top, w + 2 * halo.padding, size, { fill: COLORS.white });
 			p.text(text, at.x, y, { size, bold: true, color: COLORS.value, align: 'center' });
-		}
+		});
 	});
 
 	// Footer: the click line and the page.

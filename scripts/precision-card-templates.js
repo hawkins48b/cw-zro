@@ -175,8 +175,9 @@ function drawRange(p, words, columns) {
 	for (const r of dl.radii) {
 		p.path(`M ${cx} ${cy - r} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`, ox, oy, { border: COLORS.ring, dash: [4, 3] });
 	}
-	for (const angle of [dl.rays.I, dl.rays.II]) {
-		const end = dialPoint(angle, dl.radii[dl.radii.length - 1] + 20);
+	// Thin rays every 15° (#159); 90° is the III axis.
+	for (const angle of dl.rays.filter((a) => a < 90)) {
+		const end = dialPoint(angle, dl.radii[dl.radii.length - 1] + dl.rayOverhang);
 		p.line(ox + cx, oy + cy, end.x, end.y, { color: COLORS.ray });
 	}
 	p.line(ox + cx, oy + cy, ox + cx, oy + dl.axisTop, { width: 1.25 });
@@ -185,10 +186,17 @@ function drawRange(p, words, columns) {
 	for (const label of dl.clockLabels) {
 		p.text(label.text, ox + label.x, oy + label.y, { size: dl.clockSize, bold: true, align: 'center' });
 	}
+	for (const label of dl.clockAngles) {
+		p.text(label.text, ox + label.x, oy + label.y, { size: dl.clockAngleSize, color: COLORS.muted, align: label.align });
+	}
+	for (const angle of dl.halfRays) {
+		const at = dialPoint(angle, dl.halfRayRadius);
+		p.text(`${angle}°`, at.x, at.y + dl.halfRaySize * dl.baselineDrop, { size: dl.halfRaySize, bold: true, align: 'center' });
+	}
 	columns.wind.speeds.forEach((speed, i) => {
 		const r = dl.radii[i];
 		const x = ox + cx;
-		const y = oy + cy - r + dl.baselineDrop;
+		const y = oy + cy - r + dl.ringLabelSize * dl.baselineDrop;
 		const text = String(speed);
 		const w = p.width(text, dl.ringLabelSize, true);
 		p.rect(x - w / 2 - 2, y - dl.ringLabelSize * 0.8, w + 4, dl.ringLabelSize, { fill: COLORS.white });

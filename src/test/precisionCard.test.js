@@ -11,10 +11,12 @@ import {
 	PRECISION_MAX_DISTANCE,
 	PRECISION_MIN_DISTANCE,
 	PRECISION_UNITS,
+	WIND_ANGLES,
 	computePrecisionCard,
 	isUsableMaxDistance,
 	precisionCardRequirements,
-	precisionPageDistances
+	precisionPageDistances,
+	windFactor
 } from '#lib/utils/precisionCard.js';
 import { P308_G1 } from './fixtures/ballisticProfiles.js';
 
@@ -310,9 +312,15 @@ describe('the sample profile (real engine)', () => {
 		]);
 		expect(p700.time).toBe(1.07);
 		expect(p700.spinDrift).toEqual({ value: 1, direction: 'left' });
-		expect(p700.wind.map((w) => w.III)).toEqual([6, 12, 18, 24]);
-		expect(p700.wind.map((w) => w.II)).toEqual([5, 11, 16, 21]);
-		expect(p700.wind.map((w) => w.I)).toEqual([3, 6, 9, 12]);
+		// The design's rays I (30°), II (60°) and III (90°), as before #159.
+		const ray = (angle) => p700.wind.map((w) => w.values[WIND_ANGLES.indexOf(angle)]);
+		expect(ray(90)).toEqual([6, 12, 18, 24]);
+		expect(ray(60)).toEqual([5, 11, 16, 21]);
+		expect(ray(30)).toEqual([3, 6, 9, 12]);
+		// The rays between the hours (#159).
+		expect(ray(15)).toEqual([2, 3, 5, 6]);
+		expect(ray(45)).toEqual([4, 9, 13, 17]);
+		expect(ray(75)).toEqual([6, 12, 18, 24]);
 		expect(p700.pressure).toEqual([0, -1, -3, -4, -5, -6]);
 		expect(p700.temperature).toEqual([-2, -1, -1, 0, 1, 1, 2, 3]);
 		expect(p700.clickSize).toBe(7);
@@ -341,13 +349,27 @@ describe('the sample profile (real engine)', () => {
 		for (let i = 1; i < p1000.temperature.length; i++) expect(p1000.temperature[i]).toBeGreaterThanOrEqual(p1000.temperature[i - 1]);
 	});
 
-	it('wind grows from I to III and with the ring speed', () => {
+	it('wind grows from 15° to 90° and with the ring speed', () => {
 		for (const p of card.pages) {
 			for (const w of p.wind) {
-				expect(w.I).toBeLessThanOrEqual(w.II);
-				expect(w.II).toBeLessThanOrEqual(w.III);
+				expect(w.values).toHaveLength(6);
+				for (let r = 1; r < w.values.length; r++) expect(w.values[r]).toBeGreaterThanOrEqual(w.values[r - 1]);
 			}
-			for (let i = 1; i < p.wind.length; i++) expect(p.wind[i].III).toBeGreaterThanOrEqual(p.wind[i - 1].III);
+			for (let i = 1; i < p.wind.length; i++) expect(p.wind[i].values.at(-1)).toBeGreaterThanOrEqual(p.wind[i - 1].values.at(-1));
+		}
+	});
+
+	it('gives each ray the full crosswind times the sine of its angle (#159)', () => {
+		expect(WIND_ANGLES).toEqual([15, 30, 45, 60, 75, 90]);
+		expect(WIND_ANGLES.map((a) => Math.round(windFactor(a) * 1000) / 1000)).toEqual([0.259, 0.5, 0.707, 0.866, 0.966, 1]);
+		expect(windFactor(90)).toBe(1);
+		// In angle mode a ray is the 90° value times its factor, give or take the rounding of both.
+		const angle = computePrecisionCard(SAMPLE, { ...METRIC_CLICKS, correction: 'angle' });
+		for (const p of angle.pages) {
+			for (const w of p.wind) {
+				const full = w.values.at(-1);
+				w.values.forEach((v, r) => expect(Math.abs(v - full * windFactor(WIND_ANGLES[r]))).toBeLessThanOrEqual(0.1 + 1e-9));
+			}
 		}
 	});
 
@@ -355,7 +377,7 @@ describe('the sample profile (real engine)', () => {
 		const without = computePrecisionCard({ ...SAMPLE, barrelTwist: '' }, METRIC_CLICKS);
 		for (const p of card.pages) {
 			const q = page(without, p.distance);
-			p.wind.forEach((w, i) => expect(Math.abs(w.III - q.wind[i].III)).toBeLessThanOrEqual(1));
+			p.wind.forEach((w, i) => expect(Math.abs(w.values.at(-1) - q.wind[i].values.at(-1))).toBeLessThanOrEqual(1));
 		}
 	});
 
@@ -395,7 +417,7 @@ describe('the sample profile (real engine)', () => {
 		expect(angle.correction).toBe('angle');
 		expect(p700.elevation).toBe(5.8);
 		for (const p of angle.pages) {
-			const values = [p.elevation, ...p.extras.map((e) => e.value), ...p.pressure, ...p.temperature, p.spinDrift.value, ...p.wind.flatMap((w) => [w.I, w.II, w.III])];
+			const values = [p.elevation, ...p.extras.map((e) => e.value), ...p.pressure, ...p.temperature, p.spinDrift.value, ...p.wind.flatMap((w) => w.values)];
 			for (const v of values) if (v !== null) expect(Math.abs(Math.round(v * 10) - v * 10)).toBeLessThan(1e-9);
 		}
 	});
@@ -444,8 +466,8 @@ describe('a 100 yd zero with MOA clicks (real engine)', () => {
 	it('uses each turret its own click', () => {
 		const mixed = computePrecisionCard({ ...P308_MOA, windageClickValue: '0.1', windageClickUnit: 'MRAD' }, { maxDistance: 1000, correction: 'clicks', units: 'imperial' });
 		expect(mixed.pages.map((p) => p.elevation)).toEqual(card.pages.map((p) => p.elevation));
-		const w = page(mixed, 1000).wind[3].III;
-		const moa = page(card, 1000).wind[3].III;
+		const w = page(mixed, 1000).wind[3].values.at(-1);
+		const moa = page(card, 1000).wind[3].values.at(-1);
 		// 0.1 MRAD is 0.344 MOA, so fewer clicks than at 0.25 MOA.
 		expect(w).toBeLessThan(moa);
 		expect(Math.abs(w * 0.34377 - moa * 0.25)).toBeLessThan(0.4);

@@ -1,6 +1,7 @@
 <script>
 	/**
-	 * Reading the precision dope card (#157, board 7b). Static help text: no data, no store.
+	 * Reading the precision dope card (#157, board 7b; wind rays every 15° since #159). Static help
+	 * text: no data, no store.
 	 * The example numbers are those of the sample 6.5 Creedmoor card, not computed here.
 	 */
 	import { m } from '#lib/paraglide/messages.js';
@@ -17,11 +18,17 @@
 		{ n: '5', title: () => m.dope_guide_spin_title(), text: () => m.dope_guide_spin_text() }
 	];
 
+	// Every hour and half hour of the clock, by the ray that reads it (#159). A direction reads
+	// the ray of its angle off the line of fire, mirrored left-right and front-back: half past
+	// XII is 15°, half past V is 165°, the same crosswind as 15°.
 	const clock = [
-		{ from: 'I, V, VII, XI', read: () => 'I' },
-		{ from: 'II, IV, VIII, X', read: () => 'II' },
-		{ from: 'III, IX', read: () => 'III' },
-		{ from: 'XII, VI', read: () => m.dope_guide_clock_none() }
+		{ from: 'XII, VI', read: () => m.dope_guide_clock_none() },
+		{ from: 'XII½, V½, VI½, XI½', read: () => '15°' },
+		{ from: 'I, V, VII, XI', read: () => 'I (30°)' },
+		{ from: 'I½, IV½, VII½, X½', read: () => '45°' },
+		{ from: 'II, IV, VIII, X', read: () => 'II (60°)' },
+		{ from: 'II½, III½, VIII½, IX½', read: () => '75°' },
+		{ from: 'III, IX', read: () => 'III (90°)' }
 	];
 
 	// Sample 6.5 Creedmoor values from the design (board 7b): 58 + 7 − 3 − 1 = 61 up; 11 − 1 = 10 right.
@@ -99,6 +106,13 @@
 					<path d="M20 80 A100 100 0 0 1 120 180" />
 					<path d="M20 30 A150 150 0 0 1 170 180" />
 				</g>
+				<!-- The thin rays every 15° (#159); the example's II (60°) is drawn below -->
+				<g class="stroke-surface-300-700" stroke-width="1">
+					<path d="M20 180 L61.4 25.5" />
+					<path d="M20 180 L100 41.4" />
+					<path d="M20 180 L133.1 66.9" />
+					<path d="M20 180 L174.5 138.6" />
+				</g>
 				<!-- The ring and direction of the example -->
 				<path d="M20 80 A100 100 0 0 1 120 180" fill="none" class="stroke-primary-600-400" stroke-width="2.5" />
 				<g class="stroke-surface-950-50" stroke-width="1.25"><path d="M20 180 V14" /><path d="M20 180 H182" /></g>
@@ -118,6 +132,7 @@
 					<text x="20" y="85" text-decoration="underline">4</text>
 					<text x="20" y="35" text-decoration="underline">6</text>
 					<text x="20" y="12" font-size="13">XII</text>
+					<text x="106" y="34" font-size="13">I</text>
 					<text x="172" y="98" font-size="13">II</text>
 					<text x="194" y="185" font-size="13">III</text>
 				</g>
@@ -150,6 +165,7 @@
 
 		<ul class="list-disc pl-5 space-y-1.5 text-sm leading-relaxed text-surface-600-400">
 			<li>{m.dope_guide_wind_side()}</li>
+			<li>{m.dope_guide_wind_rays()}</li>
 			<li>{m.dope_guide_wind_between()}</li>
 			<li>{m.dope_guide_wind_imperial()}</li>
 		</ul>
@@ -173,6 +189,7 @@
 				</tbody>
 			</table>
 		</div>
+		<p class="text-xs leading-relaxed text-surface-600-400">{m.dope_guide_clock_half()}</p>
 	</section>
 
 	<!-- Worked example -->

@@ -14,10 +14,11 @@ import path from 'node:path';
 import { PDFArray, PDFDocument, PDFPage } from 'pdf-lib';
 import { generatePrecisionDopeCard } from '#lib/utils/precisionCardPdf.js';
 import { computePrecisionCard } from '#lib/utils/precisionCard.js';
-import { LEFT, PAGE_SIZE, PX, RIGHT, precisionTemplatePath } from '#lib/utils/precisionCardLayout.js';
+import { FOOTER, LEFT, PAGE_SIZE, PX, RANGE, RIGHT, precisionTemplatePath } from '#lib/utils/precisionCardLayout.js';
 import { PRECISION_LOCALES, precisionWords } from '#lib/utils/precisionCardWords.js';
 import { formatDate } from '#lib/utils/precisionCardFormat.js';
 import { TEMPLATE_UNITS, buildPrecisionTemplate } from '../../scripts/precision-card-templates.js';
+import { P223_G1 } from './fixtures/ballisticProfiles.js';
 
 const SAMPLE = Object.freeze({
 	name: 'Tikka T3x',
@@ -63,7 +64,7 @@ beforeAll(() => {
 	});
 	const real = PDFPage.prototype.drawText;
 	vi.spyOn(PDFPage.prototype, 'drawText').mockImplementation(function (text, options) {
-		texts.push({ text, x: options.x, y: options.y, width: options.font.widthOfTextAtSize(text, options.size), size: options.size });
+		texts.push({ text, x: options.x, y: options.y, width: options.font.widthOfTextAtSize(text, options.size), size: options.size, page: this.ref });
 		return real.call(this, text, options);
 	});
 });
@@ -196,6 +197,76 @@ describe('generatePrecisionDopeCard', () => {
 		for (const t of texts) expect(t.text).not.toMatch(/[Łźкарбин🎯混合\n]/u);
 		expect(texts.some((t) => t.text.startsWith('ódz') || t.text.startsWith('ód'))).toBe(true);
 		expect(texts.some((t) => t.text.includes('…'))).toBe(true);
+	});
+});
+
+describe('wind dial (#159)', () => {
+	/** The range page's dial area, in design px from the top: below the ⑤ rule, above the footer rule. */
+	const inDial = (t) => {
+		const top = (PAGE_SIZE.height - t.y) / PX;
+		return top > RANGE.spin.rule && top < FOOTER.rule;
+	};
+	/**
+	 * The box of a text in PDF points: from 0.2 of its size below the baseline to 0.8 above, the
+	 * white halo of a value (RANGE.dial.halo); `pad` on each side.
+	 */
+	const box = (t, pad = 0) => ({ left: t.x - pad, right: t.x + t.width + pad, bottom: t.y - 0.2 * t.size, top: t.y + 0.8 * t.size });
+	const overlap = (a, b) => a.left < b.right && b.left < a.right && a.bottom < b.top && b.bottom < a.top;
+	const label = (t) => `"${t.text}" at ${(t.x / PX).toFixed(1)},${((PAGE_SIZE.height - t.y) / PX).toFixed(1)}`;
+
+	/** The texts of the template's range page in the dial: badge, clock, angle, ring and unit labels. */
+	const templateDial = async (units) => {
+		texts.length = 0;
+		await buildPrecisionTemplate('en', units);
+		const pages = [...new Set(texts.map((t) => t.page))];
+		return texts.filter((t) => t.page === pages[1] && inDial(t));
+	};
+
+	/** P223_G1 with 1/4 MOA clicks: past 2000 yd it has three-digit clicks on every ring, and 100+ MOA. */
+	const LONG = { ...P223_G1, reticleType: 'moa', elevationClickValue: '0.25', elevationClickUnit: 'MOA', windageClickValue: '0.25', windageClickUnit: 'MOA' };
+	/** The sample in metres with a MOA reticle: four-character angles (12.2) on the inner rings. */
+	const SAMPLE_MOA = { ...SAMPLE, reticleType: 'moa' };
+
+	it.each([
+		['clicks', LONG, 'imperial', 3],
+		['angle', LONG, 'imperial', 5],
+		['clicks', SAMPLE_MOA, 'metric', 3],
+		['angle', SAMPLE_MOA, 'metric', 4]
+	])('%s, %s units: no dial value overlaps another, a ring label or a ray label', async (correction, profile, units, longest) => {
+		const labels = await templateDial(units);
+		// XII, I, II, III, 30°, 60°, 90°, 15°, 45°, 75°, four ring speeds, the unit and the badge.
+		expect(labels.map((t) => t.text)).toEqual(expect.arrayContaining(['XII', 'I', 'II', 'III', '15°', '30°', '45°', '60°', '75°', '90°']));
+		expect(labels).toHaveLength(16);
+
+		texts.length = 0;
+		const doc = await generatePrecisionDopeCard(profile, { ...OPTIONS, maxDistance: 3000, correction, units }, 'en');
+		const ranges = doc.getPages().slice(1, -1);
+		expect(ranges.length).toBeGreaterThan(20);
+		const pad = RANGE.dial.halo.padding * PX;
+		let widest = 0;
+		for (const page of ranges) {
+			const values = texts.filter((t) => t.page === page.ref && inDial(t));
+			expect(values).toHaveLength(24);
+			for (const v of values) widest = Math.max(widest, v.text.length);
+			for (let i = 0; i < values.length; i++) {
+				const a = box(values[i], pad);
+				for (let j = i + 1; j < values.length; j++) {
+					expect(overlap(a, box(values[j], pad)), `${label(values[i])} and ${label(values[j])}`).toBe(false);
+				}
+				for (const l of labels) expect(overlap(a, box(l)), `${label(values[i])} and ${label(l)}`).toBe(false);
+			}
+		}
+		// The worst case is on the card: the test measures the widest values it is meant for.
+		expect(widest).toBeGreaterThanOrEqual(longest);
+	});
+
+	it('prints the 700 m values of the sample, ring by ring from 15° to 90°', async () => {
+		const doc = await generatePrecisionDopeCard(SAMPLE, OPTIONS, 'en');
+		const p700 = doc.getPage(7);
+		const values = texts.filter((t) => t.page === p700.ref && inDial(t)).map((t) => t.text);
+		const card = computePrecisionCard(SAMPLE, OPTIONS);
+		const wind = card.pages.find((p) => p.distance === 700).wind;
+		expect(values).toEqual(wind.flatMap((ring) => ring.values.map(String)));
 	});
 });
 
