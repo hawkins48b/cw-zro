@@ -661,7 +661,7 @@
 	"welcome_step_velocity_title": "Vitesse initiale",
 	"welcome_step_velocity_text": "Celle de votre chronographe, ou celle de la boîte si vous n'en avez pas.",
 	"welcome_setup": "Configurer mon fusil",
-	"welcome_sample": "Essayer avec un profil d'exemple",
+	"welcome_sample": "Essayer avec des profils d'exemple",
 	"welcome_privacy": "Reste sur cet appareil. Aucun compte.",
 	"setup_step_of": "Étape {step} sur {total}",
 	"setup_progress": "Étapes de configuration",

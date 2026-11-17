@@ -661,7 +661,7 @@
 	"welcome_step_velocity_title": "Muzzle velocity",
 	"welcome_step_velocity_text": "From your chronograph, or the box if you have none.",
 	"welcome_setup": "Set up my rifle",
-	"welcome_sample": "Try it with a sample profile",
+	"welcome_sample": "Try it with sample profiles",
 	"welcome_privacy": "Stays on this device. No account.",
 	"setup_step_of": "Step {step} of {total}",
 	"setup_progress": "Setup steps",
