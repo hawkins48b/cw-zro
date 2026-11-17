@@ -43,7 +43,9 @@ describe('WindDial shooter clock (#165)', () => {
 		['37', 37, "1 o'clock, 37°"],
 		['-90', 270, "9 o'clock, 270°"],
 		['400,5', 40.5, "1 o'clock, 41°"],
-		['', 0, "12 o'clock, 0°"]
+		['', 0, "12 o'clock, 0°"],
+		['Infinity', 0, "12 o'clock, 0°"],
+		['1e999', 0, "12 o'clock, 0°"]
 	])('turns the highlight and the arrow to %j (from %s°) and announces it', (direction, deg, text) => {
 		const dial = show(direction);
 		const turns = rotations(dial);

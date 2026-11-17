@@ -20,7 +20,11 @@
 	// clock (#106): 0 = from the target (12 o'clock), 90 = from the right (3 o'clock), 180 = from
 	// behind, 270 = from the left. Boxes are read as shotWinds reads them, with a comma as a decimal
 	// point, so the dial matches the result.
-	let dirDeg = $derived(((readDecimal(direction) || 0) % 360 + 360) % 360);
+	// A non-finite box ("Infinity", "1e999") is drawn as 0°, like an empty one.
+	let dirDeg = $derived.by(() => {
+		const read = readDecimal(direction);
+		return Number.isFinite(read) ? ((read % 360) + 360) % 360 : 0;
+	});
 	let hour = $derived(clockHour(dirDeg));
 	// The hour whose numeral sits on the highlight: only when the direction is exactly on it.
 	let onHour = $derived(Number.isInteger(dirDeg) && dirDeg % 30 === 0 ? hour : null);

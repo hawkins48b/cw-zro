@@ -44,6 +44,10 @@
 	);
 </script>
 
+<!-- A release lost to an app switch or a system dialog must not keep stepping -->
+<svelte:window onblur={() => hold.stop()} />
+<svelte:document onvisibilitychange={() => hold.stop()} />
+
 <button
 	type="button"
 	class="{base} {shape}"

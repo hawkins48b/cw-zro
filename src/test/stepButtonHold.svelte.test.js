@@ -80,6 +80,15 @@ describe('StepButton hold to repeat (#168)', () => {
 		expect(value).toBe('980');
 	});
 
+	it('stops when the window loses focus', () => {
+		const { up } = show('0', SPEC);
+		press(up, 'pointerdown');
+		tick(HOLD_DELAY_MS);
+		window.dispatchEvent(new Event('blur'));
+		tick(2000);
+		expect(value).toBe('20');
+	});
+
 	it('stays within the limits', () => {
 		const { up } = show('8950', SPEC);
 		press(up, 'pointerdown');
