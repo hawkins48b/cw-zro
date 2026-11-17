@@ -59,8 +59,11 @@
 	let isInvalid = $derived(invalid ?? (!!message && messageType === 'error'));
 	let described = $derived([message ? messageId : '', describedby].filter(Boolean).join(' ') || undefined);
 
-	function step(sign) {
-		onchange?.(stepValue(value, sign * spec.step, spec));
+	/** `steps` steps of − (sign −1) or + (1); several while a button is held (#168). */
+	function step(sign, steps = 1) {
+		let text = value;
+		for (let i = 0; i < steps; i++) text = stepValue(text, sign * spec.step, spec);
+		onchange?.(text);
 	}
 </script>
 
@@ -74,7 +77,7 @@
 		</div>
 	{/if}
 	<div class="input !flex !items-center !p-0 h-11 overflow-hidden">
-		<StepButton dir="down" label={decreaseLabel} onclick={() => step(-1)} />
+		<StepButton dir="down" label={decreaseLabel} onclick={(steps) => step(-1, steps)} />
 		<input
 			id={inputId}
 			class="flex-1 w-8 min-w-0 bg-transparent border-none outline-none shadow-none px-1.5 py-0 font-semibold {align ===
@@ -96,7 +99,7 @@
 		{#if units}
 			<ChipGroup class="pr-1.5" label={unitsLabel} options={units} value={unit} onselect={(u) => onunitchange?.(u)} />
 		{/if}
-		<StepButton dir="up" label={increaseLabel} onclick={() => step(1)} />
+		<StepButton dir="up" label={increaseLabel} onclick={(steps) => step(1, steps)} />
 	</div>
 	{#if message}
 		<p

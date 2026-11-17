@@ -14,8 +14,11 @@
 	// Cant − / + (#166): one degree within the slider's range (utils/fieldStep.js), stored as the
 	// slider stores it, a number.
 	const CANT_SPEC = fieldStepSpec('cant');
-	function stepCant(sign) {
-		scopeView.setRotation(Number(stepValue(scopeView.rotation, sign * CANT_SPEC.step, CANT_SPEC)));
+	/** `steps` steps of 1° (several while a button is held, #168), within the slider's range. */
+	function stepCant(sign, steps = 1) {
+		let value = scopeView.rotation;
+		for (let i = 0; i < steps; i++) value = Number(stepValue(value, sign * CANT_SPEC.step, CANT_SPEC));
+		scopeView.setRotation(value);
 	}
 
 	// ── Constants ────────────────────────────────────────────────────
@@ -443,7 +446,7 @@
 				dir="down"
 				variant="standalone"
 				label={m.scope_view_step_cant_down({ step: '1°' })}
-				onclick={() => stepCant(-1)}
+				onclick={(steps) => stepCant(-1, steps)}
 			/>
 			<input
 				id="scope-cant"
@@ -460,7 +463,7 @@
 				dir="up"
 				variant="standalone"
 				label={m.scope_view_step_cant_up({ step: '1°' })}
-				onclick={() => stepCant(1)}
+				onclick={(steps) => stepCant(1, steps)}
 			/>
 			<span class="text-xs font-mono w-10 text-right tabular-nums">{scopeView.rotation}°</span>
 		</div>
