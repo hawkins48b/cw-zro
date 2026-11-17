@@ -24,6 +24,7 @@ import {
 	qualityPreset,
 	sceneLayout,
 	terrainHeight,
+	gridIndex,
 	treePlacements,
 	weatherLook,
 	windSway
@@ -297,14 +298,7 @@ export async function createTutorialScene(container, settings, events = {}) {
 				k++;
 			}
 		}
-		const index = [];
-		const w = xs.length;
-		for (let j = 0; j < zs.length - 1; j++) {
-			for (let i = 0; i < w - 1; i++) {
-				const a = j * w + i;
-				index.push(a, a + w, a + 1, a + 1, a + w, a + w + 1);
-			}
-		}
+		const index = gridIndex(xs.length, zs.length);
 		const geometry = own(new THREE.BufferGeometry());
 		geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 		geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));

@@ -24,7 +24,8 @@ import {
 	treePlacements,
 	weatherLook,
 	windSpeedMps,
-	windSway
+	windSway,
+	gridIndex
 } from '#lib/utils/tutorialScene.js';
 import { tutorialGeometry } from '#lib/utils/tutorialPath.js';
 
@@ -216,5 +217,27 @@ describe('modelPath', () => {
 			expect(url).toBe(`/models/${name}.glb`);
 			expect(existsSync(path.join(process.cwd(), 'static', url))).toBe(true);
 		}
+	});
+});
+
+describe('gridIndex', () => {
+	it('winds every terrain triangle so its front face points up (+Y)', () => {
+		// 3 columns along +X, 3 rows going down range (−Z), flat ground.
+		const xs = [-2, 0, 2];
+		const zs = [0, -2, -4];
+		const vertices = zs.flatMap((z) => xs.map((x) => [x, 0, z]));
+		const index = gridIndex(xs.length, zs.length);
+		expect(index).toHaveLength(2 * 2 * 6);
+		for (let t = 0; t < index.length; t += 3) {
+			const [a, b, c] = [index[t], index[t + 1], index[t + 2]].map((i) => vertices[i]);
+			const e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+			const e2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+			const normalY = e1[2] * e2[0] - e1[0] * e2[2];
+			expect(normalY).toBeGreaterThan(0);
+		}
+	});
+
+	it('uses every vertex of the grid', () => {
+		expect(new Set(gridIndex(4, 5)).size).toBe(20);
 	});
 });

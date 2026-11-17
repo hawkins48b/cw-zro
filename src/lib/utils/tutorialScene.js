@@ -137,6 +137,27 @@ export function terrainHeight(x, z, layout) {
 	return base + berm + roll;
 }
 
+/**
+ * Triangle indices for the terrain grid: `columns` vertices per row along +X, rows going down range
+ * (each row further along −Z). Each triangle is counter-clockwise seen from above, so its front face
+ * (the only side three.js draws) points up (+Y). The other order makes the ground invisible from
+ * above (#182 follow-up).
+ *
+ * @param {number} columns
+ * @param {number} rows
+ * @returns {number[]}
+ */
+export function gridIndex(columns, rows) {
+	const index = [];
+	for (let j = 0; j < rows - 1; j++) {
+		for (let i = 0; i < columns - 1; i++) {
+			const a = j * columns + i;
+			index.push(a, a + 1, a + columns, a + 1, a + columns + 1, a + columns);
+		}
+	}
+	return index;
+}
+
 /** Metres per second in a mile per hour. */
 const MPS_PER_MPH = 0.44704;
 
