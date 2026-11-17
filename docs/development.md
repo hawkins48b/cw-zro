@@ -62,6 +62,16 @@ Branch from `develop`. See [the branch flow](deployment.md#branch-flow). Before 
 
 Calculations can hang with no way to stop them. See [Input guards](ballistics-model.md#input-guards) before changing what reaches the engine.
 
+### Precision card templates
+
+The precision dope card (#157) is printed on static templates, `static/pdf/precision-<en|fr|de>-<metric|imperial>.pdf`, three A6 pages each (cover, range page, worksheet). [`scripts/precision-card-templates.js`](../scripts/precision-card-templates.js) draws them with pdf-lib; there is no SVG source. After changing the layout ([`precisionCardLayout.js`](../src/lib/utils/precisionCardLayout.js)), the words ([`precisionCardWords.js`](../src/lib/utils/precisionCardWords.js)) or the columns ([`precisionCardFormat.js`](../src/lib/utils/precisionCardFormat.js)), run:
+
+```bash
+npm run templates:precision
+```
+
+and commit the six PDFs. The output has no date or id, so an unchanged layout writes the same bytes. `precisionCardPdf.test.js` fails when a committed template differs from what the script writes. The fill code reads the same layout and words, so the numbers stay in their cells.
+
 ### Skeleton upgrades
 
 Its tools do not flag every changed default. Diff the old and new CSS, as [the Skeleton delivery](2026-11-05-74-skeleton-lucide.md) explains.

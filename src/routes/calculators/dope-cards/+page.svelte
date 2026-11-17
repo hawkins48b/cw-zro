@@ -3,6 +3,7 @@
 	import { activeProfile } from '#lib/stores/activeProfile.svelte.js';
 	import { ChevronDown, ChevronRight, Download, Loader } from '@lucide/svelte';
 	import { downloadDopeCard } from '#lib/utils/dopeCardDownload.js';
+	import PrecisionCardGenerator from '#lib/components/PrecisionCardGenerator.svelte';
 
 	// ── Download state ────────────────────────────────────────────────
 	let loading = $state({ imperial: false, metric: false });
@@ -114,6 +115,9 @@
 				</div>
 			{/if}
 		</div>
+
+		<!-- Precision dope card (#157): A6 booklet, any saved profile -->
+		<PrecisionCardGenerator save={savePDF} />
 
 	</div>
 {/if}

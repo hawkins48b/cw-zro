@@ -29,7 +29,7 @@ All scripts: [README](README.md#scripts). Setup: [docs/development.md](docs/deve
 - **Never overwrite a baseline, or widen a tolerance, to make a test pass.** A failing baseline is a finding: stop, explain it, measure the shift, report it. See [docs/testing.md](docs/testing.md#when-a-baseline-fails).
 - Do not pin known defects as baselines.
 - Do not claim more accuracy than [docs/ballistics-model.md](docs/ballistics-model.md#accuracy) shows.
-- Input handling is written out five times: `calculateShotPoint`, `calculateFullTrajectory`, `calculateMPBR` and `computeTrajectory` in both dope cards. Check them all.
+- Input handling is written out six times: `calculateShotPoint`, `calculateFullTrajectory`, `calculateMPBR`, `computeTrajectory` in both mid-range dope cards, and `computePrecisionCard` (precision card, #157). Check them all.
 
 ## Engine hangs
 

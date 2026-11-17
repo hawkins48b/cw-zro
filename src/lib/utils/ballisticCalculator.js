@@ -60,7 +60,7 @@ function humidityFraction(percent) {
  * @param {Velocity} mv    - muzzle velocity at profile.temperature
  * @returns {{ tempModifier: number, powderTemp: Temperature|null, usePowderSensitivity: boolean }}
  */
-function powderSensitivity(profile, mv) {
+export function powderSensitivity(profile, mv) {
 	if (!profile.tempSensitivity || !profile.tempModifier) {
 		return { tempModifier: 0, powderTemp: null, usePowderSensitivity: false };
 	}

@@ -39,6 +39,7 @@ The [development guide](docs/development.md) covers the production, mobile and d
 | `npm run test` | Runs the tests in watch mode |
 | `npm run test:run` | Runs the tests once, as CI does |
 | `npm run audit:check` | Fails on high or critical audit findings, as CI does |
+| `npm run templates:precision` | Redraws the precision dope card templates in `static/pdf/` (#157). See [Precision card templates](docs/development.md#precision-card-templates) |
 | `npm run cap:sync` | Runs `build:mobile`, then `npx cap sync` |
 | `npm run cap:android` | Runs `cap:sync`, then opens the Android project |
 | `npm run cap:ios` | Runs `cap:sync`, then opens the iOS project |
@@ -68,7 +69,7 @@ The [docs index](docs/README.md) lists these guides and the dated delivery docum
 | MPBR | Maximum point-blank range for a target size, with the zero to use and a chart |
 | Trajectory validation | Solves muzzle velocity or BC from an observed impact, and can save it to the profile |
 | Compare trajectories | Several profiles on one chart |
-| Dope cards | PDF cards in imperial or metric |
+| Dope cards | PDF cards in imperial or metric: a mid-range card to 500, and a precision card (A6, one page per 100 up to 3000, in clicks, MRAD or MOA) with a guide |
 | Profiles | Rifle, optic and ammunition sets, with a library of 41 loads |
 | Settings | Dark mode, language (English, French, German), about and privacy pages |
 

@@ -1,6 +1,6 @@
 # Ballistics model
 
-This guide describes what the app calculates on `develop`, what it assumes, and how far the results have been checked. The code is in [`ballisticCalculator.js`](../src/lib/utils/ballisticCalculator.js), [`trajectoryValidation.js`](../src/lib/utils/trajectoryValidation.js) and the two dope card files, on top of the `js-ballistics` library.
+This guide describes what the app calculates on `develop`, what it assumes, and how far the results have been checked. The code is in [`ballisticCalculator.js`](../src/lib/utils/ballisticCalculator.js), [`trajectoryValidation.js`](../src/lib/utils/trajectoryValidation.js), the two mid-range dope card files and [`precisionCard.js`](../src/lib/utils/precisionCard.js) (precision dope card), on top of the `js-ballistics` library.
 
 **Read this first.** The results are estimates from a point-mass model. Their accuracy depends on the velocity, BC and conditions entered. The evidence below is a comparison with two manufacturer tables that were probably computed, not measured. Nothing in this repository shows that the results are accurate or safe for hunting, competition or any other real-world use. Check them against your own rifle and ammunition.
 
@@ -61,6 +61,7 @@ Weight and diameter do not change the drag. The BC alone carries that.
 | Compare trajectories | `calculateFullTrajectory` | Standard only | No | Yes | Yes |
 | MPBR | `calculateMPBR` | Standard only | No | No | Vertical only is used |
 | Dope cards | `computeTrajectory` in each card file | Standard only | Preset | No | No |
+| Precision dope card | `computePrecisionCard` | Standard reference, plus fixed pressure and temperature columns, see [Precision dope card](#precision-dope-card) | Fixed crosswinds | Yes | Yes, from twist and length, whatever the switch says |
 
 Dope cards go to 500 yd or 500 m. They use a crosswind from the left of 8 and 20 mph (imperial) or 3.5 and 9 m/s (metric), built in the card files with the engine's 90°. The cards print the windage as a size, light wind on the left of each point-of-aim chart and strong wind on the right, marked `LI` and `ST`. No label on them says left or right, so the convention of [#106](https://github.com/hawkins48b/cw-zro/issues/106) changed nothing on them.
 
@@ -271,10 +272,10 @@ All ends are included. The gram and foot ends are the owner's rounded values, no
 | `calculateShotPoint` | Cant finite (`Number.isFinite`), checked before the zero solve. On 3.1 an infinite or NaN cant hangs the solve ([#77](https://github.com/hawkins48b/cw-zro/issues/77)). The Scope View only passes a stored rotation within ±90° (`storedRotation`) | No result |
 | `calculateShotPoint`, `calculateFullTrajectory` | Range within the limit. Step at least 1, 25 when empty, and at most the range: a larger or infinite step is read as the range (full trajectory, `tableStep`, [#133](https://github.com/hawkins48b/cw-zro/issues/133)) | No result |
 | Ballistic page, step | At least 1 and at most the range, at least 1 for a range under 1 (`tableStepLimit`). Text and NaN count as under 1, an infinite step as over the range ([#130](https://github.com/hawkins48b/cw-zro/issues/130), [#133](https://github.com/hawkins48b/cw-zro/issues/133)) | A message under the box. The table uses `tableStep`: 1, or the range |
-| All five paths | BC from 0.01 to 2 (`isUsableBc`) | No result. A dope card is not saved |
-| All five paths | Entered velocity finite and under 10000 fps, and velocity at the current temperature finite, at least 50 and under 10000 fps (`hasFlyableVelocity`). MPBR and the dope cards use no powder sensitivity | No result. A dope card is not saved |
-| All five paths | Optic height finite and within 10 in or 25.4 cm either way (`isUsableSightHeight`) | No result. A dope card is not saved |
-| All five paths | Bullet weight and diameter within the limits above (`hasUsableBullet`) ([#125](https://github.com/hawkins48b/cw-zro/issues/125)) | No result. A dope card is not saved |
+| All six paths | BC from 0.01 to 2 (`isUsableBc`) | No result. A dope card is not saved |
+| All six paths | Entered velocity finite and under 10000 fps, and velocity at the current temperature finite, at least 50 and under 10000 fps (`hasFlyableVelocity`). MPBR and the mid-range dope cards use no powder sensitivity. The precision card checks the reference and each pressure and temperature column; a column whose velocity cannot be flown prints a dash | No result. A dope card is not saved |
+| All six paths | Optic height finite and within 10 in or 25.4 cm either way (`isUsableSightHeight`) | No result. A dope card is not saved |
+| All six paths | Bullet weight and diameter within the limits above (`hasUsableBullet`) ([#125](https://github.com/hawkins48b/cw-zro/issues/125)) | No result. A dope card is not saved |
 | Shot point, full trajectory, MPBR, spin drift on | Twist, taken either way, and length within the limits above when they are set (`hasUsableBullet`). Empty, they are not passed to the engine (no twist, 2 in length), as before. The dope cards never use spin drift and do not check them | No result |
 | Shot point, full trajectory, dope cards | Zero distance 1 to 3000 (`isUsableZeroDistance`) | No result. A dope card is not saved |
 | Shot point, full trajectory, MPBR, dope cards | Finite barrel elevation after the zero solve, before any shot (`hasFiniteElevation`). It only rejects NaN and Infinity, so it changes no result. It does not stop every hang: a NaN that appears during the flight solves to a finite elevation, usually 0. On 3.1 no input inside the other guards was found that makes the solve return NaN | No result. A dope card is not saved |
@@ -298,6 +299,7 @@ All ends are included. The gram and foot ends are the owner's rounded values, no
 | `calculateTrajectoryValidation` | Velocity between 0 and 10000 in the profile's unit, BC between 0.01 and 2 (`MIN_BC`, `MAX_BC`), both ends excluded: a profile BC of exactly 0.01 or 2 gives no solution when solving for BC. Each shot goes through `calculateShotPoint`, so its limits apply too | Shot skipped |
 | `calculateTrajectoryValidation` | At most 200 shots and 5 seconds, checked before each shot | No solution, or a timeout message when time ended a search that could still move |
 | Dope card zero search | Zero elevation at most 0.6 rad | Near and far stay blank |
+| Precision dope card (`computePrecisionCard`) | Requirements first (`precisionCardRequirements`): zero exactly 100 m or 100 yd, reticle `mrad`, `mil-dot` or `moa`, both click units MOA or MRAD with a value above 0. Options: maximum distance a finite number from 100 to 3000 (`isUsableMaxDistance`), correction `clicks` or `angle`, units `metric` or `imperial`. Then the guards of the other paths: zero, sight height, weight and diameter, BC, velocity at the reference temperature, finite elevation after the zero solve. Twist and length go to the engine only when both are set and within their limits; otherwise no twist and a 2 in length, and the card prints no spin drift. No flight goes past 3000 units | No card: `generatePrecisionDopeCard` returns null and nothing is fetched |
 
 Saved profiles are read through the same guards on every path, so a stored `Infinity`, hex or out-of-limit value in a field with a limit gives no result instead of freezing a page. Since [#125](https://github.com/hawkins48b/cw-zro/issues/125) this also covers weight, diameter, twist, length and altitude: a stored `Infinity` or `0x10` there gives no result (`0x10` reads as 0, below every lower limit).
 
@@ -316,6 +318,43 @@ Saved profiles are read through the same guards on every path, so a stored `Infi
 - An MPBR calculation has no time limit, because it runs only from a button. It can take seconds on absurd input.
 
 A hang freezes that tab or window. It does not affect other users, because everything runs on the device.
+
+## Precision dope card
+
+The precision dope card ("Abaque de précision", [#157](https://github.com/hawkins48b/cw-zro/issues/157), owner decisions of 2026-11-17) has one A6 page per 100 m or yd, from 100 to the maximum distance (100 to 3000), between a cover and a click worksheet. [`computePrecisionCard`](../src/lib/utils/precisionCard.js) computes it; [`precisionCardPdf.js`](../src/lib/utils/precisionCardPdf.js) prints it. It only takes a profile zeroed at exactly 100 m or 100 yd, with an `mrad`, `mil-dot` (both MRAD) or `moa` reticle and MOA or MRAD clicks. Distances and the steps of ② follow the zero's unit; the `units` option only picks the pressure, temperature and wind columns.
+
+**Reference and zero.** The rifle is zeroed once, at 100, in the ICAO standard atmosphere: altitude 0, 1013.25 hPa (29.92 inHg), 15 °C (59 °F), humidity 0, which is `new Atmo()` in js-ballistics 3.1. Every pressure, temperature and wind column fires with that same zero elevation: only the air or the wind changes. This differs from every other calculator, which solves the zero again in each atmosphere (see [Zero](#zero)), and is what the card is for: what a rifle zeroed in standard air needs in other air.
+
+| Column | Values | Fired at |
+|--------|--------|----------|
+| ③ Pressure, metric | 1000, 950, 900, 850, 800, 750 hPa | 15 °C, altitude 0 |
+| ③ Pressure, imperial | 29.5, 28.0, 26.5, 25.0, 23.5, 22.0 inHg | 15 °C (59 °F), altitude 0 |
+| ④ Temperature, metric | +45, +35, +25, +15, +5, -5, -15, -25 °C | 1013.25 hPa |
+| ④ Temperature, imperial | +110, +90, +70, +50, +30, +10, -10 °F | 1013.25 hPa |
+| ⑥ Wind rings, metric | 2, 4, 6, 8 m/s | Reference air |
+| ⑥ Wind rings, imperial | 5, 10, 15, 20 mph | Reference air |
+
+The pressure is passed to `Atmo` as the pressure of the air at altitude 0, so a column is a station pressure, not a QNH to be corrected for altitude. **Powder sensitivity** is applied as on the Scope View (`powderSensitivity`, the profile's switch, temperature and modifier): the powder is at the air temperature, so the temperature columns include the change of muzzle velocity, and the reference uses the velocity at 15 °C. A column whose velocity at its temperature cannot be flown (`hasFlyableVelocity`) prints a dash.
+
+**Values per page** (distance D):
+
+| Item | What | Rounding |
+|------|------|----------|
+| ① Elevation | To dial up at D (a bullet below the line of sight is up) | Clicks as the Scope View counts them ([`clicks.js`](../src/lib/utils/clicks.js)): the angle rounded to 0.1 in the click unit, then divided by the click value and rounded to a whole click |
+| ② D+25, D+50, D+75 | Count at D+x minus count at D, so ① + ② is the count at D+x | As ① |
+| ③ ④ | (angle in that air - angle in the reference air) / click, signed like ①: thinner or warmer air gives fewer clicks, so negative | The angle difference is rounded, never a difference of rounded counts |
+| ⑤ Spin drift | The windage of the reference shot without wind, and the direction to dial, opposite to the drift: a right-hand twist drifts right, so dial left | As ① (Scope View count), on the windage turret |
+| ⑤ Time of flight | Of the reference shot at D | 0.01 s |
+| ⑥ Wind | A full crosswind (engine angle 90°) at the ring speed, minus the windage without wind (the spin drift), as a magnitude, at III; × 0.5 at I and × 0.866 at II | Each product rounded to a whole click on the windage turret |
+| Footer | One elevation click as a size at D: click angle (rad) × D | 0.1 cm (m) or 0.1 in (yd) |
+
+In `angle` mode every value is in the reticle's unit (MRAD or MOA) instead, rounded to 0.1 by the same rules. Elevation values use the elevation turret's click value and unit, windage values the windage turret's. A half rounds away from zero.
+
+**Spin drift** uses the profile's twist and bullet length whatever the spin drift switch says, when both are set and within their limits (a negative twist is a left-hand barrel). Without them the engine gets no twist and the card prints a dash. The drift is the library's empirical formula (see [Spin drift](#spin-drift)); it has no independent check. Only the reference shot's spin drift is printed: its change with pressure and temperature is not.
+
+**Flight limits.** The reference shot fires every 25 units to the last page + 75, never past 3000 (the range limit of every calculator, so the 3000 page has no ②). Where the engine ends a flight (minimum velocity, maximum drop or minimum altitude, its `RangeError`), the rows up to there are kept: no page for a distance the reference flight does not reach, a dash for an extra distance past it, and a dash in a column whose own flight ended before D. No card when not even the 100 page exists.
+
+**Owner's sample.** At 700 m the card gives the values on the design (6.5 Creedmoor 140 gr, G7 0.326, 820 m/s, sight height 4.5 cm, twist 1:8" right, length 1.37 in, 0.1 MRAD): +58 clicks; +3, +7, +10; pressure 0, -1, -3, -4, -5, -6; temperature -2, -1, -1, 0, +1, +1, +2, +3; spin drift left 1; 1.07 s; wind III 6, 12, 18, 24. `precisionCard.test.js` pins them. The other printed values (spin drift, pressure and temperature deltas, wind) are new outputs. The owner's approval of them is an acceptance criterion of #157, open when this was written. No check against a published table exists.
 
 ## What is not modelled
 

@@ -46,7 +46,7 @@ electron/                    # Desktop main process, navigation rules, menu, per
 messages/                    # en.json, fr.json, de.json
 project.inlang/              # Paraglide settings
 resources/                   # Desktop icons
-scripts/                     # Audit check
+scripts/                     # Audit check, precision card templates
 static/                      # Copied to build/: logo, PDF templates, robots.txt
 ```
 
@@ -66,7 +66,8 @@ Configuration is in [`vite.config.js`](../vite.config.js). There is no `svelte.c
 | `/calculators/trajectory-validation` | Velocity or BC from an observation |
 | `/calculators/compare-trajectories` | Compare chart |
 | `/calculators/compare-trajectories/add` | Choose a profile to compare |
-| `/calculators/dope-cards` | PDF cards |
+| `/calculators/dope-cards` | PDF cards: the mid-range card (imperial, metric) and the precision dope card generator ([`PrecisionCardGenerator.svelte`](../src/lib/components/PrecisionCardGenerator.svelte), [#157](https://github.com/hawkins48b/cw-zro/issues/157)) |
+| `/calculators/dope-cards/precision-guide` | How to read the precision dope card (①–⑥, wind quarters, printing) |
 | `/profiles` | Profile list |
 | `/profiles/new`, `/profiles/[id]` | Profile form |
 | `/profiles/ammo-selector` | Ammunition library |
@@ -176,7 +177,7 @@ Since [#152](https://github.com/hawkins48b/cw-zro/issues/152) (owner decisions o
 
 ### Where shots are built
 
-The input handling is written out five times: in `calculateShotPoint`, `calculateFullTrajectory` and `calculateMPBR`, and in `computeTrajectory` in each dope card file. A change to how an input is read has to be made in all of them, and they do not all apply the same options. See the [table of screens](ballistics-model.md#which-screen-uses-what).
+The input handling is written out six times: in `calculateShotPoint`, `calculateFullTrajectory` and `calculateMPBR`, in `computeTrajectory` in each mid-range dope card file, and in `computePrecisionCard` ([`precisionCard.js`](../src/lib/utils/precisionCard.js), #157). A change to how an input is read has to be made in all of them, and they do not all apply the same options. See the [table of screens](ballistics-model.md#which-screen-uses-what).
 
 ## Build targets
 
