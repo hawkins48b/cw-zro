@@ -438,7 +438,7 @@
 		</span>
 	</div>
 
-	<!-- Rotation (cant): slider with − / + 1° (#166), within the slider's range -->
+	<!-- Rotation (cant): slider with − / + 1° (#166), within the slider's range; − / + hidden with a mouse (#171) -->
 	<div class="space-y-2">
 		<div class="flex items-center gap-2">
 			<label for="scope-cant" class="text-xs text-surface-600-400 shrink-0">{m.scope_view_rotation()}</label>

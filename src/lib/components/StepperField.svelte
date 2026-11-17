@@ -2,6 +2,8 @@
 	/**
 	 * A typeable number box with − and + buttons (#166), for the Scope View and the shared wind and
 	 * atmosphere cards. Layout of the box: [−] [value] [suffix?] [unit chips?] [+].
+	 * With a mouse or trackpad as the main pointer (#171) − and + are hidden (StepButton) and the box
+	 * gets 6 px side padding, so the value, suffix and chips sit about as far in as in a plain input.
 	 *
 	 * The buttons change the text the way typing would: they call `onchange` with the new text, which
 	 * the page passes to the same store setter as a typed value. The step, the limits and the start
@@ -76,7 +78,7 @@
 			{@render labelEnd?.()}
 		</div>
 	{/if}
-	<div class="input !flex !items-center !p-0 h-11 overflow-hidden">
+	<div class="input !flex !items-center !p-0 pointer-fine:!px-1.5 h-11 overflow-hidden">
 		<StepButton dir="down" label={decreaseLabel} onclick={(steps) => step(-1, steps)} />
 		<input
 			id={inputId}

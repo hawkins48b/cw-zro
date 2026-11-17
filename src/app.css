@@ -5,6 +5,8 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 @custom-variant landscape (@media (orientation: landscape));
+/* Main pointer is a mouse or trackpad (#171): the − / + field buttons are hidden there, at any width */
+@custom-variant pointer-fine (@media (pointer: fine));
 
 /* Safe area insets for iOS notch/dynamic island — 0px on web/desktop */
 :root {

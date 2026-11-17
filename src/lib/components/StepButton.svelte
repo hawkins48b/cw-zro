@@ -14,6 +14,9 @@
 	 * @prop {(steps: number) => void} onclick - Make `steps` steps (1, or 10 while held long).
 	 * @prop {'inset'|'standalone'} [variant] - inset: inside a field box (no own border or radius);
 	 *   standalone: its own 44 px rounded button (next to a slider).
+	 *
+	 * Hidden when the main pointer is a mouse or trackpad (#171, `pointer-fine` variant in app.css,
+	 * `@media (pointer: fine)`), at any width: the box is typed there. Touch screens keep it.
 	 */
 	import { onDestroy } from 'svelte';
 	import { Minus, Plus } from '@lucide/svelte';
@@ -36,7 +39,7 @@
 	}
 
 	const base =
-		'shrink-0 flex items-center justify-center preset-tonal-surface select-none touch-manipulation [-webkit-touch-callout:none] focus-visible:outline-2 focus-visible:outline-primary-500';
+		'pointer-fine:hidden shrink-0 flex items-center justify-center preset-tonal-surface select-none touch-manipulation [-webkit-touch-callout:none] focus-visible:outline-2 focus-visible:outline-primary-500';
 	let shape = $derived(
 		variant === 'inset'
 			? 'h-full w-11 focus-visible:-outline-offset-2'
