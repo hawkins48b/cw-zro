@@ -213,7 +213,7 @@ Before #109 the zero was the far crossing (from [#86](2026-11-05-86-mpbr-search.
 
 There is no near crossing when the sight height is 0 or less: the bullet starts on or over the line of sight. MPBR then gives no result.
 
-**"Set MPBR for current profile" saves the near crossing as the zero**: 22 yd for an 8 in target on the `.308` test profile, which comes back down through the line of sight at 240 yd (21 yd and 249 yd on js-ballistics 2.2).
+**"Set zero to N" (MPBR page, "Use this zero in your profile") saves the near crossing as the zero**, and only the zero distance and its unit (#110; the page shows the zero before and after and stays open since #166): 22 yd for an 8 in target on the `.308` test profile, which comes back down through the line of sight at 240 yd (21 yd and 249 yd on js-ballistics 2.2).
 
 ## Trajectory validation
 

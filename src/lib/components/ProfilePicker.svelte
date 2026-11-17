@@ -16,6 +16,7 @@
 	 * @prop {string[]} [checkedIds]  - multiple: the checked rows.
 	 * @prop {(id: string) => void} [ontoggle] - multiple: a row was tapped.
 	 * @prop {string[]} [newIds]      - Rows marked "New" (just imported).
+	 * @prop {Record<string,string>} [badges] - Outlined badge per id (Compare "On chart"); "New" wins.
 	 * @prop {Record<string,string>} [notes] - Warning line per id (e.g. "imported as a copy").
 	 * @prop {{ heading: string, note?: string, ids: string[] }[]} [groups] - Show the rows under
 	 *                                  these headings, in this order (sorting is then off).
@@ -42,6 +43,7 @@
 		checkedIds = [],
 		ontoggle,
 		newIds = [],
+		badges = {},
 		notes = {},
 		groups = null,
 		searchable = true,
@@ -112,7 +114,8 @@
 	<PickerRow
 		title={profileName(p)}
 		detail={profileRowDetail(p)}
-		badge={newIds.includes(p.id) ? m.profiles_new_badge() : ''}
+		badge={newIds.includes(p.id) ? m.profiles_new_badge() : (badges[p.id] ?? '')}
+		badgeTone={newIds.includes(p.id) ? 'tonal' : 'outline'}
 		note={notes[p.id] ?? ''}
 		{selected}
 		{multiple}

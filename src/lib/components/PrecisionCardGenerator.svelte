@@ -244,7 +244,7 @@
 	}
 </script>
 
-<div class="card preset-filled-surface-100-900">
+<div class="card preset-filled-surface-100-900 border border-surface-200-800">
 	<button
 		type="button"
 		class="flex items-center gap-3 w-full p-4 text-left rounded-container {focusRing}"

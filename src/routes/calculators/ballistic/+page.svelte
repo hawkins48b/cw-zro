@@ -27,6 +27,7 @@
 	import ChipGroup from '#lib/components/ChipGroup.svelte';
 	import ScopeWindCard from '#lib/components/ScopeWindCard.svelte';
 	import ScopeAtmosphereCard from '#lib/components/ScopeAtmosphereCard.svelte';
+	import ProfileInUseChip from '#lib/components/ProfileInUseChip.svelte';
 	import { useCurrentWeather } from '#lib/components/currentWeather.svelte.js';
 	import { Download, Columns3, MapPin, Waves } from '@lucide/svelte';
 	import { Unit } from 'js-ballistics';
@@ -86,7 +87,7 @@
 	const distLabel = $derived(isMetric ? m.unit_m() : m.unit_yd());
 	const elevLabel = $derived(isMetric ? m.unit_cm() : m.unit_in());
 
-	// ── Header: active profile (#151), as the Scope View's profile bar ──
+	// ── Header: active profile (#151); #166: ProfileInUseChip, Change opens the picker in place ──
 	let shown = $derived(shownProfile(activeProfile.profile));
 	let profilesHref = $derived(localizeHref('/profiles'));
 
@@ -506,35 +507,45 @@
 	<!-- No profile -->
 	<div class="py-12 text-center space-y-3">
 		<p class="text-surface-600-400">{m.ballistic_no_profile()}</p>
-		<a href="/profiles" class="btn preset-tonal-primary">{m.nav_profiles()}</a>
+		<a href={profilesHref} class="btn preset-tonal-primary">{m.nav_profiles()}</a>
 	</div>
 {:else}
 	<!--
-		Below lg: one column (header, Distances, Wind, Atmosphere, stats, chart, table).
+		Below lg: the conditions, then stats, chart, table. The conditions are one column on phones, two
+		from a 672 px page (Atmosphere under both) and one row of three cards from 768 px (#166 tablet).
 		lg and up (where the app sidebar appears): conditions on the left, results on the right (#151).
 	-->
-	<div class="max-w-[1180px] mx-auto flex flex-col gap-4 lg:gap-5">
+	<div class="@container max-w-[1180px] mx-auto flex flex-col gap-4 lg:gap-5">
 		<!-- ═══ Header ═══════════════════════════════════════════════════ -->
+		<!--
+			Phone: the profile card (Change opens the picker) and an Export CSV icon button.
+			sm and up: intro, compact profile chip, Export CSV button (#166 boards).
+		-->
 		<header class="flex flex-wrap items-center gap-x-4 gap-y-3 px-1 sm:px-0">
-			<div class="flex-[1_1_320px] min-w-0">
+			<div class="max-sm:contents flex-[1_1_320px] min-w-0">
 				<!-- Below lg the app header already shows the title -->
 				<h1 class="sr-only lg:not-sr-only lg:text-[28px] lg:font-bold lg:tracking-tight">{m.ballistic_title()}</h1>
-				<p class="lg:mt-1 text-sm text-surface-600-400">{m.ballistic_intro()}</p>
+				<p class="hidden sm:block lg:mt-1 text-sm text-surface-600-400">{m.ballistic_intro()}</p>
 			</div>
-			<a
-				href={profilesHref}
-				class="flex items-center gap-2.5 min-h-11 max-w-full px-3.5 py-1.5 rounded-container border border-surface-200-800 preset-filled-surface-100-900 hover:border-primary-500 {focusRing}"
-			>
-				<span class="size-2 rounded-full shrink-0 bg-primary-500" aria-hidden="true"></span>
-				<span class="min-w-0 truncate text-sm font-semibold">
-					<span class="sr-only">{m.scope_view_active_profile()}:</span>
-					{shown?.name || m.scope_view_profile_unnamed()}{#if shown?.ammo}<span class="font-normal text-surface-600-400"> · {shown.ammo}</span>{/if}
-				</span>
-				<span class="text-[13px] font-semibold text-primary-700-300 shrink-0">{m.scope_view_profile_change()}</span>
-			</a>
+			<div class="flex-1 min-w-0 sm:hidden">
+				<ProfileInUseChip />
+			</div>
+			<div class="hidden sm:block max-w-full">
+				<ProfileInUseChip variant="compact" />
+			</div>
 			<button
 				type="button"
-				class="btn h-11 border border-surface-300-700 hover:preset-tonal-surface font-semibold {focusRing}"
+				class="btn-icon size-12 shrink-0 sm:hidden rounded-container border border-surface-300-700 hover:preset-tonal-surface {focusRing}"
+				onclick={exportCSV}
+				disabled={tablePoints.length === 0}
+				aria-label={m.ballistic_export_csv()}
+				title={m.ballistic_export_csv()}
+			>
+				<Download class="size-[18px]" aria-hidden="true" />
+			</button>
+			<button
+				type="button"
+				class="hidden sm:inline-flex btn h-11 border border-surface-300-700 hover:preset-tonal-surface font-semibold {focusRing}"
 				onclick={exportCSV}
 				disabled={tablePoints.length === 0}
 			>
@@ -544,101 +555,111 @@
 		</header>
 
 		<div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(300px,340px)_minmax(0,1fr)] lg:gap-5 lg:items-start">
-			<!-- ═══ Conditions (left column on lg) ══════════════════════════ -->
-			<div class="flex flex-col gap-3.5 min-w-0">
-				<!-- Distances -->
+			<!-- ═══ Conditions (one row on tablets, left column on lg) ═══════ -->
+			<div class="grid grid-cols-1 gap-3.5 @2xl:grid-cols-2 @3xl:grid-cols-3 items-start lg:flex lg:flex-col lg:items-stretch min-w-0">
+				<!-- Distances: unit chips in the header, max distance and step side by side -->
 				<section
-					class="card preset-filled-surface-100-900 border border-surface-200-800 px-3.5 py-3 space-y-3"
+					class="card preset-filled-surface-100-900 border border-surface-200-800 px-3.5 py-3 space-y-2.5 min-w-0"
 					aria-labelledby="{uid}-dist-title"
 				>
-					<h2 id="{uid}-dist-title" class="text-sm font-semibold">{m.ballistic_distances()}</h2>
-
-					<!-- Max distance -->
-					<div class="space-y-0.5">
-						<label for="{uid}-max" class="text-xs text-surface-600-400">{m.ballistic_max_dist()}</label>
-						<div class="input !flex !items-center gap-1 h-11">
-							<input
-								id="{uid}-max"
-								class="flex-1 w-8 min-w-0 bg-transparent border-none outline-none shadow-none p-0 font-semibold"
-								type="text"
-								inputmode="decimal"
-								autocomplete="off"
-								placeholder="500"
-								value={ballistic.range.distance}
-								aria-invalid={!rangeUsable}
-								aria-describedby={rangeUsable ? undefined : `${uid}-max-msg`}
-								oninput={(e) => ballistic.setRange({ distance: e.target.value })}
-							/>
-							<ChipGroup
-								label={m.scope_view_distance_unit()}
-								options={[
-									{ value: 'yd', label: m.unit_yd() },
-									{ value: 'm', label: m.unit_m() }
-								]}
-								value={ballistic.range.unit}
-								onselect={(unit) => ballistic.setRange({ unit })}
-							/>
-						</div>
-						{#if !rangeUsable}
-							<p id="{uid}-max-msg" class="text-xs text-error-500" role="alert">
-								{m.validation_range_above_zero({ max: formatLimit(MAX_DISTANCE), unit: distLabel })}
-							</p>
-						{/if}
+					<div class="flex flex-wrap items-center justify-between gap-2">
+						<h2 id="{uid}-dist-title" class="text-sm font-semibold">{m.ballistic_distances()}</h2>
+						<ChipGroup
+							label={m.scope_view_distance_unit()}
+							options={[
+								{ value: 'yd', label: m.unit_yd() },
+								{ value: 'm', label: m.unit_m() }
+							]}
+							value={ballistic.range.unit}
+							onselect={(unit) => ballistic.setRange({ unit })}
+						/>
 					</div>
 
-					<!-- Step -->
-					<div class="space-y-0.5">
-						<label for="{uid}-step" class="text-xs text-surface-600-400">{m.ballistic_step()}</label>
-						<div class="input !flex !items-center gap-1 h-11">
-							<input
-								id="{uid}-step"
-								class="flex-1 w-8 min-w-0 bg-transparent border-none outline-none shadow-none p-0 font-semibold"
-								type="text"
-								inputmode="decimal"
-								autocomplete="off"
-								placeholder="25"
-								value={ballistic.range.step}
-								aria-invalid={stepLimit !== null}
-								aria-describedby="{uid}-step-msg"
-								oninput={(e) => ballistic.setRange({ step: e.target.value })}
-							/>
-							<span class="text-sm text-surface-600-400 shrink-0">{distLabel}</span>
+					<div class="grid grid-cols-2 gap-2.5">
+						<!-- Max distance -->
+						<div class="space-y-1 min-w-0">
+							<label for="{uid}-max" class="block text-xs text-surface-600-400">{m.ballistic_max_dist()}</label>
+							<div class="input !flex !items-center gap-1 h-11">
+								<input
+									id="{uid}-max"
+									class="flex-1 w-8 min-w-0 bg-transparent border-none outline-none shadow-none p-0 font-semibold"
+									type="text"
+									inputmode="decimal"
+									autocomplete="off"
+									placeholder="500"
+									value={ballistic.range.distance}
+									aria-invalid={!rangeUsable}
+									aria-describedby={rangeUsable ? undefined : `${uid}-max-msg`}
+									oninput={(e) => ballistic.setRange({ distance: e.target.value })}
+								/>
+								<span class="text-xs text-surface-600-400 shrink-0" aria-hidden="true">{distLabel}</span>
+							</div>
 						</div>
-						{#if stepLimit === 'min'}
-							<p id="{uid}-step-msg" class="text-xs text-error-500" role="alert">
-								{m.ballistic_step_min({ min: formatLimit(MIN_TABLE_STEP), unit: distLabel })}
-							</p>
-						{:else if stepLimit === 'max'}
-							<p id="{uid}-step-msg" class="text-xs text-error-500" role="alert">
-								{m.ballistic_step_max({ max: formatLimit(maxTableStep(ballistic.range.distance)), unit: distLabel })}
-							</p>
-						{:else}
-							<p id="{uid}-step-msg" class="text-xs text-surface-600-400">{m.ballistic_step_hint()}</p>
-						{/if}
+
+						<!-- Step -->
+						<div class="space-y-1 min-w-0">
+							<label for="{uid}-step" class="block text-xs text-surface-600-400">{m.ballistic_step()}</label>
+							<div class="input !flex !items-center gap-1 h-11">
+								<input
+									id="{uid}-step"
+									class="flex-1 w-8 min-w-0 bg-transparent border-none outline-none shadow-none p-0 font-semibold"
+									type="text"
+									inputmode="decimal"
+									autocomplete="off"
+									placeholder="25"
+									value={ballistic.range.step}
+									aria-invalid={stepLimit !== null}
+									aria-describedby="{uid}-step-msg"
+									oninput={(e) => ballistic.setRange({ step: e.target.value })}
+								/>
+								<span class="text-xs text-surface-600-400 shrink-0" aria-hidden="true">{distLabel}</span>
+							</div>
+						</div>
 					</div>
+
+					{#if !rangeUsable}
+						<p id="{uid}-max-msg" class="text-xs text-error-500" role="alert">
+							{m.validation_range_above_zero({ max: formatLimit(MAX_DISTANCE), unit: distLabel })}
+						</p>
+					{/if}
+					{#if stepLimit === 'min'}
+						<p id="{uid}-step-msg" class="text-xs text-error-500" role="alert">
+							{m.ballistic_step_min({ min: formatLimit(MIN_TABLE_STEP), unit: distLabel })}
+						</p>
+					{:else if stepLimit === 'max'}
+						<p id="{uid}-step-msg" class="text-xs text-error-500" role="alert">
+							{m.ballistic_step_max({ max: formatLimit(maxTableStep(ballistic.range.distance)), unit: distLabel })}
+						</p>
+					{:else}
+						<p id="{uid}-step-msg" class="text-xs text-surface-600-400">{m.ballistic_step_hint_rows()}</p>
+					{/if}
 				</section>
 
 				<!-- Wind -->
-				<ScopeWindCard
-					speed={ballistic.wind.speed}
-					speedUnit={ballistic.wind.speedUnit}
-					direction={ballistic.wind.direction}
-					preset={ballistic.windPreset}
-					onchange={(patch) => ballistic.setWind(patch)}
-					onpreset={(preset) => ballistic.applyWindPreset(preset)}
-				/>
+				<div class="min-w-0">
+					<ScopeWindCard
+						speed={ballistic.wind.speed}
+						speedUnit={ballistic.wind.speedUnit}
+						direction={ballistic.wind.direction}
+						preset={ballistic.windPreset}
+						onchange={(patch) => ballistic.setWind(patch)}
+						onpreset={(preset) => ballistic.applyWindPreset(preset)}
+					/>
+				</div>
 
-				<!-- Atmosphere -->
-				<ScopeAtmosphereCard
-					{atmosphere}
-					used={atmosphereUsed}
-					altitudeTooLow={trajectory.altitudeTooLow}
-					{noAirDensity}
-					onchange={weather.onchange}
-					weatherAvailable={weather.available}
-					weatherStatus={weather.status}
-					onweather={weather.request}
-				/>
+				<!-- Atmosphere: under Distances and Wind on a two-column page -->
+				<div class="min-w-0 @2xl:col-span-2 @3xl:col-span-1">
+					<ScopeAtmosphereCard
+						{atmosphere}
+						used={atmosphereUsed}
+						altitudeTooLow={trajectory.altitudeTooLow}
+						{noAirDensity}
+						onchange={weather.onchange}
+						weatherAvailable={weather.available}
+						weatherStatus={weather.status}
+						onweather={weather.request}
+					/>
+				</div>
 			</div>
 
 			<!-- ═══ Results (right column on lg) ════════════════════════════ -->
@@ -670,6 +691,19 @@
 				>
 					<div class="flex flex-wrap items-center gap-x-3 gap-y-2">
 						<h2 id="{uid}-chart-title" class="flex-1 min-w-max text-[15px] font-semibold">{m.ballistic_chart_title()}</h2>
+						{#if chartMode === 'drop' && chartPoints.length > 0}
+							<!-- Legend (#166 boards): the bullet line, and the line of sight when the annotations draw it -->
+							<span class="flex items-center gap-1.5 text-xs text-surface-600-400">
+								<span class="inline-block w-4 h-[3px] rounded-full bg-primary-500" aria-hidden="true"></span>
+								{m.ballistic_legend_bullet()}
+							</span>
+							{#if ballistic.options.showAnnotations}
+								<span class="flex items-center gap-1.5 text-xs text-surface-600-400">
+									<span class="inline-block w-4 border-t-2 border-dashed border-surface-400-600" aria-hidden="true"></span>
+									{m.ballistic_legend_los()}
+								</span>
+							{/if}
+						{/if}
 						{#if chartMode === 'drop'}
 							<button
 								type="button"
@@ -708,14 +742,6 @@
 						<p class="text-sm text-surface-600-400 py-10 text-center">{m.ballistic_no_result()}</p>
 					{:else if chartMode === 'drop'}
 						<div bind:this={elevChartEl}></div>
-						{#if ballistic.options.showAnnotations}
-							<div class="flex flex-wrap gap-x-5 gap-y-1 px-2 text-xs text-surface-600-400">
-								<span class="flex items-center gap-1.5">
-									<span class="inline-block w-5 border-t-2 border-dashed border-surface-400-600" aria-hidden="true"></span>
-									{m.ballistic_legend_los()}
-								</span>
-							</div>
-						{/if}
 					{:else}
 						<div bind:this={velChartEl}></div>
 						<div class="flex flex-wrap justify-center gap-x-6 gap-y-1 text-xs text-surface-600-400">
@@ -752,7 +778,7 @@
 							onclick={() => (showColumnSelector = !showColumnSelector)}
 						>
 							<Columns3 class="size-4" aria-hidden="true" />
-							{m.ballistic_columns()}
+							{m.ballistic_columns_count({ shown: String(activeColumns.length), total: String(ALL_COLUMNS.length) })}
 						</button>
 					</div>
 

@@ -9,6 +9,7 @@
 	 * @prop {string}   title
 	 * @prop {string}   [detail]    - Second line, muted.
 	 * @prop {string}   [badge]     - Small tonal pill after the title (e.g. "New").
+	 * @prop {'tonal'|'outline'} [badgeTone] - outline: a muted outlined pill (Compare "On chart").
 	 * @prop {string}   [note]      - Warning line under the detail (e.g. imported as a copy).
 	 * @prop {boolean}  selected
 	 * @prop {boolean}  [multiple]
@@ -21,6 +22,7 @@
 		title,
 		detail = '',
 		badge = '',
+		badgeTone = 'tonal',
 		note = '',
 		selected = false,
 		multiple = false,
@@ -45,7 +47,11 @@
 			<span class="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[15px] font-semibold">
 				<span class="min-w-0 break-words">{title}</span>
 				{#if badge}
-					<span class="px-[7px] py-0.5 rounded-full preset-tonal-primary text-[10px] font-bold tracking-wide uppercase">
+					<span
+						class="px-[7px] py-0.5 rounded-full text-[10px] tracking-wide {badgeTone === 'outline'
+							? 'border border-surface-400-600 text-surface-600-400 font-semibold'
+							: 'preset-tonal-primary font-bold uppercase'}"
+					>
 						{badge}
 					</span>
 				{/if}

@@ -210,3 +210,25 @@ describe('compare chart name formatters (#103, #75)', () => {
 		expect(options).not.toMatch(/title\s*:\s*{[^}]*formatter/);
 	});
 });
+
+describe('compare end labels (#166)', () => {
+	it('draws each rifle name at the end of its line as text, creating no element', async () => {
+		const names = ['Smith & Wesson <img src=x onerror=alert(1)>', '<script>alert(1)</script>', `Tom's "Müller"`];
+		const root = await render({
+			series: names.map((name, i) => ({ name, data: line(i) })),
+			xaxis: { type: 'numeric', min: 0, max: 200 },
+			legend: { show: false },
+			annotations: {
+				points: names.map((name, i) => ({
+					x: 200,
+					y: i - 6,
+					marker: { size: 3 },
+					label: { text: name, textAnchor: 'end', offsetX: -4, offsetY: -4, borderWidth: 0, style: { background: 'transparent', fontSize: '11px' } }
+				}))
+			}
+		});
+		expect(root.querySelectorAll('img, script')).toHaveLength(0);
+		const texts = [...root.querySelectorAll('.apexcharts-point-annotations text')].map((t) => t.textContent);
+		for (const name of names) expect(texts).toContain(name);
+	});
+});

@@ -137,7 +137,7 @@ Since [#148](https://github.com/hawkins48b/cw-zro/issues/148) the Scope View pag
 | [`DistanceInput`](../src/lib/components/DistanceInput.svelte) | Target distance card: + / − per digit (1 to `MAX_DISTANCE`), typed entry, yd / m |
 | [`ScopeResult`](../src/lib/components/ScopeResult.svelte) | Result card with Dial / Hold; Hold renders the `hold` snippet, which the page fills with [`ScopeReticle`](../src/lib/components/ScopeReticle.svelte) |
 | [`ScopeWindCard`](../src/lib/components/ScopeWindCard.svelte) | Wind presets, speed, dial, ± 5°, o'clock hint. Presets come from [`windPreset.js`](../src/lib/utils/windPreset.js) through the store (`windPreset`, `applyWindPreset`). Also on the Ballistic page since #151 |
-| [`ScopeAtmosphereCard`](../src/lib/components/ScopeAtmosphereCard.svelte) | ISA / Estimate / Accurate, with QNH / Station. Also on the Ballistic page since #151. In Accurate, "Use current weather here" since #152 (see [Current weather](#current-weather)). The Trajectory Validation page keeps [`AtmosphereCard`](../src/lib/components/AtmosphereCard.svelte) |
+| [`ScopeAtmosphereCard`](../src/lib/components/ScopeAtmosphereCard.svelte) | ISA / Estimate / Accurate, with QNH / Station. Also on the Ballistic page since #151. In Accurate, "Use current weather here" since #152 (see [Current weather](#current-weather)). The Trajectory Validation page keeps [`AtmosphereCard`](../src/lib/components/AtmosphereCard.svelte) (ISA switch and four fields, restyled for its step 3 in #166: optional `title` and `isaHint`, order Altitude, Temperature, Pressure, Humidity) |
 | [`WindDial`](../src/lib/components/WindDial.svelte) | The direction dial of `ScopeWindCard`: 24 points every 15°; near the rim a tap or drag snaps to them, inside it sets whole degrees ([`dialDirection`](../src/lib/utils/windDirection.js), #155). Arrows turn 5°, Page Up / Page Down 15°, Home sets 0°. `WindInput`, the Ballistic wind box before #151, was removed in #151 |
 | [`ChipGroup`](../src/lib/components/ChipGroup.svelte) | A row of toggle buttons with `aria-pressed`, at least 44 px wide, with a 44 px touch area (`.touch-hit` in [`app.css`](../src/app.css)) |
 
@@ -149,8 +149,8 @@ Since [#166](2026-11-17-166-profiles-redesign.md) (Profiles round) profile and a
 
 | Component | Role |
 |-----------|------|
-| [`ProfilePicker`](../src/lib/components/ProfilePicker.svelte) | Search, sort Recent (newest first) / Rifle / Ammo, single choice or checkboxes, New badges, groups. Used by Profiles and the import review; meant for the calculators and Compare in a later round |
-| [`picker/`](../src/lib/components/picker/) | `PickerSearch`, `PickerList`, `PickerGroup`, `PickerRow`, `AmmoSummaryCard`, shared with the Ammo Library and the setup ammunition step |
+| [`ProfilePicker`](../src/lib/components/ProfilePicker.svelte) | Search, sort Recent (newest first) / Rifle / Ammo, single choice or checkboxes, New badges, an outlined badge per id (`badges`, Compare "On chart"; New wins), groups. Used by Profiles, the import review, `ProfileInUseChip` and `CompareAddPicker` |
+| [`picker/`](../src/lib/components/picker/) | `PickerSearch`, `PickerList`, `PickerGroup`, `PickerRow` (badge `badgeTone` `tonal` or `outline`), `AmmoSummaryCard`, shared with the Ammo Library and the setup ammunition step |
 | [`profile/ProfileSummaryCard`](../src/lib/components/profile/ProfileSummaryCard.svelte), [`ProfileDetailsCard`](../src/lib/components/profile/ProfileDetailsCard.svelte) | The profile in use: 8 key numbers and Edit (phone), right pane from 768 px |
 | [`profile/ProfileImportDialog`](../src/lib/components/profile/ProfileImportDialog.svelte) | File chooser and review; reads files with [`profileImport.js`](../src/lib/utils/profileImport.js), stores with `importProfiles` |
 | [`ResponsiveDialog`](../src/lib/components/ResponsiveDialog.svelte), [`ConfirmDialog`](../src/lib/components/ConfirmDialog.svelte), [`Toast`](../src/lib/components/Toast.svelte), [`SwitchRow`](../src/lib/components/SwitchRow.svelte) | Sheet on phones / dialog from 640 px; small confirmation; bottom message; on/off row. Dialogs use the [`focusTrap`](../src/lib/actions/focusTrap.js) action |
@@ -178,9 +178,25 @@ Since the Settings round of [#166](2026-11-17-166-settings-redesign.md) the Sett
 - **Licence list.** [`scripts/licenses.js`](../scripts/licenses.js) writes `src/lib/data/licenses.json` with the rules of [`scripts/license-rules.js`](../scripts/license-rules.js), at development time, not during the build. See [Included software list](development.md#included-software-list).
 - **Ids.** `DarkModeToggle`, `LanguageSwitcher` and the settings components take their element ids from `$props.id()`, so two copies on one page (sidebar and Settings) do not clash.
 
+### Calculator components
+
+Since the Calculators round of [#166](2026-11-17-166-calculators-redesign.md) the calculator pages share these components. They compute nothing: the result comes from the same calculation calls as before.
+
+| Component | Role |
+|-----------|------|
+| [`ProfileInUseChip`](../src/lib/components/ProfileInUseChip.svelte) | The profile in use with Change, on every calculator and the hub (from 640 px). Variants: `card` (bordered, 48 px, label above the name; Scope View style), `compact` (one line, 44 px, page headers), `inline` (tinted row in a card, Dope Cards mid-range card). Change opens `ResponsiveDialog` with `ProfilePicker` and `ProfileSummaryCard`; "Use this profile" calls `activeProfile.setActive` |
+| [`calc/ApplyChangeCard`](../src/lib/components/calc/ApplyChangeCard.svelte) | Before → after with a save button, then a status line or an "already at this value" line. MPBR "Use this zero in your profile" and Validation "Apply to profile"; the page saves through `profiles.update` and stays |
+| [`compare/CompareAddPicker`](../src/lib/components/compare/CompareAddPicker.svelte) | Compare "Add a profile": picker with "On chart" badges, preselects the newest profile not on the chart, confirm button; adds with `compareTrajectories.addEntry` on the profile's zero. On the `/add` page (phone, tablet) and in an inline panel on desktop |
+
+The view logic is in `utils/`, tested without Svelte:
+
+- [`mpbrView.js`](../src/lib/utils/mpbrView.js): `mpbrChartMarkers` (near zero, far zero, highest point, MPBR end), `chartLabelAnchor`, `mpbrZeroChange` (before, after, `same`, `usable`, and the patch `{ zeroDist: optimalZero, zeroUnit }` of #110). The MPBR page clears its result when the profile in use changes, so a result is never saved to another profile.
+- [`validationView.js`](../src/lib/utils/validationView.js): `validationChange` (before, after, difference, percent), `validationPatch` (`{ velocity }` or `{ bc }` as text, as before), `validationObservationPoint` (the observation marker on the chart). The applied change stays shown until the observation, solve-for, weather or profile in use changes.
+- Compare draws each profile name at the end of its line as an ApexCharts point annotation (SVG text, checked by `apexcharts.test.js`), with four colours per theme; a fifth line reuses the first.
+
 ### Ballistic page
 
-Since [#151](https://github.com/hawkins48b/cw-zro/issues/151) the Ballistic page ([`+page.svelte`](../src/routes/calculators/ballistic/+page.svelte)) has a header (title, the active profile with Change, Export CSV), then the conditions (Distances, `ScopeWindCard`, `ScopeAtmosphereCard`) and the results (four stats, the Bullet Path chart, the data table). Under 1024 px (`lg`) it is one column in that order; from 1024 px the conditions are a left column of 300 to 340 px and the results fill the right.
+Since [#151](https://github.com/hawkins48b/cw-zro/issues/151) the Ballistic page ([`+page.svelte`](../src/routes/calculators/ballistic/+page.svelte)) has a header (title, the active profile with Change, Export CSV; since #166 the profile is a `ProfileInUseChip` and Export is an icon button on phones), then the conditions (Distances, `ScopeWindCard`, `ScopeAtmosphereCard`) and the results (four stats, the Bullet Path chart, the data table). Under 1024 px (`lg`) it is one column in that order (since #166 the condition cards are 2 in a row from 672 px of page width and 3 from 768 px, container queries `@2xl` and `@3xl`); from 1024 px the conditions are a left column of 300 to 340 px and the results fill the right.
 
 | Part | Source |
 |------|--------|

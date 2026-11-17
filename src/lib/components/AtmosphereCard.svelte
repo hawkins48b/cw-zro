@@ -11,12 +11,21 @@
 
 	import { altitudeTooLowMessage } from '#lib/components/altitudeMessage.js';
 	import { hasNoAirDensity } from '#lib/utils/ballisticCalculator.js';
+	import SwitchRow from '#lib/components/SwitchRow.svelte';
 
 	/**
 	 * altitudeTooLow: the page's result is missing because the engine ended the flight at its
 	 * minimum altitude (#125, flightStop.js). Shown under the altitude box when the box itself is valid.
 	 */
-	let { atmosphere, onchange, altitudeTooLow = false } = $props();
+	/**
+	 * Trajectory Validation, step 3 (#166): title, an ISA switch with its hint, then the four
+	 * fields (two columns from sm) and the QNH hint once under them.
+	 *
+	 * @prop {string} [title]   - Card heading (already translated).
+	 * @prop {string} [isaHint] - Shown under the switch while ISA is on.
+	 */
+	let { atmosphere, onchange, altitudeTooLow = false, title = '', isaHint = '' } = $props();
+	const uid = $props.id();
 
 	/**
 	 * The range message of a box whose value the calculators reject (isUsableAtmosphere), or ''.
@@ -54,20 +63,21 @@
 	let noAirDensity = $derived(!atmosphere.useISA && hasNoAirDensity(atmosphere));
 </script>
 
-<div class="card preset-filled-surface-100-900">
-	<div class="p-4 space-y-4">
-		<!-- ISA toggle -->
-		<label class="flex items-center gap-2 cursor-pointer select-none border-b border-surface-200-800 pb-2">
-			<input
-				type="checkbox"
-				class="checkbox"
-				checked={atmosphere.useISA}
-				onchange={(e) => onchange({ useISA: e.target.checked })}
-			/>
-			<span class="text-sm">{m.ballistic_use_isa()}</span>
-		</label>
-
+<section
+	class="card preset-filled-surface-100-900 border border-surface-200-800 p-4 space-y-3"
+	aria-labelledby={title ? `${uid}-title` : undefined}
+>
+	{#if title}
+		<h2 id="{uid}-title" class="text-[15px] font-semibold">{title}</h2>
+	{/if}
+	<SwitchRow
+		bind:checked={() => atmosphere.useISA, (v) => onchange({ useISA: v })}
+		title={m.ballistic_use_isa()}
+		controls="{uid}-fields"
+	/>
+	<div id="{uid}-fields">
 		{#if !atmosphere.useISA}
+		<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
 			<!-- Altitude -->
 			<div class="space-y-1.5">
 				<span class="text-sm font-medium">{m.ballistic_altitude()}</span>
@@ -84,6 +94,7 @@
 							<button
 								type="button"
 								class="chip text-xs {atmosphere.altitudeUnit === opt.value ? 'preset-filled-primary-500' : 'preset-tonal-surface'}"
+								aria-pressed={atmosphere.altitudeUnit === opt.value}
 								onclick={() => onchange({ altitudeUnit: opt.value })}
 							>{opt.label}</button>
 						{/each}
@@ -93,36 +104,6 @@
 					<p class="text-xs text-error-500">{altitudeError}</p>
 				{:else if altitudeTooLow}
 					<p class="text-xs text-warning-800-200" role="alert">{altitudeTooLowMessage(atmosphere.altitudeUnit)}</p>
-				{/if}
-			</div>
-
-			<!-- Pressure -->
-			<div class="space-y-1.5">
-				<span class="text-sm font-medium">{m.ballistic_pressure()}</span>
-				<div class="input !flex !items-center gap-2">
-					<input
-						class="flex-1 min-w-0 bg-transparent border-none outline-none shadow-none p-0 text-sm"
-						type="text"
-						inputmode="decimal"
-						value={atmosphere.pressure}
-						oninput={(e) => onchange({ pressure: e.target.value })}
-					/>
-					<div class="flex gap-1 shrink-0">
-						{#each [{ value: 'inhg', label: m.unit_inhg() }, { value: 'hpa', label: m.unit_hpa() }] as opt}
-							<button
-								type="button"
-								class="chip text-xs {atmosphere.pressureUnit === opt.value ? 'preset-filled-primary-500' : 'preset-tonal-surface'}"
-								onclick={() => onchange({ pressureUnit: opt.value })}
-							>{opt.label}</button>
-						{/each}
-					</div>
-				</div>
-				{#if pressureError}
-					<p class="text-xs text-error-500">{pressureError}</p>
-				{:else if noAirDensity}
-					<p class="text-xs text-error-500" role="alert">{m.ballistic_air_too_thin()}</p>
-				{:else}
-					<p class="text-xs text-surface-600-400">{m.ballistic_pressure_hint()}</p>
 				{/if}
 			</div>
 
@@ -142,6 +123,7 @@
 							<button
 								type="button"
 								class="chip text-xs {atmosphere.temperatureUnit === opt.value ? 'preset-filled-primary-500' : 'preset-tonal-surface'}"
+								aria-pressed={atmosphere.temperatureUnit === opt.value}
 								onclick={() => onchange({ temperatureUnit: opt.value })}
 							>{opt.label}</button>
 						{/each}
@@ -149,6 +131,35 @@
 				</div>
 				{#if temperatureError}
 					<p class="text-xs text-error-500">{temperatureError}</p>
+				{/if}
+			</div>
+
+			<!-- Pressure -->
+			<div class="space-y-1.5">
+				<span class="text-sm font-medium">{m.ballistic_pressure()}</span>
+				<div class="input !flex !items-center gap-2">
+					<input
+						class="flex-1 min-w-0 bg-transparent border-none outline-none shadow-none p-0 text-sm"
+						type="text"
+						inputmode="decimal"
+						value={atmosphere.pressure}
+						oninput={(e) => onchange({ pressure: e.target.value })}
+					/>
+					<div class="flex gap-1 shrink-0">
+						{#each [{ value: 'inhg', label: m.unit_inhg() }, { value: 'hpa', label: m.unit_hpa() }] as opt}
+							<button
+								type="button"
+								class="chip text-xs {atmosphere.pressureUnit === opt.value ? 'preset-filled-primary-500' : 'preset-tonal-surface'}"
+								aria-pressed={atmosphere.pressureUnit === opt.value}
+								onclick={() => onchange({ pressureUnit: opt.value })}
+							>{opt.label}</button>
+						{/each}
+					</div>
+				</div>
+				{#if pressureError}
+					<p class="text-xs text-error-500">{pressureError}</p>
+				{:else if noAirDensity}
+					<p class="text-xs text-error-500" role="alert">{m.ballistic_air_too_thin()}</p>
 				{/if}
 			</div>
 
@@ -169,12 +180,17 @@
 					<p class="text-xs text-error-500">{humidityError}</p>
 				{/if}
 			</div>
+		</div>
+		<p class="mt-3 text-xs text-surface-600-400">{m.ballistic_pressure_hint()}</p>
 		{:else}
+			{#if isaHint}
+				<p class="text-xs leading-snug text-surface-600-400">{isaHint}</p>
+			{/if}
 			<!-- ICAO standard values -->
-			<div class="text-sm text-surface-600-400 space-y-0.5">
+			<div class="mt-2 text-xs text-surface-600-400 space-y-0.5">
 				<p>0 {m.unit_ft()}, 29.92 {m.unit_inhg()}, 59 {m.unit_f()}, 0% {m.ballistic_humidity()}</p>
 				<p>0 {m.unit_m()}, 1013.25 {m.unit_hpa()}, 15 {m.unit_c()}, 0% {m.ballistic_humidity()}</p>
 			</div>
 		{/if}
 	</div>
-</div>
+</section>
