@@ -1,3 +1,9 @@
 {
-	"exceptions": []
+	"exceptions": [
+		{
+			"id": "GHSA-fc5q-39xc-vjpf",
+			"reason": "picomatch ReDoS (#176): build and test tooling only (vite, vitest, svelte-kit, electron-builder), matching our own config globs, never user input; not in the shipped app. No fixed picomatch yet (<= 4.0.7 affected): upgrade when one ships.",
+			"expires": "2026-12-17"
+		}
+	]
 }
