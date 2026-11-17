@@ -291,13 +291,13 @@ export function bullet() {
 	const ogiveLength = length - boatTail - bearing;
 	const segments = 48;
 
-	// Tangent ogive from the bearing surface (r = R) to the tip, cut at a 0.8 mm meplat.
+	// Tangent ogive from a sharp point (r = 0, no meplat) to the bearing surface (r = R).
 	const rho = (R * R + ogiveLength * ogiveLength) / (2 * R);
 	const ogiveProfile = /** @type {Array<[number, number]>} */ ([[0, -length]]);
 	const steps = 10;
-	for (let i = 0; i <= steps; i++) {
+	for (let i = 1; i <= steps; i++) {
 		const x = (i / steps) * ogiveLength; // from the tip
-		const r = Math.max(0.0004, Math.sqrt(Math.max(0, rho * rho - (ogiveLength - x) ** 2)) + R - rho);
+		const r = Math.sqrt(Math.max(0, rho * rho - (ogiveLength - x) ** 2)) + R - rho;
 		ogiveProfile.push([r, -length + x]);
 	}
 	const ogive = part('ogive', [[copper, latheZ(ogiveProfile, segments)]]);

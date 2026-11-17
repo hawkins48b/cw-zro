@@ -83,3 +83,7 @@ Not verified:
 ## Changelog
 
 - 2026-11-17: initial delivery
+
+## Follow-up: sharp bullet tip
+
+At the owner's request the bullet's ogive now ends in a sharp point instead of a 0.8 mm flat meplat (`scripts/models/weapons.js`). `bullet.glb` is 41,540 bytes and 1,920 triangles (was 43,272 and 2,016), so all models are 467,092 bytes and 8,584 triangles. As with the base of the boat tail, the 48 triangles at the point have no area; they draw nothing.
