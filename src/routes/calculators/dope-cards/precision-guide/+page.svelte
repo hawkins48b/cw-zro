@@ -218,7 +218,7 @@
 
 	<a
 		href={localizeHref('/calculators/dope-cards')}
-		class="btn preset-filled-primary-500 min-h-12 w-full sm:w-auto sm:self-start {focusRing}"
+		class="btn preset-filled-primary-500 self-start {focusRing}"
 	>
 		{m.dope_guide_back()}
 	</a>

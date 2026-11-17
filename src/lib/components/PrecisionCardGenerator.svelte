@@ -356,11 +356,10 @@
 					invalid={usable ? maxError : ''}
 				/>
 
-				<div class="space-y-1.5">
-					<p class="text-sm font-medium">{m.dope_precision_correction()}</p>
+				<!-- Toggles (#161): the app's small unit chips, one labelled row each, as in the profile form -->
+				<div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+					<span class="text-sm font-medium" aria-hidden="true">{m.dope_precision_correction()}</span>
 					<ChipGroup
-						variant="segmented"
-						stretch
 						label={m.dope_precision_correction()}
 						value={correction}
 						onselect={(v) => (correction = /** @type {'clicks'|'angle'} */ (v))}
@@ -371,34 +370,32 @@
 					/>
 				</div>
 
-				<!-- Units (#160): the presets above one toggle per quantity -->
-				<div class="space-y-2">
-					<p class="text-sm font-medium">{m.dope_precision_units()}</p>
-					<ChipGroup
-						variant="segmented"
-						stretch
-						label={m.dope_precision_units_presets()}
-						value={unitPreset}
-						onselect={pickPreset}
-						options={[
-							{ value: 'metric', label: m.dope_metric() },
-							{ value: 'imperial', label: m.dope_imperial() }
-						]}
-					/>
-					<div class="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1.5">
-						{#each UNIT_ROWS as row (row.key)}
+				<!-- Units (#160): the presets beside the heading, then one row per quantity -->
+				<div class="space-y-1.5">
+					<div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+						<span class="text-sm font-medium" aria-hidden="true">{m.dope_precision_units()}</span>
+						<ChipGroup
+							label={m.dope_precision_units_presets()}
+							value={unitPreset}
+							onselect={pickPreset}
+							options={[
+								{ value: 'metric', label: m.dope_metric() },
+								{ value: 'imperial', label: m.dope_imperial() }
+							]}
+						/>
+					</div>
+					{#each UNIT_ROWS as row (row.key)}
+						<div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
 							<!-- The group's aria-label names it; the visible label is for sight only. -->
-							<span class="text-[13px] text-surface-600-400" aria-hidden="true">{row.label()}</span>
+							<span class="text-sm text-surface-600-400" aria-hidden="true">{row.label()}</span>
 							<ChipGroup
-								variant="segmented"
-								stretch
 								label={row.label()}
 								value={units[row.key]}
 								onselect={(v) => pickUnit(row.key, v)}
 								options={row.options()}
 							/>
-						{/each}
-					</div>
+						</div>
+					{/each}
 				</div>
 			</fieldset>
 
@@ -416,7 +413,7 @@
 
 			<button
 				type="button"
-				class="btn preset-filled-primary-500 w-full sm:w-auto min-h-12"
+				class="btn preset-filled-primary-500"
 				onclick={download}
 				disabled={!canDownload || loading}
 			>
