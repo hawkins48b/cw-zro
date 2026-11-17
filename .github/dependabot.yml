@@ -26,11 +26,14 @@ updates:
           # Calculation results depend on it, and any change to them needs owner
           # approval (#77), so it must not hide among other updates.
           - js-ballistics
-          # Pinned on 8.8.1 by owner decision (#75). Its licence changed at 7.4.0,
-          # 7.7.0 and 8.7.0, within majors, so every update is reviewed on its own:
-          # LICENSE.md diff, release notes, charts in a browser.
+          # Exact pin by owner decision (#75), licence terms accepted. Its licence
+          # changed at 7.4.0, 7.7.0 and 8.7.0, within majors, so every update is
+          # reviewed on its own: CI checks LICENSE.md against the accepted text
+          # (src/test/apexcharts.test.js, #164), then release notes and charts in
+          # a browser.
           - apexcharts
-          # Its runtime dependency (8.x), under the same licence terms.
+          # Its runtime dependency (8.x), under the same licence terms, checked by
+          # the same test.
           - apex-commons
 
   - package-ecosystem: github-actions

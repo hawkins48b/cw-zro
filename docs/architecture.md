@@ -15,7 +15,7 @@ Versions are those locked in `package-lock.json` on `develop`.
 | UI | Skeleton, Tailwind CSS | 5.0.1, 4.3.4 |
 | Icons | `@lucide/svelte` | 1.69.0 |
 | Ballistics | `js-ballistics`, pinned by owner decision ([#77](https://github.com/hawkins48b/cw-zro/issues/77)), with its WebAssembly engine bclibc (LGPL-3.0) | 3.1.0 (bclibc 2.0.0) |
-| Charts | ApexCharts, lazy-loaded, pinned by owner decision ([#75](https://github.com/hawkins48b/cw-zro/issues/75)) | 8.8.1 |
+| Charts | ApexCharts, lazy-loaded, pinned on an exact version by owner decision ([#75](https://github.com/hawkins48b/cw-zro/issues/75)); licence text checked by a test (#164) | 8.8.1 |
 | PDF | `pdf-lib` | 1.17.1 |
 | Translations | Paraglide | 3.1.0 |
 | Tests | Vitest, jsdom | 5.1.0, 31.0.0 |
