@@ -14,6 +14,8 @@
 	import { isUsableRange, MAX_DISTANCE } from '#lib/utils/inputLimits.js';
 	import { Unit } from 'js-ballistics';
 	import { Plus, X } from '@lucide/svelte';
+	import ChipGroup from '#lib/components/ChipGroup.svelte';
+	import CompareAddPicker from '#lib/components/compare/CompareAddPicker.svelte';
 
 	// ── ApexCharts (lazy-loaded, browser-only) ───────────────────────
 	let ApexCharts = $state(null);
@@ -100,20 +102,24 @@
 			}));
 			// An entry without a result has no series, so the color comes from the entry's position:
 			// a line must keep the color of the dot on its card.
-			series.push({ name: entry.seriesName, data, color: entryColor(i) });
+			// endLabel: the rifle name drawn at the end of the line (#166), as text (see buildChartOptions).
+			series.push({ name: entry.seriesName, data, color: entryColor(i), endLabel: entry.shown.name });
 		}
 
 		return series.length > 0 ? series : null;
 	});
 
 	// ── Chart rendering ──────────────────────────────────────────────
-	const CHART_COLORS = [
-		'#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4',
-		'#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#64748b'
-	];
+	// #166: four colours that keep 3:1 contrast on the card in each theme (owner's list); a fifth
+	// line starts the list again. The chart, the legend and the dot on each entry use the same one.
+	const CHART_COLORS = {
+		light: ['#4f46e5', '#c2410c', '#0e7490', '#be185d'],
+		dark: ['#a5b4fc', '#fb923c', '#22d3ee', '#f472b6']
+	};
 
 	function entryColor(index) {
-		return CHART_COLORS[index % CHART_COLORS.length];
+		const list = settings.darkMode ? CHART_COLORS.dark : CHART_COLORS.light;
+		return list[index % list.length];
 	}
 
 	/**
@@ -150,7 +156,7 @@
 			grid: {
 				borderColor: dark ? '#374151' : '#e5e7eb',
 				strokeDashArray: 3,
-				padding: { left: 10, right: 20, top: 0, bottom: 0 }
+				padding: { left: 10, right: 20, top: 8, bottom: 0 }
 			},
 			xaxis: {
 				type: 'numeric',
@@ -165,6 +171,23 @@
 			},
 			colors: series.map((s) => s.color),
 			annotations: {
+				// Each line's name at its end (#166): drawn by ApexCharts as SVG text, never as HTML
+				// (src/test/apexcharts.test.js "compare end labels").
+				points: series
+					.filter((s) => s.data.length > 0)
+					.map((s) => ({
+						x: s.data.at(-1).x,
+						y: s.data.at(-1).y,
+						marker: { size: 3, fillColor: s.color, strokeColor: s.color, strokeWidth: 0 },
+						label: {
+							text: s.endLabel,
+							textAnchor: 'end',
+							offsetX: -4,
+							offsetY: -4,
+							borderWidth: 0,
+							style: { color: s.color, background: 'transparent', fontSize: '11px', fontWeight: 600 }
+						}
+					})),
 				yaxis: [
 					{
 						y: 0,
@@ -193,7 +216,8 @@
 				x: { formatter: (v) => `${v} ${dLabel}` },
 				y: { formatter: (v) => `${v} ${yLabel}` }
 			},
-			legend: { show: true, position: 'top', horizontalAlign: 'right' },
+			// The legend is the page's own list under the title (#166), with each line's zero.
+			legend: { show: false },
 			markers: { size: 0 }
 		};
 	}
@@ -210,161 +234,264 @@
 		return () => chart.destroy();
 	});
 
-	// ── Helper ───────────────────────────────────────────────────────
-	function profileZeroLabel(profile) {
-		return `${profile.zeroDist}\u202f${profile.zeroUnit === 'm' ? m.unit_m() : m.unit_yd()}`;
-	}
+	// ── Legend (#166): colour, name and the zero of each line on the chart ──
+	let legend = $derived(
+		resolvedEntries
+			.map((entry, i) => ({ entry, i }))
+			.filter(({ i }) => !!entryResults[i])
+			.map(({ entry, i }) => ({
+				id: entry.id,
+				color: entryColor(i),
+				text: m.compare_legend_entry({
+					name: entry.shown.name || m.scope_view_profile_unnamed(),
+					zero: `${String(entry.zeroDist).trim()}\u202f${entry.zeroUnit === 'm' ? m.unit_m() : m.unit_yd()}`
+				})
+			}))
+	);
+
+	// ── Add profile (#166) ───────────────────────────────────────────
+	// Desktop: an inline panel, open at first when the chart is empty. Below lg: the /add page.
+	let addOpen = $state(compareTrajectories.entries.length === 0);
+	const addHref = localizeHref('/calculators/compare-trajectories/add');
+
+	const uid = $props.id();
+	const focusRing = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500';
+	const unitOptions = () => [
+		{ value: 'yd', label: m.unit_yd() },
+		{ value: 'm', label: m.unit_m() }
+	];
 </script>
 
 <svelte:head>
 	<title>{m.compare_title()} — {m.app_name()}</title>
 </svelte:head>
 
-<div class="space-y-6">
+{#snippet addButton(cls)}
+	<!-- Below lg: the Add page; lg and up: the inline panel -->
+	<a
+		href={addHref}
+		class="lg:hidden btn h-11 px-3.5 gap-1.5 preset-filled-primary-500 text-sm font-semibold {focusRing} {cls}"
+	>
+		<Plus class="size-[18px]" strokeWidth={2.5} aria-hidden="true" />
+		{m.compare_add_profile()}
+	</a>
+	<button
+		type="button"
+		class="hidden lg:inline-flex btn h-11 px-4 gap-1.5 preset-filled-primary-500 text-sm font-semibold {focusRing} {cls}"
+		aria-expanded={addOpen}
+		aria-controls="{uid}-add"
+		onclick={() => (addOpen = !addOpen)}
+	>
+		<Plus class="size-[18px]" strokeWidth={2.5} aria-hidden="true" />
+		{m.compare_add_profile()}
+	</button>
+{/snippet}
 
+<div class="flex flex-col gap-3 sm:gap-4 lg:gap-5">
 	{#if profiles.list.length === 0}
 		<div class="py-12 text-center space-y-3">
 			<p class="text-surface-600-400">{m.compare_no_profiles()}</p>
-			<a href="/profiles" class="btn preset-tonal-primary">{m.nav_profiles()}</a>
+			<a href={localizeHref('/profiles')} class="btn preset-tonal-primary {focusRing}">{m.nav_profiles()}</a>
 		</div>
 	{:else}
-
-		<!-- ═══ Selected entries ════════════════════════════════════ -->
-		<div class="space-y-2 max-w-2xl">
-			<div class="flex items-center gap-2">
-				<span class="text-sm font-medium flex-1">{m.compare_selected()}</span>
-				{#if resolvedEntries.length > 0}
-					<span class="chip text-xs preset-filled-primary-500">{resolvedEntries.length}</span>
-				{/if}
-				<a
-					href={localizeHref('/calculators/compare-trajectories/add')}
-					class="btn btn-icon preset-filled-primary-500 shrink-0"
-					title={m.compare_add_profile()}
-				>
-					<Plus class="size-5" />
-				</a>
+		<!-- Header: title on desktop (the app header shows it below lg), intro and Add from sm -->
+		<header class="flex flex-wrap items-center gap-x-4 gap-y-3 max-sm:sr-only">
+			<div class="flex-[1_1_320px] min-w-0">
+				<h1 class="sr-only lg:not-sr-only lg:text-[28px] lg:font-bold lg:tracking-tight">{m.compare_title()}</h1>
+				<p class="lg:mt-1 text-sm text-surface-600-400">{m.compare_intro()}</p>
 			</div>
+			<div class="max-sm:hidden">{@render addButton('')}</div>
+		</header>
 
-			{#if resolvedEntries.length > 0}
-				<div class="grid gap-2">
-					{#each resolvedEntries as entry, i}
-						<div class="card preset-tonal-primary p-2 sm:p-3 overflow-hidden">
-							<!-- Header: color dot + name + remove -->
-							<div class="flex items-center gap-2">
-								<span
-									class="size-3 rounded-full shrink-0"
-									style="background-color: {entryColor(i)}"
-								></span>
-								<div class="flex-1 min-w-0">
-									<p class="text-sm font-semibold truncate">{entry.shown.name}</p>
-									<p class="text-xs opacity-70 truncate">{entry.shown.ammo}</p>
-								</div>
-								<button
-									type="button"
-									class="btn btn-icon btn-sm preset-tonal-error shrink-0"
-									title={m.compare_remove()}
-									onclick={() => compareTrajectories.removeEntry(entry.id)}
-								>
-									<X class="size-4" />
-								</button>
-							</div>
-
-							<!-- Zero distance override -->
-							<div class="mt-1.5 input !flex !items-center gap-1.5">
-								<input
-									class="flex-1 min-w-0 bg-transparent border-none outline-none shadow-none p-0 text-right"
-									type="text"
-									inputmode="decimal"
-									placeholder={String(entry.shown.zeroDist)}
-									value={entry.zeroDist}
-									aria-invalid={!isUsableZeroDistance(entry.zeroDist)}
-									aria-describedby={isUsableZeroDistance(entry.zeroDist) ? undefined : `zero-error-${i}`}
-									oninput={(e) => compareTrajectories.updateEntry(entry.id, { zeroDist: e.target.value })}
-								/>
-								<div class="flex items-center gap-1 shrink-0">
-									{#each [{ value: 'yd', label: m.unit_yd() }, { value: 'm', label: m.unit_m() }] as opt}
-										<button
-											type="button"
-											class="chip text-xs {entry.zeroUnit === opt.value
-												? 'preset-filled-primary-500'
-												: 'preset-tonal-surface'}"
-											onclick={() => compareTrajectories.updateEntry(entry.id, { zeroUnit: opt.value })}
-										>{opt.label}</button>
-									{/each}
-								</div>
-							</div>
-							{#if !isUsableZeroDistance(entry.zeroDist)}
-								<p id={`zero-error-${i}`} class="mt-1 text-xs text-error-500">
-									{m.compare_zero_invalid({ min: formatLimit(MIN_ZERO_DISTANCE), max: formatLimit(MAX_ZERO_DISTANCE) })}
-								</p>
-							{:else if rangeUsable && !entryResults[i]}
-								<!-- A usable zero can still give no trajectory, e.g. a short zero on a slow load (#114). -->
-								<p class="mt-1 text-xs text-warning-800-200">{m.compare_zero_no_result()}</p>
-							{/if}
-						</div>
-					{/each}
-				</div>
-			{:else}
-				<p class="text-sm text-surface-600-400 text-center py-4">{m.compare_no_entries()}</p>
-			{/if}
-		</div>
-
-		<!-- ═══ Chart controls ═══════════════════════════════════════ -->
-		<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-			<!-- Max distance -->
-			<div class="card preset-filled-surface-100-900 p-4 space-y-1.5">
-				<span class="text-sm font-medium">{m.compare_max_dist()}</span>
-				<div class="input !flex !items-center gap-2">
-					<input
-						class="flex-1 min-w-0 bg-transparent border-none outline-none shadow-none p-0"
-						type="text"
-						inputmode="decimal"
-						placeholder="500"
-						value={compareTrajectories.range.distance}
-						aria-invalid={!rangeUsable}
-						oninput={(e) => compareTrajectories.setRange({ distance: e.target.value })}
-					/>
-					<div class="flex items-center gap-1 shrink-0">
-						{#each [{ value: 'yd', label: m.unit_yd() }, { value: 'm', label: m.unit_m() }] as opt}
+		<!--
+			Phone: entries, chart, chart settings. sm and up: entries and settings on the left, the
+			chart on the right when there is room, else under them (flex-wrap, as on the boards).
+		-->
+		<div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:gap-5">
+			<div class="max-sm:contents sm:flex-[1_1_340px] sm:max-w-full lg:max-w-[420px] flex flex-col gap-3.5 min-w-0">
+				<!-- Desktop: Add a profile, inline -->
+				{#if addOpen}
+					<section
+						id="{uid}-add"
+						aria-labelledby="{uid}-add-title"
+						class="hidden lg:flex flex-col gap-2.5 card preset-filled-surface-100-900 border border-surface-300-700 p-4"
+					>
+						<div class="flex items-center gap-2">
+							<h2 id="{uid}-add-title" class="flex-1 text-[15px] font-semibold">{m.compare_pick_profile()}</h2>
 							<button
 								type="button"
-								class="chip text-xs {compareTrajectories.range.unit === opt.value
-									? 'preset-filled-primary-500'
-									: 'preset-tonal-surface'}"
-								onclick={() => compareTrajectories.setRange({ unit: opt.value })}
-							>{opt.label}</button>
-						{/each}
-					</div>
-				</div>
-				{#if !rangeUsable}
-					<p class="text-xs text-error-500">{m.validation_range_above_zero({ max: formatLimit(MAX_DISTANCE), unit: distLabel })}</p>
+								class="btn-icon size-9 rounded-base text-surface-600-400 hover:preset-tonal-surface {focusRing}"
+								aria-label={m.common_close()}
+								title={m.common_close()}
+								onclick={() => (addOpen = false)}
+							>
+								<X class="size-[18px]" aria-hidden="true" />
+							</button>
+						</div>
+						<CompareAddPicker listClass="max-h-72 overflow-y-auto" onadded={() => (addOpen = false)} />
+					</section>
 				{/if}
+
+				<!-- On the chart -->
+				<section aria-labelledby="{uid}-entries-title" class="order-1 flex flex-col gap-2 min-w-0">
+					<div class="flex items-center gap-2 px-1 sm:px-0">
+						<h2 id="{uid}-entries-title" class="flex-1 text-xs font-bold tracking-wider uppercase text-surface-600-400">
+							{m.compare_on_the_chart()}
+						</h2>
+						{#if resolvedEntries.length > 0}
+							<span class="min-w-[22px] h-[22px] px-1.5 rounded-full preset-tonal-surface text-xs font-bold flex items-center justify-center tabular-nums">
+								{resolvedEntries.length}
+							</span>
+						{/if}
+						<div class="sm:hidden">{@render addButton('')}</div>
+					</div>
+
+					{#if resolvedEntries.length > 0}
+						<ul class="card preset-filled-surface-100-900 border border-surface-200-800 divide-y divide-surface-200-800 overflow-hidden">
+							{#each resolvedEntries as entry, i (entry.id)}
+								{@const zeroOk = isUsableZeroDistance(entry.zeroDist)}
+								{@const name = entry.shown.name || m.scope_view_profile_unnamed()}
+								<li class="px-3.5 py-2.5 flex flex-col gap-1.5">
+									<div class="flex items-center gap-2.5">
+										<span class="size-3 rounded-full shrink-0" style="background-color: {entryColor(i)}" aria-hidden="true"></span>
+										<span class="flex-1 min-w-0">
+											<span class="block text-[15px] font-semibold truncate">{name}</span>
+											{#if entry.shown.ammo}
+												<span class="block text-xs text-surface-600-400 truncate">{entry.shown.ammo}</span>
+											{/if}
+										</span>
+										<button
+											type="button"
+											class="btn-icon size-11 -mr-2 shrink-0 rounded-base text-surface-600-400 hover:preset-tonal-surface {focusRing}"
+											title={m.compare_remove()}
+											aria-label={m.compare_remove_named({ name })}
+											onclick={() => compareTrajectories.removeEntry(entry.id)}
+										>
+											<X class="size-[18px]" aria-hidden="true" />
+										</button>
+									</div>
+									<div class="flex items-center gap-2.5 pl-[22px]">
+										<label for="{uid}-zero-{entry.id}" class="flex-1 text-xs text-surface-600-400">{m.compare_zero_override()}</label>
+										<div class="input !flex !items-center gap-1 h-10 w-[150px] shrink-0">
+											<input
+												id="{uid}-zero-{entry.id}"
+												class="flex-1 w-10 min-w-0 bg-transparent border-none outline-none shadow-none p-0 font-semibold"
+												type="text"
+												inputmode="decimal"
+												autocomplete="off"
+												placeholder={String(entry.shown.zeroDist)}
+												value={entry.zeroDist}
+												aria-invalid={!zeroOk}
+												aria-describedby={zeroOk ? undefined : `${uid}-zero-msg-${entry.id}`}
+												oninput={(e) => compareTrajectories.updateEntry(entry.id, { zeroDist: e.target.value })}
+											/>
+											<ChipGroup
+												label={m.compare_zero_unit_named({ name })}
+												options={unitOptions()}
+												value={entry.zeroUnit}
+												onselect={(unit) => compareTrajectories.updateEntry(entry.id, { zeroUnit: unit })}
+											/>
+										</div>
+									</div>
+									{#if !zeroOk}
+										<p id="{uid}-zero-msg-{entry.id}" class="pl-[22px] text-xs text-error-500" role="alert">
+											{m.compare_zero_invalid({ min: formatLimit(MIN_ZERO_DISTANCE), max: formatLimit(MAX_ZERO_DISTANCE) })}
+										</p>
+									{:else if rangeUsable && !entryResults[i]}
+										<!-- A usable zero can still give no trajectory, e.g. a short zero on a slow load (#114). -->
+										<p class="pl-[22px] text-xs text-warning-800-200">{m.compare_zero_no_result()}</p>
+									{/if}
+								</li>
+							{/each}
+						</ul>
+						<p class="px-1 sm:px-0 text-xs leading-snug text-surface-600-400">{m.compare_zero_note()}</p>
+					{:else}
+						<div class="card preset-filled-surface-100-900 border border-surface-200-800 px-4 py-6 text-center">
+							<p class="text-sm text-surface-600-400">{m.compare_no_entries()}</p>
+						</div>
+					{/if}
+				</section>
+
+				<!-- Chart settings -->
+				<section
+					aria-labelledby="{uid}-settings-title"
+					class="order-3 card preset-filled-surface-100-900 border border-surface-200-800 px-3.5 py-3 flex flex-col gap-3 min-w-0"
+				>
+					<h2 id="{uid}-settings-title" class="text-xs font-bold tracking-wider uppercase text-surface-600-400">{m.compare_chart_settings()}</h2>
+					<div class="flex flex-wrap gap-x-4 gap-y-3">
+						<div class="flex-[1_1_160px] min-w-0 space-y-1">
+							<label for="{uid}-max" class="block text-xs text-surface-600-400">{m.compare_max_dist()}</label>
+							<div class="input !flex !items-center gap-1 h-11">
+								<input
+									id="{uid}-max"
+									class="flex-1 w-10 min-w-0 bg-transparent border-none outline-none shadow-none p-0 font-semibold"
+									type="text"
+									inputmode="decimal"
+									autocomplete="off"
+									placeholder="500"
+									value={compareTrajectories.range.distance}
+									aria-invalid={!rangeUsable}
+									aria-describedby={rangeUsable ? undefined : `${uid}-max-msg`}
+									oninput={(e) => compareTrajectories.setRange({ distance: e.target.value })}
+								/>
+								<ChipGroup
+									label={m.scope_view_distance_unit()}
+									options={unitOptions()}
+									value={compareTrajectories.range.unit}
+									onselect={(unit) => compareTrajectories.setRange({ unit })}
+								/>
+							</div>
+							{#if !rangeUsable}
+								<p id="{uid}-max-msg" class="text-xs text-error-500" role="alert">
+									{m.validation_range_above_zero({ max: formatLimit(MAX_DISTANCE), unit: distLabel })}
+								</p>
+							{/if}
+						</div>
+						<div class="flex-[1_1_200px] min-w-0 space-y-1">
+							<span class="block text-xs text-surface-600-400" aria-hidden="true">{m.compare_height_in()}</span>
+							<ChipGroup
+								variant="segmented"
+								label={m.compare_y_axis()}
+								options={Y_AXIS_OPTIONS.map((o) => ({ value: o.value, label: o.label() }))}
+								value={compareTrajectories.yAxis}
+								onselect={(unit) => compareTrajectories.setYAxis(unit)}
+							/>
+						</div>
+					</div>
+				</section>
 			</div>
 
-			<!-- Y axis unit -->
-			<div class="card preset-filled-surface-100-900 p-4 space-y-1.5">
-				<span class="text-sm font-medium">{m.compare_y_axis()}</span>
-				<div class="flex flex-wrap gap-1">
-					{#each Y_AXIS_OPTIONS as opt}
-						<button
-							type="button"
-							class="chip text-xs {compareTrajectories.yAxis === opt.value
-								? 'preset-filled-primary-500'
-								: 'preset-tonal-surface'}"
-							onclick={() => compareTrajectories.setYAxis(opt.value)}
-						>{opt.label()}</button>
-					{/each}
+			<!-- Chart -->
+			<section
+				aria-labelledby="{uid}-chart-title"
+				class="order-2 sm:flex-[999_1_440px] lg:flex-[999_1_560px] min-w-0 card preset-filled-surface-100-900 border border-surface-200-800 p-4 flex flex-col gap-2.5"
+			>
+				<div class="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+					<h2 id="{uid}-chart-title" class="flex-[1_1_auto] text-[15px] font-semibold">{m.compare_chart_title()}</h2>
+					{#if chartData}
+						<ul class="flex flex-wrap gap-x-3.5 gap-y-1" aria-label={m.compare_legend()}>
+							{#each legend as item (item.id)}
+								<li class="flex items-center gap-1.5 text-xs text-surface-600-400">
+									<span class="inline-block w-4 h-[3px] rounded-full shrink-0" style="background-color: {item.color}" aria-hidden="true"></span>
+									{item.text}
+								</li>
+							{/each}
+						</ul>
+					{/if}
 				</div>
-			</div>
+				{#if chartData}
+					<div bind:this={chartEl}></div>
+				{:else}
+					<div class="py-10 flex flex-col items-center gap-3 text-center">
+						<p class="text-sm text-surface-600-400">
+							{resolvedEntries.length === 0 ? m.compare_no_entries() : m.ballistic_no_result()}
+						</p>
+						{#if resolvedEntries.length === 0}
+							{@render addButton('')}
+						{/if}
+					</div>
+				{/if}
+			</section>
 		</div>
-
-		<!-- ═══ Chart ════════════════════════════════════════════════ -->
-		{#if chartData}
-			<div class="space-y-2">
-				<h2 class="font-semibold">{m.compare_chart_title()}</h2>
-				<div bind:this={chartEl}></div>
-			</div>
-		{/if}
-
 	{/if}
 </div>

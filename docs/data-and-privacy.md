@@ -8,15 +8,17 @@ Data stays in the browser's `localStorage`, or the same store in the Electron an
 
 | Key | Content | Store |
 |-----|---------|-------|
-| `zro-profiles` | Profiles: names, rifle and optic names, ammunition, zero, ballistic data, click values. Not written on first launch: since [#150](https://github.com/hawkins48b/cw-zro/issues/150) it appears with the first profile saved (guided setup, sample profile or profile form) | [`profiles`](../src/lib/stores/profiles.svelte.js) |
+| `zro-profiles` | Profiles: names, rifle and optic names, ammunition, zero, ballistic data, click values. Not written on first launch: since [#150](https://github.com/hawkins48b/cw-zro/issues/150) it appears with the first profile saved (guided setup, sample profiles or profile form) | [`profiles`](../src/lib/stores/profiles.svelte.js) |
 | `zro-active-profile` | ID of the active profile. Not written on first launch either (#150): it appears when a profile is made active | [`activeProfile`](../src/lib/stores/activeProfile.svelte.js) |
 | `zro-ballistic` | Ballistic calculator: range and step, atmosphere (with its mode, weather and pressure reference, #151; filled boxes of the current weather, #152), wind, display options (annotations, table columns, velocity unit, chart shown) | [`ballistic`](../src/lib/stores/ballistic.svelte.js) |
 | `zro-scope-view` | Scope view: range, angle, atmosphere (with its mode, weather and pressure reference, #148; filled boxes of the current weather, #152), wind, rotation, Dial or Hold | [`scopeView`](../src/lib/stores/scopeView.svelte.js) |
 | `zro-traj-validation` | Trajectory validation inputs | [`trajectoryValidation`](../src/lib/stores/trajectoryValidation.svelte.js) |
 | `zro-compare-traj` | Compared profiles, range, chart unit | [`compareTrajectories`](../src/lib/stores/compareTrajectories.svelte.js) |
 | `zro-mpbr` | MPBR target size | [`mpbr`](../src/lib/stores/mpbr.svelte.js) |
-| `zro-dark-mode` | Dark mode choice, stored only after a change | [`settings`](../src/lib/stores/settings.svelte.js) |
+| `zro-dark-mode` | Dark mode choice (`true` or `false`), stored only after a change: Settings > Display or the sidebar theme buttons. Any stored value other than `true` reads as light, in the store and in `theme-init.js` (#166) | [`settings`](../src/lib/stores/settings.svelte.js) |
 | `zro-locale` | Language picked in the language switcher, `en`, `fr` or `de` as plain text, stored only after a click ([#96](https://github.com/hawkins48b/cw-zro/issues/96)) | [`storedLocale.js`](../src/lib/utils/storedLocale.js), read by [`hooks.client.js`](../src/hooks.client.js) |
+
+Every key starts with `zro-`. [`appStorage.js`](../src/lib/utils/appStorage.js) lists them (`APP_STORAGE_KEYS`) for "Clear all data on this device" ([#166](https://github.com/hawkins48b/cw-zro/issues/166)): `clearAllData` in [`clearAllData.js`](../src/lib/stores/clearAllData.js) removes these keys and any other key starting with `zro-`, puts every store back to its default in memory, empties the ammo selection and form draft, and deletes the old locale cookie. Keys of other apps on the same origin are left alone. Since the Settings round of #166 it is called from Settings > Danger zone ([`ClearDataCard.svelte`](../src/lib/components/settings/ClearDataCard.svelte)): "Clear all data…" opens a confirmation inside the card (focus on Cancel), and "Delete everything" calls `clearAllData()`, then opens `/welcome` with `replace`, so Back does not return to an emptied Settings page. The theme then follows the device setting again. Nothing is backed up first; the card says how many profiles will be deleted and points to Export all.
 
 These are the only uses of `localStorage` in `src/`, apart from the read in [`theme-init.js`](../static/theme-init.js), loaded by [`app.html`](../src/app.html), that sets dark mode before the first paint. Each stays until the user clears the site data or uninstalls the app. There is no `sessionStorage`, no IndexedDB and no service worker.
 
@@ -26,7 +28,7 @@ These are the only uses of `localStorage` in `src/`, apart from the read in [`th
 
 ### Limits of this storage
 
-- Data lives on one device, in one browser. There is no sync, backup or import of profiles. One profile at a time can be exported as a JSON file ([#149](https://github.com/hawkins48b/cw-zro/issues/149), see below), but the app cannot read it back yet.
+- Data lives on one device, in one browser. There is no sync or automatic backup. Profiles can be exported as JSON files, one ([#149](https://github.com/hawkins48b/cw-zro/issues/149)) or all ([#166](https://github.com/hawkins48b/cw-zro/issues/166)), and imported again on any device (see below). Only profiles: calculator inputs and settings are not exported.
 - Clearing site data deletes everything. The web, desktop and mobile apps each have their own separate storage.
 - A value that is not valid JSON is replaced by the default, so a corrupted store loses its content.
 - Anyone with access to the device or browser profile can read it.
@@ -38,7 +40,9 @@ These are the only uses of `localStorage` in `src/`, apart from the read in [`th
 | Page and code files | Web: opening the app, moving to a page that needs a new chunk | Standard browser request. No cookie, apart from the old locale cookie until it is deleted (see above) | The site's host |
 | `/pdf/rifle-dataset-*.pdf`, `/pdf/precision-*.pdf` | Creating a dope card | Fetches the blank template. No profile data is sent | The same origin: the site's host on the web, local files on desktop and mobile |
 | `_app/version.json` | When the tab regains focus, and once an hour | Standard browser request. The app does not use the result | The same origin |
-| GitHub | Only when the user opens one of the three links on the About page (ZRO, js-ballistics, bclibc) | Opens in a browser | github.com |
+| GitHub | Only when the user opens a link on the About page: the ZRO repository, js-ballistics, bclibc (tag `v2.0.0`) | Opens in a new tab; in the desktop app, the system browser | github.com |
+| chocolate-warfare.com | Only when the user opens the link of the "Provided by Chocolate Warfare" card on the About page (#166) | Opens in a new tab | chocolate-warfare.com |
+| Package web pages | Only when the user opens a package name in Included software (Licences page, desktop About; #166). The addresses come from `src/lib/data/licenses.json`, https only | Opens in a new tab | The package's homepage or repository (github.com, capacitorjs.com, svelte.dev and others) |
 | Current weather ([#152](https://github.com/hawkins48b/cw-zro/issues/152)) | Web and mobile only: each tap of "Use current weather here" in the Accurate atmosphere of the Scope View or the Ballistic page, after the user allowed the location. Never on load, never in the background, never on desktop | One `GET https://api.open-meteo.com/v1/forecast?latitude=<lat>&longitude=<lon>&current=temperature_2m,relative_humidity_2m,pressure_msl&hourly=temperature_2m,relative_humidity_2m,pressure_msl&models=meteoswiss_icon_ch1,best_match&forecast_hours=1`, latitude and longitude rounded to 2 decimals; every other parameter is fixed ([#154](https://github.com/hawkins48b/cw-zro/issues/154)). No cookie (`credentials: 'omit'`), no referrer (`referrerPolicy: 'no-referrer'`), no HTTP cache (`cache: 'no-store'`). No profile, no other value, no device altitude. The browser adds its usual headers (user agent, language) and, because the request goes to another site, `Origin`: the app's address (the web site, or `https://localhost` / `capacitor://localhost` on mobile). Open-Meteo sees the IP address | api.open-meteo.com |
 | open-meteo.com | Only when the user opens the attribution link shown after a fill | Opens in a browser | open-meteo.com |
 | meteoswiss.admin.ch | Only when the user opens the MeteoSwiss link, shown after a fill with ICON-CH1 values ([#154](https://github.com/hawkins48b/cw-zro/issues/154)) | Opens in a browser | www.meteoswiss.admin.ch |
@@ -55,8 +59,8 @@ The ballistic engine (bclibc, WebAssembly, [#77](https://github.com/hawkins48b/c
 | Location | `navigator.geolocation.getCurrentPosition`, high accuracy, a fix up to 5 minutes old. The exact position stays in memory for the request, then is dropped. It is never stored |
 | Sent | Latitude and longitude rounded to 2 decimals: at most about 0.56 km off in latitude, less in longitude away from the equator. Nothing else from the app: the fields, the models and the forecast hours asked for are the same for everyone |
 | Model | Since [#154](https://github.com/hawkins48b/cw-zro/issues/154) (owner decision of 2026-11-16): MeteoSwiss ICON-CH1 inside its area (Switzerland and around), Open-Meteo's default models elsewhere, in the same request. MeteoSwiss data reaches the app through Open-Meteo; the app makes no request to MeteoSwiss |
-| Altitude | The device's GPS altitude when it gives one, else Open-Meteo's ground elevation of the point. The GPS altitude is not sent. It is usually height above the WGS84 ellipsoid, not above sea level, so it can be tens of metres off; it is not corrected (owner decision) |
-| Stored | Only the four filled boxes, with the pressure reference set to QNH, in the page's own key (`zro-scope-view` or `zro-ballistic`), as typed values are. No position, no answer, no time. No cache |
+| Altitude | The device's GPS altitude when it gives one, else Open-Meteo's ground elevation of the point. The GPS altitude is not sent. It is usually height above the WGS84 ellipsoid, not above sea level, so it can be tens of metres off; it is not corrected (owner decision). Since [#172](https://github.com/hawkins48b/cw-zro/issues/172) it is used only on the device, to turn the sea-level pressure of the answer into the station pressure at that altitude; it is not stored |
+| Stored | Only the three filled boxes (station pressure, temperature, humidity), with the pressure reference set to station, in the page's own key (`zro-scope-view` or `zro-ballistic`), as typed values are. No position, no altitude, no answer, no time. No cache. Before #172 the altitude box and the sea-level pressure (QNH) were stored |
 | Failure | Refused location, no fix, no connection, an HTTP error, a 10 s timeout or a bad answer: nothing changes, and a message says why |
 | Desktop | The button is hidden (app scheme or Electron user agent), and the desktop app refuses every permission, location included |
 | Licence | Open-Meteo's data is under CC BY 4.0. The card shows "Weather data: Open-Meteo.com" with a link after each fill. MeteoSwiss's open data is also under CC BY 4.0, and its [terms of use](https://opendatadocs.meteoswiss.ch/general/terms-of-use) (read on 2026-11-16) require the source to be acknowledged ("Source: MeteoSwiss", "Quelle: MeteoSchweiz", "Source: MétéoSuisse"; art. 5 para. 1 let. a MetO), without suggesting that MeteoSwiss supports the user. After a fill with ICON-CH1 values the card adds ", Source: MeteoSwiss (ICON-CH1 model)" (fr "Source : MétéoSuisse (modèle ICON-CH1)", de "Quelle: MeteoSchweiz (Modell ICON-CH1)"), linked to www.meteoswiss.admin.ch |
@@ -65,7 +69,7 @@ What Open-Meteo logs and keeps is in its own terms, not in this repository; it w
 
 **Generated files** are built on the device. CSV exports, PDF dope cards and profile exports are saved through the normal download. They contain profile names and data, so they go wherever the user sends them.
 
-**Profile export** ([#149](https://github.com/hawkins48b/cw-zro/issues/149)). Export in the profile's menu on the Profiles page saves `zro-profile-<name>.json`, built by [`profileExport.js`](../src/lib/utils/profileExport.js). Nothing is sent: the page makes a `blob:` URL and clicks a download link. The file holds the whole profile as stored (`profiles.get`), its id included, in an envelope:
+**Profile export** ([#149](https://github.com/hawkins48b/cw-zro/issues/149)). "Export this profile" on the card of the profile in use (Profiles page, since #166; the ⋮ menu before) saves `zro-profile-<name>.json`, built by [`profileExport.js`](../src/lib/utils/profileExport.js). Nothing is sent: the page makes a `blob:` URL and clicks a download link. The file holds the whole profile as stored (`profiles.get`), its id included, in an envelope:
 
 | Field | Value |
 |-------|-------|
@@ -74,7 +78,25 @@ What Open-Meteo logs and keeps is in its own terms, not in this repository; it w
 | `exportedAt` | The time of the export, ISO 8601 in UTC (`null` if the clock gives no valid date) |
 | `profile` | The stored profile, every field as stored, damaged values included |
 
-The file name keeps letters (accented ones too), digits, `_` and `-` from the profile name; every other run of characters (spaces, dots, path characters, control and format characters, emoji) becomes one `-`; `-` and `_` are trimmed from the ends, and the name part is cut to 60 characters. A name with nothing left gives `zro-profile.json`. A profile that is missing or not an object gives no file. Not checked on a device: whether the Android and iOS web views save a `blob:` download at all (the same open point as the CSV and the dope cards).
+The file name keeps letters (accented ones too), digits, `_` and `-` from the profile name; every other run of characters (spaces, dots, path characters, control and format characters, emoji) becomes one `-`; `-` and `_` are trimmed from the ends, and the name part is cut to 60 characters. A name with nothing left gives `zro-profile.json`. A profile that is missing or not an object gives no file. Not checked on a device: whether the Android and iOS web views save a `blob:` download at all (the same open point as the CSV and the dope cards). Since #166 the page revokes the `blob:` URL 1000 ms after the click, not at once (`downloadFile`).
+
+**Export all** ([#166](https://github.com/hawkins48b/cw-zro/issues/166)). "Export all" in the Profiles header saves every profile in one file, `zro-profiles-YYYY-MM-DD.json` (the date of the device's time zone; `zro-profiles.json` if the clock gives no valid date), the same way. No profile, no file.
+
+| Field | Value |
+|-------|-------|
+| `format` | `"zro-profiles"` |
+| `version` | `1` |
+| `exportedAt` | As in the single export |
+| `profiles` | Every stored profile as stored (`profiles.list`), ids included; entries that are not objects left out |
+
+**Profile import** ([#166](https://github.com/hawkins48b/cw-zro/issues/166)). "Import" on the Profiles page reads one or several files chosen by the user, of both formats, on the device, with [`profileImport.js`](../src/lib/utils/profileImport.js). Nothing is sent or fetched. Nothing in a file is trusted:
+
+- A file over 1 MiB is refused on its size, before it is read. A file that is empty, not JSON, of another `format`, or of a `version` other than 1 is refused. A `zro-profiles` file with more than 500 profiles is refused, and so is a file that would take one import over 500 profiles. The dialog names each refused file and its reason.
+- Each profile is rebuilt from the profile form's fields only. Every other key, `id` and `__proto__` included, is dropped. Texts are cut to 60 characters, a number text longer than 32 characters reads as an empty box. The profile must pass the profile form's validation, and is stored as the form stores it; one that fails is skipped and counted.
+- Every imported profile gets a new id (`crypto.randomUUID`). A name already used, compared without case, becomes a copy name ("K31 (2)").
+- Nothing is stored before the user confirms the review. Imported profiles are appended to `zro-profiles`; no stored profile is changed and the active profile stays. If storage refuses the save, nothing is added, in storage or in memory.
+
+The in-app privacy page covers export and import since the Settings round of #166 ("Profile files": both stay on the device, nothing is sent).
 
 ## What does not exist
 
@@ -114,7 +136,7 @@ Calculations run on the device. The current weather needs a connection on every 
 - The desktop app refuses every permission request (camera, location, notifications, devices).
 - The desktop window cannot leave the app, and opens `https:` links only in the system browser. See [Architecture](architecture.md#desktop).
 - Saved values are not validated when read, apart from the chart unit of compare trajectories. See [Input guards](ballistics-model.md#input-guards).
-- The app's [privacy page](../src/routes/settings/privacy/+page.svelte) lists what is stored, that it stays until the site data is cleared or the app is uninstalled, the web host's view of requests, and the offline limits of the web version ([#102](https://github.com/hawkins48b/cw-zro/issues/102)), and since [#152](https://github.com/hawkins48b/cw-zro/issues/152) what the current weather sends and when. It follows this guide: change both together.
+- The app's [privacy page](../src/routes/settings/privacy/+page.svelte) lists what is stored, that it stays until the site data is cleared, the app is uninstalled or Clear all data is used, the web host's view of requests, and the offline limits of the web version ([#102](https://github.com/hawkins48b/cw-zro/issues/102)), and since [#152](https://github.com/hawkins48b/cw-zro/issues/152) what the current weather sends and when. Since the Settings round of #166 it has a summary card, a "Profile files" card (export and import stay on the device), the weather facts as a When / Sent / To / Back / Kept table, and "No cookies."; the line about the old language cookie was dropped. It follows this guide: change both together.
 
 ## Licences
 
@@ -124,8 +146,9 @@ Since [#77](https://github.com/hawkins48b/cw-zro/issues/77) every build (web, de
 
 | Where | What |
 |-------|------|
-| About page | A card "Includes bclibc (LGPL-3.0)", in English, French and German, with a link to the bclibc source and to the licences page |
-| `/settings/about/licenses` | The third-party notice and the full LGPL-3.0 and GPL-3.0 texts, shown in the app, so the desktop window never has to leave it |
+| About page | Since #166, a "Calculation engine" card: js-ballistics and the bclibc solver it embeds, with versions and licences read from `licenses.json`, links to both sources and to the licences page. On desktop, the Included software table; on tablet, the licence texts |
+| `/settings/about/licenses` | The third-party notice and the full LGPL-3.0 and GPL-3.0 texts, shown in the app (one open at a time), so the desktop window never has to leave it. Since #166 also **Included software**: every shipped package with version and licence, highlighted when the licence has terms beyond a permissive one (`hasExtraTerms`), tagged when it is only in some builds |
+| [`src/lib/data/licenses.json`](../src/lib/data/licenses.json) | The shipped packages (#166), written by `npm run licenses:generate` from the lockfile, see [Included software list](development.md#included-software-list). 27 entries on 2026-11-17, bclibc among them as an embedded entry. `src/test/licenses.test.js` fails when it no longer matches the lockfile |
 | `static/licenses/` | `THIRD-PARTY-NOTICES.txt` (bclibc, the link to the ZRO source and how to replace bclibc, since #143), `LGPL-3.0.txt`, `GPL-3.0.txt`, copied into every build under `/licenses/`. The LGPL-3.0 text is identical to the `LICENSE` of bclibc; the LGPL-3.0 incorporates the GPL-3.0, so both are shipped |
 
 `js-ballistics` does not ship a licence notice for bclibc itself; its package declares ISC only.

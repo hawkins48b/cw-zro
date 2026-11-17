@@ -14,7 +14,7 @@ import path from 'node:path';
 import { PDFArray, PDFDocument, PDFPage } from 'pdf-lib';
 import { generatePrecisionDopeCard } from '#lib/utils/precisionCardPdf.js';
 import { computePrecisionCard } from '#lib/utils/precisionCard.js';
-import { FOOTER, LEFT, PAGE_SIZE, PX, RANGE, RIGHT, precisionTemplatePath } from '#lib/utils/precisionCardLayout.js';
+import { FOOTER, LEFT, PAGE_SIZE, PX, RANGE, RIGHT, dialValuePoint, precisionTemplatePath } from '#lib/utils/precisionCardLayout.js';
 import { PRECISION_LOCALES, precisionWords } from '#lib/utils/precisionCardWords.js';
 import { PRECISION_COLUMNS, PRECISION_QUANTITIES, formatColumn, formatDate, unitSymbol } from '#lib/utils/precisionCardFormat.js';
 import { buildPrecisionTemplate } from '../../scripts/precision-card-templates.js';
@@ -277,6 +277,20 @@ describe('wind dial (#159)', () => {
 		}
 		// The worst case is on the card: the test measures the widest values it is meant for.
 		expect(widest).toBeGreaterThanOrEqual(longest);
+	});
+
+	it('staggers only the inner ring: from the second ring on, every value sits on its ring (#174)', () => {
+		const dl = RANGE.dial;
+		const centre = { x: dl.origin.x + dl.centre.x, y: dl.origin.y + dl.centre.y };
+		const radius = (ring, ray) => {
+			const at = dialValuePoint(ring, ray);
+			return Math.hypot(at.x - centre.x, at.y - centre.y);
+		};
+		dl.rays.forEach((angle, ray) => {
+			for (let ring = 1; ring < dl.radii.length; ring++) expect(radius(ring, ray)).toBeCloseTo(dl.radii[ring], 9);
+			expect(radius(0, ray)).toBeCloseTo(dl.radii[0] + (dl.halfRays.includes(angle) ? dl.stagger[0] : 0), 9);
+		});
+		expect(dl.stagger[0]).toBeGreaterThan(0);
 	});
 
 	it('prints the 700 m values of the sample, ring by ring from 15° to 90°', async () => {

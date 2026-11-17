@@ -1,8 +1,10 @@
 import { WIND_FROM_TARGET, migrateStoredWind, pageWind, patchWind } from '#lib/utils/storedWind.js';
 import {
+	DEFAULT_ELEVATION,
 	ISA_ATMOSPHERE,
 	patchedAtmosphere,
 	storedBallisticAtmosphere,
+	storedBallisticElevation,
 	storedBallisticOptions,
 	storedObject,
 	storedRange
@@ -25,6 +27,7 @@ const DEFAULT_OPTIONS = {
 
 const store = localStore('zro-ballistic', () => ({
 	range: { distance: '500', unit: 'yd', step: '25' },
+	elevation: { ...DEFAULT_ELEVATION },
 	atmosphere: { ...ISA_ATMOSPHERE },
 	wind: DEFAULT_WIND,
 	options: DEFAULT_OPTIONS
@@ -44,6 +47,10 @@ if (migratedWind !== state().wind) {
 export const ballistic = {
 	get range() {
 		return storedRange(state().range, { step: true });
+	},
+	/** The uphill or downhill angle (#173), as the Scope View's; 0° in state saved before it. */
+	get elevation() {
+		return storedBallisticElevation(state().elevation);
 	},
 	/**
 	 * The boxes, plus mode, weather and pressureRef, as on the Scope View (#151). Hand it to
@@ -71,6 +78,9 @@ export const ballistic = {
 
 	setRange(patch) {
 		store.value = { ...state(), range: { ...this.range, ...patch } };
+	},
+	setElevation(patch) {
+		store.value = { ...state(), elevation: { ...this.elevation, ...patch } };
 	},
 	/** Change the atmosphere as the Scope View does: see patchedAtmosphere in storedState.js. */
 	setAtmosphere(patch) {

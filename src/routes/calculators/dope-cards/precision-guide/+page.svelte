@@ -57,7 +57,7 @@
 	>
 {/snippet}
 
-<div class="max-w-2xl flex flex-col gap-3 px-2 sm:px-0">
+<div class="mx-auto w-full max-w-2xl flex flex-col gap-3 sm:gap-4 lg:gap-5">
 	<a
 		href={localizeHref('/calculators/dope-cards')}
 		class="hidden lg:inline-flex items-center gap-2 self-start min-h-11 text-sm font-semibold text-primary-700-300 hover:underline underline-offset-2 rounded-sm {focusRing}"

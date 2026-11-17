@@ -8,7 +8,7 @@
 	import { profiles } from '#lib/stores/profiles.svelte.js';
 	import { activeProfile } from '#lib/stores/activeProfile.svelte.js';
 	import { isFirstRun } from '#lib/utils/firstRun.js';
-	import { SAMPLE_PROFILE } from '#lib/utils/sampleProfile.js';
+	import { SAMPLE_PROFILES } from '#lib/utils/sampleProfile.js';
 
 	// Welcome only while there is no usable profile: otherwise this page goes on to Scope View.
 	const firstRun = isFirstRun(profiles.list);
@@ -26,7 +26,8 @@
 		// Once only, also on a double tap.
 		if (leaving) return;
 		leaving = true;
-		const id = profiles.add({ ...SAMPLE_PROFILE });
+		// #175: the M4 and the Remington 700; the M4 (first) is the active one.
+		const [id] = SAMPLE_PROFILES.map((profile) => profiles.add({ ...profile }));
 		activeProfile.setActive(id);
 		goto(localizeHref('/scope-view'), { replace: true });
 	}

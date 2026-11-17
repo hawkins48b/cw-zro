@@ -13,12 +13,15 @@
 	 */
 	import { tick } from 'svelte';
 	import { m } from '#lib/paraglide/messages.js';
-	import { Search, CircleCheck, Circle } from '@lucide/svelte';
 	import UnitField from '#lib/components/UnitField.svelte';
 	import TextField from '#lib/components/setup/TextField.svelte';
 	import { MAX_NAME_LENGTH } from '#lib/utils/storedProfiles.js';
 	import { formatNumber } from '#lib/utils/format.js';
 	import ammoData from '#lib/data/ammo.json';
+	import PickerSearch from '#lib/components/picker/PickerSearch.svelte';
+	import PickerList from '#lib/components/picker/PickerList.svelte';
+	import PickerRow from '#lib/components/picker/PickerRow.svelte';
+	import AmmoSummaryCard from '#lib/components/picker/AmmoSummaryCard.svelte';
 
 	let {
 		form = $bindable(),
@@ -74,9 +77,12 @@
 		form.bulletWeightUnit = item.weightUnit.toLowerCase();
 		form.bc = String(item.ballisticCoefficient);
 		form.bcType = item.ballisticCoefficientProfile;
+		// The length belongs to the bullet: a pick without one does not keep the previous pick's (#177).
 		if (item.length) {
 			form.bulletLength = String(item.length);
 			form.bulletLengthUnit = item.lengthUnit.toLowerCase();
+		} else {
+			form.bulletLength = '';
 		}
 	}
 
@@ -95,153 +101,116 @@
 	}
 </script>
 
-<div class="flex flex-col gap-4">
-	<!-- Search -->
-	<label
-		class="input !flex !items-center gap-2 h-[46px] px-3 text-surface-600-400 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primary-500"
-	>
-		<Search class="size-[18px] shrink-0" aria-hidden="true" />
-		<input
-			type="search"
-			class="flex-1 min-w-0 bg-transparent border-none outline-none shadow-none p-0 text-[15px] text-surface-950-50"
-			placeholder={m.setup_ammo_search_placeholder()}
-			aria-label={m.setup_ammo_search()}
-			aria-controls="{uid}-list"
-			bind:value={query}
-			onkeydown={(e) => {
-				// Enter searches, it does not submit the step.
-				if (e.key === 'Enter') e.preventDefault();
-			}}
-		/>
-	</label>
+<!--
+	One column; two from a 672 px wide step (the desktop setup card, #166 SetupDesktop board): the
+	search and list on the left, what the pick filled in (or the fields) on the right.
+-->
+<div class="@container">
+	<div class="grid grid-cols-1 gap-4 @2xl:grid-cols-2 @2xl:items-start">
+		<div class="flex flex-col gap-4 min-w-0">
+			<!-- Search, library and the pick: the picker pattern, shared with the Ammo Library (#166) -->
+			<PickerSearch
+				bind:value={query}
+				label={m.setup_ammo_search()}
+				placeholder={m.setup_ammo_search_placeholder()}
+				controls="{uid}-list"
+			/>
 
-	<!-- Library -->
-	{#if matches.length === 0}
-		<p class="mx-1 text-sm text-surface-600-400" role="status">{m.ammo_selector_no_results()}</p>
-	{:else}
-		<ul
-			id="{uid}-list"
-			aria-label={m.ammo_selector_library()}
-			class="max-h-72 overflow-y-auto rounded-container border border-surface-200-800 divide-y divide-surface-200-800"
-		>
-			{#each matches as item (item)}
-				{@const selected = pick === item}
-				<li>
+			{#if matches.length === 0}
+				<p class="mx-1 text-sm text-surface-600-400" role="status">{m.ammo_selector_no_results()}</p>
+			{:else}
+				<PickerList id="{uid}-list" label={m.ammo_selector_library()} class="max-h-72">
+					{#each matches as item (item)}
+						<PickerRow title={item.brand} detail={rowDetail(item)} selected={pick === item} onclick={() => choose(item)} />
+					{/each}
+				</PickerList>
+			{/if}
+		</div>
+
+		<div class="flex flex-col gap-4 min-w-0">
+			<p class="mx-1 text-xs text-surface-600-400">{m.ammo_selector_disclaimer()}</p>
+
+			<!-- What the pick filled in -->
+			{#if pick && !manual}
+				{#snippet editButton()}
 					<button
 						type="button"
-						class="w-full min-h-14 flex items-center gap-3 px-3.5 py-2.5 text-left transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500 {selected
-							? 'preset-tonal-primary'
-							: 'hover:preset-tonal-surface'}"
-						aria-pressed={selected}
-						onclick={() => choose(item)}
+						class="btn btn-sm touch-hit min-w-11 -my-1 px-2 font-semibold underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
+						onclick={() => openFields(false)}
 					>
-						<span class="flex-1 min-w-0">
-							<span class="block text-[15px] font-semibold break-words">{item.brand}</span>
-							<span class="block mt-0.5 text-[13px] text-surface-600-400">{rowDetail(item)}</span>
-						</span>
-						{#if selected}
-							<CircleCheck class="size-[22px] shrink-0 text-primary-600-400" aria-hidden="true" />
-						{:else}
-							<Circle class="size-[22px] shrink-0 text-surface-400-600" aria-hidden="true" />
-						{/if}
+						{m.common_edit()}
 					</button>
-				</li>
-			{/each}
-		</ul>
-	{/if}
+				{/snippet}
+				<AmmoSummaryCard
+					title={m.setup_ammo_filled({ brand: pick.brand })}
+					values={{
+						weight: withUnit(form.bulletWeight, form.bulletWeightUnit),
+						bc: `${formatNumber(Number(form.bc))}\u00a0${form.bcType}`,
+						diameter: withUnit(form.bulletDiameter, form.bulletDiameterUnit),
+						length: form.bulletLength ? withUnit(form.bulletLength, form.bulletLengthUnit) : '—'
+					}}
+					action={editButton}
+				/>
+			{/if}
 
-	<p class="mx-1 text-xs text-surface-600-400">{m.ammo_selector_disclaimer()}</p>
-
-	<!-- What the pick filled in -->
-	{#if pick && !manual}
-		<div class="card preset-tonal-primary p-4 flex flex-col gap-3" aria-live="polite">
-			<div class="flex items-start justify-between gap-3">
-				<p class="min-w-0 text-sm font-semibold break-words">{m.setup_ammo_filled({ brand: pick.brand })}</p>
+			{#if !manual}
+				{#if missing}
+					<p class="mx-1 text-xs text-error-500" role="alert">{m.setup_ammo_missing()}</p>
+				{/if}
 				<button
 					type="button"
-					class="btn btn-sm touch-hit min-w-11 -my-1 px-2 font-semibold underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
-					onclick={() => openFields(false)}
+					class="self-start min-h-11 px-1 text-sm font-semibold text-primary-700-300 underline underline-offset-2 rounded-base focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
+					onclick={() => openFields(true)}
 				>
-					{m.common_edit()}
+					{m.setup_ammo_not_listed()}
 				</button>
-			</div>
-			<dl class="grid grid-cols-2 min-[400px]:grid-cols-4 gap-x-3 gap-y-2">
-				<div>
-					<dt class="text-[11px] uppercase tracking-wide opacity-80">{m.setup_ammo_weight()}</dt>
-					<dd class="text-sm font-semibold">{withUnit(form.bulletWeight, form.bulletWeightUnit)}</dd>
-				</div>
-				<div>
-					<dt class="text-[11px] uppercase tracking-wide opacity-80">{m.setup_ammo_bc()}</dt>
-					<dd class="text-sm font-semibold">{formatNumber(Number(form.bc))}&nbsp;{form.bcType}</dd>
-				</div>
-				<div>
-					<dt class="text-[11px] uppercase tracking-wide opacity-80">{m.setup_ammo_diameter()}</dt>
-					<dd class="text-sm font-semibold">{withUnit(form.bulletDiameter, form.bulletDiameterUnit)}</dd>
-				</div>
-				<div>
-					<dt class="text-[11px] uppercase tracking-wide opacity-80">{m.setup_ammo_length()}</dt>
-					<dd class="text-sm font-semibold">
-						{form.bulletLength ? withUnit(form.bulletLength, form.bulletLengthUnit) : '—'}
-					</dd>
-				</div>
-			</dl>
+			{:else}
+				<!-- The numbers from the box -->
+				<!-- min-w-0: a fieldset is at least as wide as its content (min-inline-size: min-content), and
+					the unit fields' inputs and chips made it wider than a 360 px screen (#177). -->
+				<fieldset class="card min-w-0 preset-filled-surface-100-900 border border-surface-200-800 p-4">
+					<legend class="float-left w-full mb-4 text-sm font-semibold">{m.setup_ammo_box_legend()}</legend>
+					<div class="clear-left flex flex-col gap-4">
+						<TextField
+							label={m.profile_ammo_brand()}
+							hint={m.profile_ammo_brand_hint()}
+							placeholder={m.profile_ammo_brand_placeholder()}
+							maxlength={MAX_NAME_LENGTH}
+							invalid={error('bulletBrand')}
+							bind:value={form.bulletBrand}
+							bind:input={brandInput}
+						/>
+
+						<UnitField
+							label={m.profile_ammo_diameter()}
+							hint={m.profile_ammo_diameter_hint()}
+							invalid={error('bulletDiameter')}
+							bind:value={form.bulletDiameter}
+							bind:unit={form.bulletDiameterUnit}
+							units={[{ value: 'in', label: m.unit_in() }, { value: 'mm', label: m.unit_mm() }]}
+						/>
+
+						<UnitField
+							label={m.profile_ammo_weight()}
+							hint={m.profile_ammo_weight_hint()}
+							invalid={error('bulletWeight')}
+							bind:value={form.bulletWeight}
+							bind:unit={form.bulletWeightUnit}
+							units={[{ value: 'gr', label: m.unit_gr() }, { value: 'g', label: m.unit_g() }]}
+						/>
+
+						<UnitField
+							label={m.profile_ammo_bc()}
+							hint={m.profile_ammo_bc_hint()}
+							invalid={error('bc')}
+							bind:value={form.bc}
+							bind:unit={form.bcType}
+							units={[{ value: 'G1', label: 'G1' }, { value: 'G7', label: 'G7' }]}
+							placeholder="0.500"
+						/>
+					</div>
+				</fieldset>
+			{/if}
 		</div>
-	{/if}
-
-	{#if !manual}
-		{#if missing}
-			<p class="mx-1 text-xs text-error-500" role="alert">{m.setup_ammo_missing()}</p>
-		{/if}
-		<button
-			type="button"
-			class="self-start min-h-11 px-1 text-sm font-semibold text-primary-700-300 underline underline-offset-2 rounded-base focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
-			onclick={() => openFields(true)}
-		>
-			{m.setup_ammo_not_listed()}
-		</button>
-	{:else}
-		<!-- The numbers from the box -->
-		<fieldset class="card preset-filled-surface-100-900 border border-surface-200-800 p-4">
-			<legend class="float-left w-full mb-4 text-sm font-semibold">{m.setup_ammo_box_legend()}</legend>
-			<div class="clear-left flex flex-col gap-4">
-				<TextField
-					label={m.profile_ammo_brand()}
-					hint={m.profile_ammo_brand_hint()}
-					placeholder={m.profile_ammo_brand_placeholder()}
-					maxlength={MAX_NAME_LENGTH}
-					invalid={error('bulletBrand')}
-					bind:value={form.bulletBrand}
-					bind:input={brandInput}
-				/>
-
-				<UnitField
-					label={m.profile_ammo_diameter()}
-					hint={m.profile_ammo_diameter_hint()}
-					invalid={error('bulletDiameter')}
-					bind:value={form.bulletDiameter}
-					bind:unit={form.bulletDiameterUnit}
-					units={[{ value: 'in', label: m.unit_in() }, { value: 'mm', label: m.unit_mm() }]}
-				/>
-
-				<UnitField
-					label={m.profile_ammo_weight()}
-					hint={m.profile_ammo_weight_hint()}
-					invalid={error('bulletWeight')}
-					bind:value={form.bulletWeight}
-					bind:unit={form.bulletWeightUnit}
-					units={[{ value: 'gr', label: m.unit_gr() }, { value: 'g', label: m.unit_g() }]}
-				/>
-
-				<UnitField
-					label={m.profile_ammo_bc()}
-					hint={m.profile_ammo_bc_hint()}
-					invalid={error('bc')}
-					bind:value={form.bc}
-					bind:unit={form.bcType}
-					units={[{ value: 'G1', label: 'G1' }, { value: 'G7', label: 'G7' }]}
-					placeholder="0.500"
-				/>
-			</div>
-		</fieldset>
-	{/if}
+	</div>
 </div>

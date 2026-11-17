@@ -29,12 +29,15 @@ export function isUsableBallisticRange(distance) {
  * @param {object|null} atmosphere - scopeAtmosphereParams of the stored atmosphere (#151): a custom
  *   atmosphere, or null for the standard atmosphere at sea level
  * @param {object|null} wind
+ * @param {{ angle: unknown, unit: 'deg'|'cos' } | null} [elevation] - the uphill or downhill angle
+ *   (#173), as storedBallisticElevation reads it; null or missing is a flat table. An angle out of
+ *   its limits (isUsableScopeAngle) gives no result, and the angle box shows its message.
  * @returns {{ result: ReturnType<typeof calculateFullTrajectory>, altitudeTooLow: boolean }}
  */
-export function ballisticPageTrajectory(profile, range, atmosphere, wind) {
+export function ballisticPageTrajectory(profile, range, atmosphere, wind, elevation = null) {
 	if (!profile || !isUsableBallisticRange(range.distance)) return { result: null, altitudeTooLow: false };
 	const report = {};
-	const result = calculateFullTrajectory(profile, range, atmosphere, wind, { report });
+	const result = calculateFullTrajectory(profile, range, atmosphere, wind, { report, elevation });
 	return { result, altitudeTooLow: !result && !!atmosphere && report.minimumAltitude };
 }
 
@@ -48,7 +51,9 @@ const tenth = (value) => Math.round(value * 10) / 10;
  * The index of the table row at the Scope View's target distance (#151), or -1 when no row is there.
  *
  * The Scope View distance is its range box (the distance typed, not the distance after the uphill
- * or downhill angle). It is converted to the table's unit (yd or m) and matched to a row when both,
+ * or downhill angle). The table's distances are along the line of sight too, with or without the
+ * Ballistic angle (#173), so the two compare like for like; the values of that row equal the Scope
+ * View's only when both pages have the same angle and conditions. It is converted to the table's unit (yd or m) and matched to a row when both,
  * rounded to 0.1 as the table shows them, are equal. A Scope View distance the Scope View does not
  * calculate (isUsableScopeRange: empty, text, 0, negative, past the maximum) highlights nothing.
  *

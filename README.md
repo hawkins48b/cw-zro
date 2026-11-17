@@ -10,7 +10,7 @@ Results are estimates from a point-mass model. Read the [assumptions, limits and
 - **`develop`:** the integration branch. A push runs CI and deploys to a separate dev site over FTPS, once the owner has set it up. Until then it deploys nothing ([#69](https://github.com/hawkins48b/cw-zro/issues/69)). See [Set up the dev site](docs/deployment.md#set-up-the-dev-site).
 - **Desktop:** a version tag on `main` builds unsigned installers for Windows, macOS and Linux and publishes them as a GitHub release. No tag has been pushed yet. See [Desktop release](docs/deployment.md#desktop-release).
 - **Mobile:** built by hand, not in CI ([#79](https://github.com/hawkins48b/cw-zro/issues/79)). See [Mobile](docs/deployment.md#mobile).
-- **Pinned by owner decision:** `js-ballistics` on 3.1.0 ([#77](https://github.com/hawkins48b/cw-zro/issues/77)); it embeds the LGPL-3.0 engine bclibc, see [Licences](docs/data-and-privacy.md#licences). ApexCharts on 8.8.1 ([#75](https://github.com/hawkins48b/cw-zro/issues/75)).
+- **Pinned by owner decision:** `js-ballistics` on 3.1.0 ([#77](https://github.com/hawkins48b/cw-zro/issues/77)); it embeds the LGPL-3.0 engine bclibc, see [Licences](docs/data-and-privacy.md#licences). ApexCharts on an exact version, licence accepted ([#75](https://github.com/hawkins48b/cw-zro/issues/75)).
 
 ## Quick start
 
@@ -40,6 +40,7 @@ The [development guide](docs/development.md) covers the production, mobile and d
 | `npm run test:run` | Runs the tests once, as CI does |
 | `npm run audit:check` | Fails on high or critical audit findings, as CI does |
 | `npm run templates:precision` | Redraws the precision dope card templates in `static/pdf/` (#157). See [Precision card templates](docs/development.md#precision-card-templates) |
+| `npm run licenses:generate` | Rewrites `src/lib/data/licenses.json`, the included software list of the Licences page, from the lockfile (#166). Needs `npm ci` first; `node scripts/licenses.js --check` only checks. See [Included software list](docs/development.md#included-software-list) |
 | `npm run cap:sync` | Runs `build:mobile`, then `npx cap sync` |
 | `npm run cap:android` | Runs `cap:sync`, then opens the Android project |
 | `npm run cap:ios` | Runs `cap:sync`, then opens the iOS project |
@@ -78,7 +79,8 @@ The [docs index](docs/README.md) lists these guides and the dated delivery docum
 Dependabot (`.github/dependabot.yml`) checks npm and GitHub Actions every week and opens pull requests against `develop`, never `main`. Minor and patch updates are grouped into one pull request per ecosystem. Major updates come one by one.
 
 - **`js-ballistics`** always gets its own pull request. Merge it only with owner approval of the results (#77), and check the bclibc version and licence it embeds.
-- **`apexcharts`** always gets its own pull request, minor and patch updates included. Its licence changed within majors, so diff `LICENSE.md` against 8.8.1 before merging, and stop for the owner if it changed (#75).
+- **`apexcharts`** (and its dependency `apex-commons`) always gets its own pull request, minor and patch updates included. Its licence changed within majors, so CI compares each package's `LICENSE.md` with the text the owner accepted (#75), by sha256 in `src/test/apexcharts.test.js` (#164). A green pull request has the same licence: read the release notes and check the charts in a browser before merging. A red licence test means the text changed: stop for the owner, and update the hash only once they accept it. The exact pin (no `^`) is checked too, and must match the installed version.
+- **Every npm update** changes the included software list: run `npm ci` and `npm run licenses:generate` on the pull request branch and commit `src/lib/data/licenses.json`, or `src/test/licenses.test.js` fails (#166). A `js-ballistics` update also needs the bclibc entry in `scripts/license-rules.js` checked.
 - **`SamKirkland/FTP-Deploy-Action`** always gets its own pull request, because it runs with the FTP password. Review each update on its own.
 
 Dependabot *security updates*, a repository setting, must stay off: they always target `main` and skip the rules above. Dependabot alerts are fine. No file in this repository can enforce this, so the owner has to confirm it in the repository settings.

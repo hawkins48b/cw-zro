@@ -1,8 +1,10 @@
 <script>
-	import { Plus, Minus } from '@lucide/svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { readDecimal } from '#lib/utils/decimal.js';
 	import { clockHour } from '#lib/utils/windDirection.js';
+	import { fieldStepSpec } from '#lib/utils/fieldStep.js';
+	import { formatNumber } from '#lib/utils/format.js';
+	import StepperField from '#lib/components/StepperField.svelte';
 	import ChipGroup from '#lib/components/ChipGroup.svelte';
 	import WindDial from '#lib/components/WindDial.svelte';
 
@@ -32,14 +34,13 @@
 	];
 	let activePreset = $derived(PRESETS.find((p) => p.value === preset) ?? null);
 
-	const STEP = 5;
-
-	/** Turn by ±5°, kept in [0, 360). A box that is not a number starts from 0, as the dial does. */
-	function turn(delta) {
-		const current = readDecimal(direction) || 0;
-		const next = (((current + delta) % 360) + 360) % 360;
-		onchange({ direction: String(next) });
-	}
+	// − / + steps (#166): utils/fieldStep.js. The direction turns by 5° in [0, 360), from 0 for a box
+	// that is not a number, as the dial does.
+	const DIRECTION_SPEC = fieldStepSpec('windDirection');
+	let speedSpec = $derived(fieldStepSpec('windSpeed', speedUnit));
+	let speedStepText = $derived(
+		`${formatNumber(speedSpec.step)} ${speedUnit === 'mps' ? m.unit_mps() : m.unit_mph()}`
+	);
 
 	let hour = $derived(clockHour(readDecimal(direction)));
 	let clockText = $derived.by(() => {
@@ -73,62 +74,34 @@
 		/>
 
 		<div class="flex-1 min-w-0 space-y-2">
-			<!-- Speed -->
-			<div class="space-y-0.5">
-				<label for="{uid}-speed" class="text-xs text-surface-600-400">{m.scope_view_wind_speed()}</label>
-				<div class="input !flex !items-center gap-1 h-11">
-					<input
-						id="{uid}-speed"
-						class="flex-1 w-8 min-w-0 bg-transparent border-none outline-none shadow-none p-0 font-semibold"
-						type="text"
-						inputmode="decimal"
-						autocomplete="off"
-						placeholder="0"
-						value={speed}
-						oninput={(e) => onchange({ speed: e.target.value })}
-					/>
-					<ChipGroup
-						label={m.scope_view_wind_speed_unit()}
-						options={[{ value: 'mph', label: m.unit_mph() }, { value: 'mps', label: m.unit_mps() }]}
-						value={speedUnit}
-						onselect={(value) => onchange({ speedUnit: value })}
-					/>
-				</div>
-			</div>
+			<!-- Speed: − / + by 0.5 m/s or 1 mph (#166) -->
+			<StepperField
+				id="{uid}-speed"
+				label={m.scope_view_wind_speed()}
+				value={speed}
+				onchange={(text) => onchange({ speed: text })}
+				spec={speedSpec}
+				decreaseLabel={m.scope_view_step_speed_down({ step: speedStepText })}
+				increaseLabel={m.scope_view_step_speed_up({ step: speedStepText })}
+				units={[{ value: 'mph', label: m.unit_mph() }, { value: 'mps', label: m.unit_mps() }]}
+				unit={speedUnit}
+				unitsLabel={m.scope_view_wind_speed_unit()}
+				onunitchange={(value) => onchange({ speedUnit: value })}
+			/>
 
-			<!-- Direction, where the wind comes from -->
+			<!-- Direction, where the wind comes from: − / + 5° round the dial -->
 			<div class="space-y-0.5">
-				<label for="{uid}-dir" class="text-xs text-surface-600-400">{m.scope_view_wind_comes_from()}</label>
-				<div class="input !flex !items-center !p-0 h-11 overflow-hidden">
-					<button
-						type="button"
-						class="h-full w-11 shrink-0 flex items-center justify-center preset-tonal-surface focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500"
-						aria-label={m.scope_view_wind_turn_left({ step: String(STEP) })}
-						onclick={() => turn(-STEP)}
-					>
-						<Minus class="size-4" />
-					</button>
-					<input
-						id="{uid}-dir"
-						class="flex-1 w-8 min-w-0 bg-transparent border-none outline-none shadow-none px-1 py-0 text-right font-semibold"
-						type="text"
-						inputmode="decimal"
-						autocomplete="off"
-						placeholder="0"
-						value={direction}
-						aria-describedby="{uid}-clock"
-						oninput={(e) => onchange({ direction: e.target.value })}
-					/>
-					<span class="pr-1 text-sm" aria-hidden="true">°</span>
-					<button
-						type="button"
-						class="h-full w-11 shrink-0 flex items-center justify-center preset-tonal-surface focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500"
-						aria-label={m.scope_view_wind_turn_right({ step: String(STEP) })}
-						onclick={() => turn(STEP)}
-					>
-						<Plus class="size-4" />
-					</button>
-				</div>
+				<StepperField
+					id="{uid}-dir"
+					label={m.scope_view_wind_comes_from()}
+					value={direction}
+					onchange={(text) => onchange({ direction: text })}
+					spec={DIRECTION_SPEC}
+					decreaseLabel={m.scope_view_wind_turn_left({ step: String(DIRECTION_SPEC.step) })}
+					increaseLabel={m.scope_view_wind_turn_right({ step: String(DIRECTION_SPEC.step) })}
+					suffix="°"
+					describedby="{uid}-clock"
+				/>
 				<p id="{uid}-clock" class="text-xs text-surface-600-400">{clockText}</p>
 			</div>
 		</div>

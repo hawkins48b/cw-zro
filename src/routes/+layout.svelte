@@ -3,11 +3,15 @@
 	import favicon from '#lib/assets/favicon.svg';
 	import { page } from '$app/state';
 	import { m } from '#lib/paraglide/messages.js';
-	import { localizeHref, deLocalizeHref, getLocale } from '#lib/paraglide/runtime.js';
+	import { localizeHref, deLocalizeHref, extractLocaleFromUrl, baseLocale } from '#lib/paraglide/runtime.js';
 	import { ArrowLeftIcon, ListIcon, CalculatorIcon, SlidersHorizontalIcon } from '@lucide/svelte';
 	import ReticleIcon from '#lib/components/ReticleIcon.svelte';
 	import DarkModeToggle from '#lib/components/DarkModeToggle.svelte';
 	import { settings, applyDarkMode } from '#lib/stores/settings.svelte.js';
+	import { profiles } from '#lib/stores/profiles.svelte.js';
+	import { shownProfile } from '#lib/utils/storedProfiles.js';
+	import { profileName } from '#lib/components/profile/profileLabels.js';
+	import { NEW_PROFILE_PATH } from '#lib/utils/setupSteps.js';
 
 	let { children } = $props();
 
@@ -30,11 +34,43 @@
 			]
 		},
 		{ href: '/profiles', labelKey: 'nav_profiles', shortKey: 'nav_profiles', icon: ListIcon },
-		{ href: '/settings', labelKey: 'nav_settings', shortKey: 'nav_settings', icon: SlidersHorizontalIcon }
+		{
+			href: '/settings',
+			labelKey: 'nav_settings',
+			shortKey: 'nav_settings',
+			icon: SlidersHorizontalIcon,
+			// #166: Settings pages; exact, since About contains Licences and Settings contains them all.
+			subItems: [
+				{ href: '/settings', labelKey: 'settings_general', exact: true },
+				{ href: '/settings/about', labelKey: 'settings_about', exact: true },
+				{ href: '/settings/privacy', labelKey: 'settings_privacy', exact: true },
+				{ href: '/settings/about/licenses', labelKey: 'settings_licenses_short', exact: true }
+			]
+		}
 	];
 
 	// The path without its /fr or /de prefix, so a nav item is active in every language.
 	let currentPath = $derived(deLocalizeHref(page.url.pathname));
+
+	// The profile editor (#166) has its own header (back, title, Cancel / Save) on phone and tablet,
+	// and a pinned Cancel / Save bar instead of the tab bar on phones.
+	let editor = $derived(/^\/profiles\/(?!ammo-selector\/?$)[^/]+\/?$/.test(currentPath));
+
+	// Desktop sidebar (#166): under Profiles, on its sub-pages, every profile (rifle · ammunition)
+	// linking to its editor, then "+ New profile".
+	let profileSubItems = $derived.by(() => {
+		if (!currentPath.startsWith('/profiles/')) return null;
+		const items = profiles.list.map(shownProfile).map((p) => {
+			const ammo = p.bulletBrand?.trim();
+			return { href: `/profiles/${p.id}`, label: ammo ? `${profileName(p)} · ${ammo}` : profileName(p) };
+		});
+		// #177: "+ New profile" opens the guided setup.
+		items.push({ href: NEW_PROFILE_PATH, label: `+ ${m.profiles_new()}` });
+		return items;
+	});
+
+	// Settings (#166): from 768 px the Settings pane (settings/+layout.svelte) holds the title.
+	let settingsSection = $derived(currentPath === '/settings' || currentPath.startsWith('/settings/'));
 
 	// First-run screens (#150) are full screen: no header, rail, sidebar or tab bar.
 	const bareRoutes = ['/welcome', '/setup'];
@@ -63,9 +99,12 @@
 		if (path.startsWith('/calculators/compare-trajectories/add')) return m.compare_pick_profile();
 		if (path.startsWith('/calculators/compare-trajectories')) return m.compare_title();
 		if (path.startsWith('/calculators/ballistic')) return m.ballistic_title();
+		if (path.startsWith('/calculators/mpbr')) return m.calc_mpbr();
+		if (path.startsWith('/calculators/trajectory-validation')) return m.traj_val_title();
 		if (path.startsWith('/calculators/dope-cards/precision-guide')) return m.dope_guide_title();
 		if (path.startsWith('/calculators/dope-cards')) return m.dope_title();
 		if (path.startsWith('/calculators')) return m.calculators_title();
+		if (path.startsWith('/settings/about/licenses')) return m.licenses_title();
 		if (path.startsWith('/settings/about')) return m.about_title();
 		if (path.startsWith('/settings/privacy')) return m.privacy_title();
 		if (path.startsWith('/settings')) return m.settings_title();
@@ -82,10 +121,14 @@
 		applyDarkMode(settings.darkMode);
 	});
 
+	// The language of the URL (/fr, /de, none for English). The language buttons switch it without a
+	// reload (#178): the app below is keyed on it, so every message renders again in that language.
+	// SvelteKit updates the address bar before page.url, so Paraglide's getLocale() agrees with it.
+	let locale = $derived(extractLocaleFromUrl(page.url.href) ?? baseLocale);
+
 	// The static build serves one index.html for every locale, so its lang is always the base one.
-	// The language buttons reload the page, so this runs again after each switch.
 	$effect(() => {
-		document.documentElement.lang = getLocale();
+		document.documentElement.lang = locale;
 	});
 </script>
 
@@ -93,6 +136,7 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
+{#key locale}
 <div class="h-dvh flex flex-col" style="padding-top: var(--safe-area-top); padding-bottom: var(--safe-area-bottom);">
 	{#if bare}
 	<main class="flex-1 min-h-0">
@@ -140,7 +184,12 @@
 			<nav aria-label={m.nav_main()} class="flex flex-col gap-0.5 px-2.5 py-3">
 				{#each navItems as item (item.href)}
 					{@const Icon = item.icon}
-					{@const current = currentAttr(item.href)}
+					{@const subItems = item.href === '/profiles' ? profileSubItems : item.subItems}
+					<!-- A section whose own page is also a sub-item (Settings > General) fills the sub-item only. -->
+					{@const current =
+						currentAttr(item.href) === 'page' && subItems?.some((s) => s.href === item.href)
+							? 'true'
+							: currentAttr(item.href)}
 					<a
 						href={localizeHref(item.href)}
 						aria-current={current}
@@ -153,18 +202,18 @@
 						<Icon class="size-[18px] shrink-0" aria-hidden="true" />
 						{m[item.labelKey]()}
 					</a>
-					{#if item.subItems}
+					{#if subItems}
 						<div class="ml-[19px] pl-2.5 border-l border-surface-200-800 flex flex-col gap-0.5">
-							{#each item.subItems as sub (sub.href)}
-								{@const subActive = isActive(sub.href)}
+							{#each subItems as sub (sub.href)}
+								{@const subActive = sub.exact ? currentPath.replace(/(.)\/$/, '$1') === sub.href : isActive(sub.href)}
 								<a
 									href={localizeHref(sub.href)}
-									aria-current={currentAttr(sub.href)}
-									class="flex items-center h-[34px] px-2.5 rounded-base text-[13px] {focusRing} {subActive
+									aria-current={sub.exact ? (subActive ? 'page' : undefined) : currentAttr(sub.href)}
+									class="flex items-center min-h-[34px] px-2.5 py-1 rounded-base text-[13px] leading-tight break-words {focusRing} {subActive
 										? 'preset-filled-primary-500 font-semibold'
 										: 'text-surface-600-400 hover:preset-tonal-surface hover:text-surface-950-50'}"
 								>
-									{m[sub.labelKey]()}
+									{sub.label ?? m[sub.labelKey]()}
 								</a>
 							{/each}
 						</div>
@@ -180,7 +229,7 @@
 
 		<!-- Page content with header inside scroll area -->
 		<main class="flex-1 min-w-0 overflow-y-auto">
-			<header class="flex items-center gap-1 pl-4 pr-2 py-2 sm:pl-6 sm:pr-4 lg:hidden">
+			<header class="{editor ? 'hidden' : 'flex'} {settingsSection ? 'md:hidden' : ''} items-center gap-1 pl-4 pr-2 py-2 sm:pl-6 sm:pr-4 lg:hidden">
 				{#if canGoBack}
 					<button
 						type="button"
@@ -196,8 +245,13 @@
 				<!-- The rail has its own theme button on tablets -->
 				<DarkModeToggle class="sm:hidden" />
 			</header>
-			<div class="px-2 pb-2 sm:px-2 sm:pb-6 lg:px-8 lg:py-8">
-				{@render children()}
+			<!-- One page frame for every route (#169): side padding per device class (phone 16 px, tablet
+				24 px in line with the header, desktop 16 to 40 px as on the design boards), and on every
+				device the content centred within 1180 px. Pages set no width, centring or side padding. -->
+			<div class="px-4 pb-4 sm:px-6 sm:pb-6 lg:px-[clamp(16px,3vw,40px)] lg:pt-8 lg:pb-12">
+				<div class="mx-auto w-full max-w-[1180px]">
+					{@render children()}
+				</div>
 			</div>
 		</main>
 	</div>
@@ -205,7 +259,7 @@
 	<!-- Phone tab bar (below sm) -->
 	<nav
 		aria-label={m.nav_main()}
-		class="sm:hidden grid grid-cols-4 px-1.5 pt-1.5 pb-1 border-t border-surface-200-800 bg-surface-100-900"
+		class="{editor ? 'hidden' : 'grid'} sm:hidden grid-cols-4 px-1.5 pt-1.5 pb-1 border-t border-surface-200-800 bg-surface-100-900"
 	>
 		{#each navItems as item (item.href)}
 			{@const Icon = item.icon}
@@ -226,3 +280,4 @@
 	</nav>
 	{/if}
 </div>
+{/key}

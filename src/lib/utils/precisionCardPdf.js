@@ -279,7 +279,7 @@ function fillRange(p, ctx, page, number) {
 	});
 	p.text(unitSymbol(data.columns.wind.unit), dl.origin.x + dl.unit.x, dl.origin.y + dl.unit.y, { size: dl.unit.size, bold: true, color: COLORS.muted });
 
-	// One value per ray and ring (#159), on a white halo; staggered on the inner rings
+	// One value per ray and ring (#159), on a white halo; staggered on the inner ring (#174)
 	// (dialValuePoint).
 	const size = dl.valueSize;
 	const halo = dl.halo;

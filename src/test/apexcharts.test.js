@@ -1,12 +1,13 @@
 /**
- * ApexCharts 8.8.1 (#75), rendered in jsdom: the behaviour of the library that the app relies on.
+ * ApexCharts 8 (#75), rendered in jsdom: the behaviour of the library that the app relies on.
  *
  * The app imports `apexcharts`, which the browser build resolves to dist/apexcharts.esm.js.
  * Vitest would take the server build, so these tests import `apexcharts/client`, the same file.
  * jsdom has no layout: the chart gets a fixed width, and the SVG measuring calls are stubbed.
  * A failure here after an ApexCharts update means the update needs a review, not a new expected value.
  */
-import { readFileSync } from 'fs';
+import { createHash } from 'crypto';
+import { existsSync, readFileSync } from 'fs';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import ApexCharts from 'apexcharts/client';
 import { compareSeriesText } from '#lib/utils/compareEntries.js';
@@ -64,11 +65,33 @@ const line = (y) => [
 	{ x: 200, y: y - 6 }
 ];
 
-describe('the installed ApexCharts', () => {
-	it('is pinned to 8.8.1, the version the owner accepted (#75)', () => {
-		const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
-		expect(pkg.dependencies.apexcharts).toBe('8.8.1');
-		expect(JSON.parse(readFileSync('node_modules/apexcharts/package.json', 'utf8')).version).toBe('8.8.1');
+/**
+ * The licence texts the owner accepted (#75): ApexCharts 8.7.0 to 8.8.2 and apex-commons 0.10.0 to 0.11.0 ship
+ * these exact files. Dependabot proposes each update on its own (#164): a new version passes when its licence is
+ * unchanged, and a changed licence fails here until the owner accepts it. Then, and only then, update the hash.
+ */
+const ACCEPTED_LICENCES = {
+	apexcharts: '93c2382614506a657f2002d134504e3cf561fa46bc9e34717fa1c9642f384dfa',
+	'apex-commons': 'dd54b5bf530b5ca8e2ca33f9f874f1ee8d97931a16d1804e0c1ca2732ff5186f'
+};
+
+const readJson = (path) => JSON.parse(readFileSync(path, 'utf8'));
+
+describe('the installed ApexCharts (#75, #164)', () => {
+	it('is pinned on an exact version, the one installed', () => {
+		const pinned = readJson('package.json').dependencies.apexcharts;
+		expect(pinned).toMatch(/^\d+\.\d+\.\d+$/);
+		expect(readJson('node_modules/apexcharts/package.json').version).toBe(pinned);
+	});
+
+	it.each(Object.entries(ACCEPTED_LICENCES))('%s ships the licence text the owner accepted', (name, sha256) => {
+		expect(readJson(`node_modules/${name}/package.json`).license).toBe('SEE LICENSE IN LICENSE.md');
+		const text = readFileSync(`node_modules/${name}/LICENSE.md`);
+		expect(createHash('sha256').update(text).digest('hex')).toBe(sha256);
+	});
+
+	it('uses the one apex-commons checked above', () => {
+		expect(existsSync('node_modules/apexcharts/node_modules/apex-commons')).toBe(false);
 	});
 });
 
@@ -185,5 +208,27 @@ describe('compare chart name formatters (#103, #75)', () => {
 		expect(options).not.toMatch(/tooltipHoverFormatter|custom\s*:/);
 		expect(options).not.toMatch(/legend\s*:\s*{[^}]*formatter/);
 		expect(options).not.toMatch(/title\s*:\s*{[^}]*formatter/);
+	});
+});
+
+describe('compare end labels (#166)', () => {
+	it('draws each rifle name at the end of its line as text, creating no element', async () => {
+		const names = ['Smith & Wesson <img src=x onerror=alert(1)>', '<script>alert(1)</script>', `Tom's "Müller"`];
+		const root = await render({
+			series: names.map((name, i) => ({ name, data: line(i) })),
+			xaxis: { type: 'numeric', min: 0, max: 200 },
+			legend: { show: false },
+			annotations: {
+				points: names.map((name, i) => ({
+					x: 200,
+					y: i - 6,
+					marker: { size: 3 },
+					label: { text: name, textAnchor: 'end', offsetX: -4, offsetY: -4, borderWidth: 0, style: { background: 'transparent', fontSize: '11px' } }
+				}))
+			}
+		});
+		expect(root.querySelectorAll('img, script')).toHaveLength(0);
+		const texts = [...root.querySelectorAll('.apexcharts-point-annotations text')].map((t) => t.textContent);
+		for (const name of names) expect(texts).toContain(name);
 	});
 });

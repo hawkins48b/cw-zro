@@ -4,17 +4,20 @@ import {
 	HUMIDITY_LIMITS,
 	PRESSURE_LIMITS,
 	TEMPERATURE_LIMITS,
-	altitudeLimits,
 	pressureLimits,
 	temperatureLimits
 } from './inputLimits.js';
+import { isDesktopApp } from './platform.js';
+import { stationPressure } from './stationPressure.js';
 
 /**
  * Current weather at the user's location (#152; owner decisions of 2026-11-16).
  *
  * On a tap of "Use current weather here" in the Accurate atmosphere, the page asks the device for
  * its position, sends only the latitude and longitude, rounded to 2 decimals (about 1 km), to
- * Open-Meteo, and fills altitude, sea-level pressure (QNH), temperature and humidity once. Nothing
+ * Open-Meteo, and fills pressure, temperature and humidity once. Open-Meteo gives the sea-level
+ * pressure (QNH); since #172 it is converted here to the station pressure at the site altitude
+ * (GPS altitude, else Open-Meteo's ground elevation), which is what the Accurate mode uses. Nothing
  * runs before the tap; nothing is cached or stored here (the filled boxes are stored by the page's
  * own atmosphere store, as typed values are). See docs/data-and-privacy.md.
  *
@@ -331,27 +334,29 @@ function boxValue(value, limits) {
 }
 
 /**
- * The atmosphere patch for the card's boxes, in the units they show: altitude whole (ft or m),
- * pressure as QNH with 1 decimal in hPa or 2 in inHg, temperature with 1 decimal (°C or °F), humidity
- * whole. Mode stays accurate; pressureRef becomes 'qnh', since pressure_msl is a sea-level pressure.
+ * The atmosphere patch for the card's boxes, in the units they show: station pressure with 1 decimal
+ * in hPa or 2 in inHg, temperature with 1 decimal (°C or °F), humidity whole. Mode stays accurate,
+ * and pressureRef is 'station' (#172): the sea-level pressure_msl is converted to the pressure at
+ * `altitude` with stationPressure, the conversion the calculators made of a QNH box before #172. The
+ * altitude box is not filled: the Accurate mode has none, and ISA and Estimate keep the user's.
  * Units are not changed. Conversions are js-ballistics', as the calculators use.
  *
  * @param {{ temperature: number, humidity: number, pressure: number }} weather - from readWeather
  * @param {number} altitude - metres, from siteAltitude
- * @param {{ altitudeUnit?: string, pressureUnit?: string, temperatureUnit?: string }} units - the
- *   card's current units; anything but 'm', 'hpa', 'c' reads as ft, inHg, °F, as the calculators do
- * @returns {{ mode: 'accurate', pressureRef: 'qnh', altitude: string, pressure: string,
- *   temperature: string, humidity: string }}
- * @throws {WeatherError} 'invalid' when a converted value falls outside its box's limits
+ * @param {{ pressureUnit?: string, temperatureUnit?: string }} units - the card's current units;
+ *   anything but 'hpa', 'c' reads as inHg, °F, as the calculators do
+ * @returns {{ mode: 'accurate', pressureRef: 'station', pressure: string, temperature: string,
+ *   humidity: string }}
+ * @throws {WeatherError} 'invalid' when the altitude is not usable, or a converted value falls
+ *   outside its box's limits
  */
 export function weatherPatch(weather, altitude, units) {
-	const altitudeUnit = units?.altitudeUnit === 'm' ? 'm' : 'ft';
 	const pressureUnit = units?.pressureUnit === 'hpa' ? 'hpa' : 'inhg';
 	const temperatureUnit = units?.temperatureUnit === 'c' ? 'c' : 'f';
 
-	const altitudeValue = round(altitudeUnit === 'm' ? altitude : UNew.Meter(altitude).In(Unit.Foot), 0);
-	const pressureValue =
-		pressureUnit === 'hpa' ? round(weather.pressure, 1) : round(UNew.hPa(weather.pressure).In(Unit.InHg), 2);
+	if (!isFiniteNumber(altitude) || !within(altitude, ALTITUDE_LIMITS.m)) throw new WeatherError('invalid');
+	const station = stationPressure(UNew.hPa(weather.pressure), UNew.Meter(altitude));
+	const pressureValue = pressureUnit === 'hpa' ? round(station.In(Unit.hPa), 1) : round(station.In(Unit.InHg), 2);
 	const temperatureValue = round(
 		temperatureUnit === 'c' ? weather.temperature : UNew.Celsius(weather.temperature).In(Unit.Fahrenheit),
 		1
@@ -359,8 +364,7 @@ export function weatherPatch(weather, altitude, units) {
 
 	return {
 		mode: 'accurate',
-		pressureRef: 'qnh',
-		altitude: boxValue(altitudeValue, altitudeLimits(altitudeUnit)),
+		pressureRef: 'station',
 		pressure: boxValue(pressureValue, pressureLimits(pressureUnit)),
 		temperature: boxValue(temperatureValue, temperatureLimits(temperatureUnit)),
 		humidity: boxValue(round(weather.humidity, 0), HUMIDITY_LIMITS)
@@ -390,9 +394,6 @@ export async function readCurrentWeather({ geolocation, fetch: fetchFn, signal, 
 	return { weather, altitude, altitudeSource: source, model: weatherModel(json) };
 }
 
-/** Electron's app scheme (electron/navigation.js, APP_SCHEME), as location.protocol gives it. */
-const ELECTRON_PROTOCOL = 'app:';
-
 /**
  * Whether to show "Use current weather here": web and mobile (Capacitor) with geolocation and
  * fetch. Not on the desktop build, which refuses every permission (electron/permissions.js): it
@@ -404,8 +405,7 @@ const ELECTRON_PROTOCOL = 'app:';
 export function isCurrentWeatherAvailable(env) {
 	const nav = env?.navigator;
 	if (!nav?.geolocation || typeof nav.geolocation.getCurrentPosition !== 'function') return false;
-	if (env.location?.protocol === ELECTRON_PROTOCOL) return false;
-	if (/\bElectron\//.test(String(nav.userAgent ?? ''))) return false;
+	if (isDesktopApp(env)) return false;
 	return typeof env.fetch === 'function' && typeof env.AbortController === 'function';
 }
 

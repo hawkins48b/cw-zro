@@ -23,6 +23,8 @@
 	 * @prop {'metric'|'imperial'} energyUnit - J and m/s, or ft·lb and fps.
 	 * @prop {(unit: 'metric'|'imperial') => void} onenergyunitchange
 	 * @prop {import('svelte').Snippet} hold - Hold mode body.
+	 * @prop {boolean} [both] - Tablet (#166, TabletScope board): no Dial / Hold switch; the dial tiles
+	 *   and, under the card, the hold body are both shown. The stored mode is left as it is.
 	 */
 	let {
 		status = 'ok',
@@ -38,17 +40,21 @@
 		velocity = null,
 		energyUnit = 'metric',
 		onenergyunitchange,
-		hold
+		hold,
+		both = false
 	} = $props();
+
+	/** The mode shown: the dial tiles when both are shown. */
+	let shownMode = $derived(both ? 'dial' : mode);
 
 	const clicksWord = (n) => (n === 1 ? m.scope_view_click() : m.scope_view_clicks());
 
 	let title = $derived.by(() => {
 		if (distance === null || distance === '') {
-			return mode === 'hold' ? m.scope_view_result_hold_plain() : m.scope_view_result_dial_plain();
+			return shownMode === 'hold' ? m.scope_view_result_hold_plain() : m.scope_view_result_dial_plain();
 		}
 		const args = { distance: String(distance), unit: unitLabel };
-		return mode === 'hold' ? m.scope_view_result_hold_title(args) : m.scope_view_result_dial_title(args);
+		return shownMode === 'hold' ? m.scope_view_result_hold_title(args) : m.scope_view_result_dial_title(args);
 	});
 </script>
 
@@ -59,16 +65,18 @@
 	>
 		<div class="flex items-center justify-between gap-2 flex-wrap">
 			<h2 id="scope-result-title" class="text-sm font-medium">{title}</h2>
-			<ChipGroup
-				variant="on-primary"
-				label={m.scope_view_result_mode()}
-				options={[
-					{ value: 'dial', label: m.scope_view_mode_dial() },
-					{ value: 'hold', label: m.scope_view_mode_hold() }
-				]}
-				value={mode}
-				onselect={(value) => onmodechange?.(value)}
-			/>
+			{#if !both}
+				<ChipGroup
+					variant="on-primary"
+					label={m.scope_view_result_mode()}
+					options={[
+						{ value: 'dial', label: m.scope_view_mode_dial() },
+						{ value: 'hold', label: m.scope_view_mode_hold() }
+					]}
+					value={mode}
+					onselect={(value) => onmodechange?.(value)}
+				/>
+			{/if}
 		</div>
 
 		{#if status === 'no-profile'}
@@ -83,7 +91,7 @@
 			</div>
 		{:else if status === 'no-result'}
 			<p class="py-3 text-center text-sm font-medium" aria-live="polite">{m.scope_view_no_valid_result()}</p>
-		{:else if mode === 'dial'}
+		{:else if shownMode === 'dial'}
 			<div class="grid grid-cols-2 gap-2.5">
 				{#each [{ data: elevation, vertical: true }, { data: windage, vertical: false }] as tile}
 					{@const d = tile.data}
@@ -130,7 +138,7 @@
 		{/if}
 	</section>
 
-	{#if mode === 'hold' && status !== 'no-profile'}
+	{#if (both || mode === 'hold') && status !== 'no-profile'}
 		{@render hold?.()}
 	{/if}
 </div>

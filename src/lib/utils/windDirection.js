@@ -51,8 +51,8 @@ export function clockHour(degrees) {
 export const DIAL_SNAP_DEGREES = 15;
 
 /**
- * Inner edge of the wind dial's snapping rim, as a fraction of the dial radius (#155). The touch
- * points sit at 0.86; a tap or drag from here outwards snaps to the nearest point, so a finger
+ * Inner edge of the wind dial's snapping rim, as a fraction of the dial radius (#155). The clock
+ * numerals sit at 0.78 (#165); a tap or drag from here outwards snaps to the nearest point, so a finger
  * does not have to hit the point itself. Inside it the dial sets whole degrees.
  */
 export const DIAL_SNAP_RIM = 0.7;

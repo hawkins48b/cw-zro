@@ -9,7 +9,7 @@ ZRO is in English, French and German, through Paraglide 3. English is the base l
 | Plugin | [`vite.config.js`](../vite.config.js) |
 | Generated code | `src/lib/paraglide/`, git-ignored |
 
-Each language has 622 keys on 2026-11-17, after #160.
+Each language has 900 keys on 2026-11-17, after #177 added seven for the guided setup (step 4, Skip, the full form link). Check with `node -e "console.log(Object.keys(require('./messages/en.json')).length)"`.
 
 ## Adding a message
 
@@ -51,7 +51,9 @@ It does not check that a translation is correct, or that a key used in the code 
 
 English has no prefix. The strategy in `vite.config.js` is `url`, then `baseLocale`. The URL always wins, so a path with no prefix is English. [`hooks.js`](../src/hooks.js) removes the locale before routing.
 
-[`LanguageSwitcher.svelte`](../src/lib/components/LanguageSwitcher.svelte) uses `localizeHref` and a full page reload. On a click it stores the language in `localStorage` under `zro-locale` (`en`, `fr` or `de`, plain text; English too, so that it can be chosen back).
+[`LanguageSwitcher.svelte`](../src/lib/components/LanguageSwitcher.svelte) switches without a page reload ([#178](https://github.com/hawkins48b/cw-zro/issues/178)). Its links are real links to the same page, query and hash in each language ([`localeHref`](../src/lib/utils/switchLocale.js), which gives the start page instead of any address on another protocol or host). A plain left click runs [`switchLocale`](../src/lib/utils/switchLocale.js): `goto` to that address with `replace: true, reset: false`, then the scroll of `<main>` and the focus on the language button are put back. Where the browser has View Transitions and reduced motion is off, the change cross-fades. If `goto` fails, the page is loaded in that language instead. A click with a modifier key (new tab) is left to the browser. The root [`+layout.svelte`](../src/routes/+layout.svelte) is wrapped in `{#key locale}`, the locale of `page.url`, so the layout and the page are built again and every message and number format renders in the new language. SvelteKit updates the address before `page.url`, so Paraglide's `getLocale()` (which reads the address) agrees. Values typed but not stored are lost, as with the reload before. Messages must therefore be called when rendering, never stored at module level. Tests: [`switchLocale.test.js`](../src/test/switchLocale.test.js).
+
+On a click it also stores the language in `localStorage` under `zro-locale` (`en`, `fr` or `de`, plain text; English too, so that it can be chosen back).
 
 **The choice survives a restart** ([#96](https://github.com/hawkins48b/cw-zro/issues/96)). The `init` hook in [`hooks.client.js`](../src/hooks.client.js) runs before the first render. When the URL has no locale prefix and `zro-locale` holds `fr` or `de`, it replaces the location with the same path, query and hash in that language (`location.replace`, so no history entry). A URL with `/fr` or `/de` wins and does not change the stored choice. Any other stored value is ignored, and so is a target on another protocol or host: a path such as `//evil.example` or `/\evil.example` would otherwise localize to `//evil.example/fr/`, an open redirect. The decision is [`startupLocaleRedirect`](../src/lib/utils/storedLocale.js), tested in [`storedLocale.test.js`](../src/test/storedLocale.test.js). The web, Electron (`app://`) and the Capacitor apps all start at `/`, so the same hook covers them. Storage errors are caught: the choice then holds until the app restarts.
 

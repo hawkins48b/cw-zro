@@ -13,9 +13,7 @@
 	 */
 	import { m } from '#lib/paraglide/messages.js';
 	import { getLocale, localizeHref } from '#lib/paraglide/runtime.js';
-	import { profiles } from '#lib/stores/profiles.svelte.js';
 	import { activeProfile } from '#lib/stores/activeProfile.svelte.js';
-	import { shownProfile } from '#lib/utils/storedProfiles.js';
 	import { parseDecimal, readDecimal } from '#lib/utils/decimal.js';
 	import { formatLimit } from '#lib/utils/format.js';
 	import { downloadDopeCard } from '#lib/utils/dopeCardDownload.js';
@@ -49,24 +47,9 @@
 	let expanded = $state(true);
 
 	// ── Profile ───────────────────────────────────────────────────────
-	// The active profile until the user picks another one. Not persisted (#157).
-	let pickedId = $state(null);
-	let profileList = $derived(profiles.list);
-	let profile = $derived((pickedId != null && profiles.get(pickedId)) || activeProfile.profile);
+	// The profile in use (#170): the page's one profile selector changes it for both cards.
+	let profile = $derived(activeProfile.profile);
 	let profileId = $derived(profile ? String(profile.id) : '');
-
-	function profileLabel(p) {
-		const shown = shownProfile(p);
-		if (!shown) return '';
-		return [shown.name || m.scope_view_profile_unnamed(), shown.ammo].filter(Boolean).join(' · ');
-	}
-
-	function pickProfile(id) {
-		pickedId = id;
-		// The units follow the new profile's zero again.
-		unitsChoice = null;
-		outcome = null;
-	}
 
 	// ── Requirements ──────────────────────────────────────────────────
 	let req = $derived(profile ? precisionCardRequirements(profile) : null);
@@ -172,11 +155,14 @@
 	let angleLabel = $derived(req?.reticle?.unit ?? 'MRAD');
 
 	/**
-	 * The units of wind, pressure and temperature (#160), a plain frozen object (raw state, so that
-	 * the PDF code gets no proxy). Null follows the zero: the metric preset for m, imperial for yd.
-	 * @type {Readonly<import('#lib/utils/precisionCardFormat.js').PrecisionUnits>|null}
+	 * The units of wind, pressure and temperature (#160) the user picked, a plain frozen object (raw
+	 * state, so that the PDF code gets no proxy), kept with the profile they were picked for: when
+	 * another profile is in use (#170) the units follow its zero again, the metric preset for m,
+	 * imperial for yd.
+	 * @type {{ id: string, units: Readonly<import('#lib/utils/precisionCardFormat.js').PrecisionUnits> }|null}
 	 */
-	let unitsChoice = $state.raw(null);
+	let unitsPick = $state.raw(null);
+	let unitsChoice = $derived(unitsPick?.id === profileId ? unitsPick.units : null);
 	let units = $derived(unitsChoice ?? PRECISION_UNIT_PRESETS[distUnit === 'yd' ? 'imperial' : 'metric']);
 	/** The preset the units match, or null for a mixed choice (neither preset pressed). */
 	let unitPreset = $derived(precisionUnitPreset(units));
@@ -210,11 +196,11 @@
 	];
 
 	function pickPreset(name) {
-		if (Object.hasOwn(PRECISION_UNIT_PRESETS, name)) unitsChoice = PRECISION_UNIT_PRESETS[name];
+		if (Object.hasOwn(PRECISION_UNIT_PRESETS, name)) unitsPick = { id: profileId, units: PRECISION_UNIT_PRESETS[name] };
 	}
 
 	function pickUnit(key, value) {
-		unitsChoice = Object.freeze({ ...units, [key]: value });
+		unitsPick = { id: profileId, units: Object.freeze({ ...units, [key]: value }) };
 	}
 
 	let distances = $derived(maxValid ? precisionPageDistances(maxDistance) : []);
@@ -223,28 +209,33 @@
 
 	// ── Download ──────────────────────────────────────────────────────
 	let loading = $state(false);
-	/** @type {import('#lib/utils/dopeCardDownload.js').DopeCardOutcome|null} */
-	let outcome = $state(null);
+	/**
+	 * The last download's outcome with its profile: the message goes when another profile is in use.
+	 * @type {{ id: string, value: import('#lib/utils/dopeCardDownload.js').DopeCardOutcome }|null}
+	 */
+	let outcomePick = $state(null);
+	let outcome = $derived(outcomePick?.id === profileId ? outcomePick.value : null);
 
 	async function download() {
 		const p = profile;
 		if (!p || loading || !canDownload) return;
 		loading = true;
-		outcome = null;
+		outcomePick = null;
 		const options = { maxDistance, correction, units };
 		const locale = getLocale();
 		try {
 			// Loaded on demand, inside downloadDopeCard so that a failed load counts as a failure.
 			const generate = async (pr) =>
 				(await import('#lib/utils/precisionCardPdf.js')).generatePrecisionDopeCard(pr, options, locale);
-			outcome = await downloadDopeCard(generate, p, (pdfDoc) => save(pdfDoc, 'precision-dope-card.pdf'));
+			const value = await downloadDopeCard(generate, p, (pdfDoc) => save(pdfDoc, 'precision-dope-card.pdf'));
+			outcomePick = { id: String(p.id), value };
 		} finally {
 			loading = false;
 		}
 	}
 </script>
 
-<div class="card preset-filled-surface-100-900">
+<div class="card preset-filled-surface-100-900 border border-surface-200-800">
 	<button
 		type="button"
 		class="flex items-center gap-3 w-full p-4 text-left rounded-container {focusRing}"
@@ -274,21 +265,6 @@
 				<BookOpen class="size-[18px] shrink-0" aria-hidden="true" />
 				{m.dope_precision_guide_link()}
 			</a>
-
-			<!-- Profile -->
-			<div class="space-y-1.5">
-				<label for="{uid}-profile" class="text-sm font-medium block">{m.dope_precision_profile()}</label>
-				<select
-					id="{uid}-profile"
-					class="select"
-					value={profileId}
-					onchange={(e) => pickProfile(e.currentTarget.value)}
-				>
-					{#each profileList as p (p.id)}
-						<option value={String(p.id)}>{profileLabel(p)}</option>
-					{/each}
-				</select>
-			</div>
 
 			<!-- Requirements -->
 			<ul

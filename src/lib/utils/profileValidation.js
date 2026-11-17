@@ -290,13 +290,19 @@ export function buildProfileData(form, spinDrift, tempSensitivity) {
 
 /**
  * The profile the guided setup stores (#150), or null when its form is not valid. It is checked as
- * the profile form checks a new profile: validateProfile with spin drift and temperature
- * sensitivity off, which the guided setup does not ask for. Then built as ProfileForm builds it.
+ * the profile form checks a new profile, with the same two switches: since #177 the setup's optional
+ * step 4 can turn on spin drift and temperature sensitivity (off by default, and off when it is
+ * skipped). Then built as ProfileForm builds it, so the fields of a switch that is off are stored as
+ * typed, as the profile form stores them.
  *
- * @param {object} form - the guided setup's form, values as typed
+ * @param {object}  form - the guided setup's form, values as typed
+ * @param {boolean} [spinDrift]
+ * @param {boolean} [tempSensitivity]
  * @returns {object | null}
  */
-export function setupProfileData(form) {
-	if (!isValid(validateProfile(form, false, false))) return null;
-	return buildProfileData(form, false, false);
+export function setupProfileData(form, spinDrift = false, tempSensitivity = false) {
+	const spin = spinDrift === true;
+	const temp = tempSensitivity === true;
+	if (!isValid(validateProfile(form, spin, temp))) return null;
+	return buildProfileData(form, spin, temp);
 }

@@ -7,6 +7,8 @@
 	 *     stays "Dark theme" and aria-pressed says whether it is on. Shows a moon in light theme and a
 	 *     sun in dark theme, the theme a tap switches to.
 	 *   segmented: "Theme" label with Light / Dark buttons (desktop sidebar footer).
+	 *   settings: the Theme row of the Settings Display card (#166): 15 px label, 44 px Light / Dark
+	 *     buttons with icons, and a hint that the device's setting applies until the user chooses.
 	 */
 	import { MoonIcon, SunIcon } from '@lucide/svelte';
 	import { m } from '#lib/paraglide/messages.js';
@@ -14,15 +16,48 @@
 
 	let { variant = 'icon', class: cls = '' } = $props();
 
+	// The sidebar and the Settings page can both show a theme group: ids must not clash.
+	const uid = $props.id();
 	const focusRing = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500';
 </script>
 
-{#if variant === 'segmented'}
+{#if variant === 'settings'}
 	<div class="flex flex-col gap-2 {cls}">
-		<span id="theme-label" class="text-xs text-surface-600-400">{m.theme_label()}</span>
+		<span id="{uid}-label" class="text-[15px] font-medium">{m.theme_label()}</span>
 		<div
 			role="group"
-			aria-labelledby="theme-label"
+			aria-labelledby="{uid}-label"
+			aria-describedby="{uid}-hint"
+			class="grid grid-cols-2 gap-0.5 p-[3px] rounded-container bg-surface-200-800"
+		>
+			{#each ['light', 'dark'] as theme (theme)}
+				{@const on = settings.theme === theme}
+				<button
+					type="button"
+					class="h-11 rounded-base flex items-center justify-center gap-2 text-sm font-semibold {focusRing} {on
+						? 'bg-surface-50-950 shadow-sm'
+						: 'text-surface-700-300 hover:text-surface-950-50'}"
+					aria-pressed={on}
+					onclick={() => settings.setTheme(theme)}
+				>
+					{#if theme === 'dark'}
+						<MoonIcon class="size-4" aria-hidden="true" />
+						{m.theme_dark()}
+					{:else}
+						<SunIcon class="size-4" aria-hidden="true" />
+						{m.theme_light()}
+					{/if}
+				</button>
+			{/each}
+		</div>
+		<span id="{uid}-hint" class="text-xs text-surface-600-400">{m.settings_theme_hint()}</span>
+	</div>
+{:else if variant === 'segmented'}
+	<div class="flex flex-col gap-2 {cls}">
+		<span id="{uid}-label" class="text-xs text-surface-600-400">{m.theme_label()}</span>
+		<div
+			role="group"
+			aria-labelledby="{uid}-label"
 			class="grid grid-cols-2 gap-0.5 p-0.5 rounded-container bg-surface-200-800"
 		>
 			<button

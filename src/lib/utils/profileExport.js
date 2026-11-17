@@ -145,3 +145,114 @@ export function profileExportFile(profile, exportedAt) {
 		type: PROFILE_EXPORT_TYPE
 	};
 }
+
+/** How long the Blob URL of a download is kept, in ms, before it is revoked. */
+export const DOWNLOAD_URL_LIFETIME_MS = 1000;
+
+/**
+ * Downloads a file built here, through a normal download, as the CSV and dope card downloads do:
+ * a Blob URL clicked from a link that is never added to the page. Nothing is sent.
+ *
+ * @param {{ filename: string, content: string, type: string } | null} file
+ * @param {Document} [doc]
+ * @returns {boolean} false when there is no file
+ */
+export function downloadFile(file, doc = globalThis.document) {
+	if (!file) return false;
+	const blob = new Blob([file.content], { type: file.type });
+	const url = URL.createObjectURL(blob);
+	const a = doc.createElement('a');
+	a.href = url;
+	a.download = file.filename;
+	a.click();
+	// Later, not at once: a browser may still be starting the download after click() returns
+	// (security review of #166).
+	setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_URL_LIFETIME_MS);
+	return true;
+}
+
+/**
+ * Downloads one profile (#149): "Export this profile".
+ * @param {unknown} profile - the profile as `profiles.get(id)` gives it
+ * @param {Date} [now]
+ * @returns {boolean} false when the profile gives no file
+ */
+export function downloadProfile(profile, now = new Date()) {
+	return downloadFile(profileExportFile(profile, now));
+}
+
+// ── Export all (#166) ─────────────────────────────────────────────────────
+
+/** The `format` field of the file with all profiles. */
+export const ALL_PROFILES_EXPORT_FORMAT = 'zro-profiles';
+
+/** Its `version`. Same rule as PROFILE_EXPORT_VERSION. */
+export const ALL_PROFILES_EXPORT_VERSION = 1;
+
+/** Its file name when the date is not valid. */
+export const ALL_PROFILES_EXPORT_FALLBACK_NAME = 'zro-profiles.json';
+
+/**
+ * The envelope of the file with all profiles (#166):
+ *
+ * ```json
+ * { "format": "zro-profiles", "version": 1, "exportedAt": "2026-11-17T09:30:00.000Z", "profiles": [ ... ] }
+ * ```
+ *
+ * Each profile is written as the single export writes it: as stored (`profiles.list`), id included.
+ * An entry that is not an object is left out. A date that is not valid gives `exportedAt: null`.
+ *
+ * @param {unknown} profiles - profiles.list
+ * @param {Date} [now]
+ * @returns {{ format: string, version: number, exportedAt: string|null, profiles: object[] }}
+ */
+export function buildAllProfilesExport(profiles, now = new Date()) {
+	const time = now instanceof Date && !Number.isNaN(now.getTime()) ? now.toISOString() : null;
+	return {
+		format: ALL_PROFILES_EXPORT_FORMAT,
+		version: ALL_PROFILES_EXPORT_VERSION,
+		exportedAt: time,
+		profiles: Array.isArray(profiles) ? profiles.filter(isRecord) : []
+	};
+}
+
+/**
+ * The file name of the file with all profiles: `zro-profiles-YYYY-MM-DD.json`, the date of the
+ * device's own time zone (the day the user sees), or ALL_PROFILES_EXPORT_FALLBACK_NAME.
+ * @param {Date} [now]
+ * @returns {string}
+ */
+export function allProfilesExportFileName(now = new Date()) {
+	if (!(now instanceof Date) || Number.isNaN(now.getTime())) return ALL_PROFILES_EXPORT_FALLBACK_NAME;
+	const pad = (n) => String(n).padStart(2, '0');
+	return `zro-profiles-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}.json`;
+}
+
+/**
+ * The file with all profiles, or null when there is no profile to export or it cannot be written
+ * as JSON.
+ * @param {unknown} profiles - profiles.list
+ * @param {Date} [now]
+ * @returns {{ filename: string, content: string, type: string } | null}
+ */
+export function allProfilesExportFile(profiles, now = new Date()) {
+	const envelope = buildAllProfilesExport(profiles, now);
+	if (envelope.profiles.length === 0) return null;
+	let content;
+	try {
+		content = JSON.stringify(envelope, null, 2) + '\n';
+	} catch {
+		return null;
+	}
+	return { filename: allProfilesExportFileName(now), content, type: PROFILE_EXPORT_TYPE };
+}
+
+/**
+ * Downloads every profile in one file: "Export all".
+ * @param {unknown} profiles - profiles.list
+ * @param {Date} [now]
+ * @returns {boolean} false when there was nothing to export
+ */
+export function downloadAllProfiles(profiles, now = new Date()) {
+	return downloadFile(allProfilesExportFile(profiles, now));
+}

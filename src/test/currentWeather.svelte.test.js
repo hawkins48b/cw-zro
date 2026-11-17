@@ -130,6 +130,26 @@ describe('ScopeAtmosphereCard', () => {
 		expect(buttonsNamed(BUTTON)).toHaveLength(1);
 	});
 
+	it('shows station pressure, temperature and humidity in Accurate, without QNH / Station or altitude (#172)', () => {
+		render(Card, props());
+		expect(target.querySelector('input[id$="-press"]')).not.toBeNull();
+		expect(target.querySelector('input[id$="-temp"]')).not.toBeNull();
+		expect(target.querySelector('input[id$="-hum"]')).not.toBeNull();
+		expect(target.querySelector('input[id$="-alt"]')).toBeNull();
+		expect(buttonsNamed('QNH')).toHaveLength(0);
+		expect(buttonsNamed('Station')).toHaveLength(0);
+		expect(target.textContent).toContain('Station pressure');
+		expect(target.textContent).toContain('no altitude is needed');
+		unmount(component);
+		// ISA and Estimate keep the altitude box.
+		for (const mode of ['isa', 'estimate']) {
+			render(Card, props({ atmosphere: { ...METRIC_ACCURATE, mode } }));
+			expect(target.querySelector('input[id$="-alt"]')).not.toBeNull();
+			unmount(component);
+		}
+		component = null;
+	});
+
 	it('calls onweather only on a tap', () => {
 		const p = props({ weatherAvailable: true });
 		render(Card, p);
@@ -195,7 +215,7 @@ for (const [name, path, key] of [
 			expect(fetchSpy).not.toHaveBeenCalled();
 		});
 
-		it('fills the four boxes as QNH on a tap, from the rounded position only', async () => {
+		it('fills the three boxes on a tap, as station pressure, from the rounded position only', async () => {
 			render(Page);
 			buttonsNamed(BUTTON)[0].click();
 			await vi.waitFor(() => expect(target.textContent).toContain('Filled from current weather at'));
@@ -209,11 +229,13 @@ for (const [name, path, key] of [
 			);
 			// An answer without an hourly block is the default model: no MeteoSwiss credit.
 			expect(target.querySelector(METEOSWISS)).toBeNull();
+			// 1018.6 hPa at sea level is 959.8 hPa at the GPS altitude of 498.7 m (#172). The stored
+			// altitude (100 m, for ISA and Estimate) is not changed.
 			expect(stored(key)).toMatchObject({
 				mode: 'accurate',
-				pressureRef: 'qnh',
-				altitude: '499',
-				pressure: '1018.6',
+				pressureRef: 'station',
+				altitude: '100',
+				pressure: '959.8',
 				temperature: '8.4',
 				humidity: '71',
 				altitudeUnit: 'm',
@@ -221,9 +243,10 @@ for (const [name, path, key] of [
 				temperatureUnit: 'c'
 			});
 			flushSync();
-			expect([...target.querySelectorAll('input')].map((i) => i.value)).toEqual(
-				expect.arrayContaining(['1018.6', '499', '8.4', '71'])
-			);
+			const values = [...target.querySelectorAll('input')].map((i) => i.value);
+			expect(values).toEqual(expect.arrayContaining(['959.8', '8.4', '71']));
+			// Accurate shows no altitude box (#172).
+			expect(target.querySelector('input[id$="-alt"]')).toBeNull();
 		});
 
 		it('credits MeteoSwiss ICON-CH1 for a Bern-shaped answer', async () => {
@@ -233,7 +256,7 @@ for (const [name, path, key] of [
 			await vi.waitFor(() => expect(target.textContent).toContain('Filled from current weather at'));
 			expect(target.querySelector(METEOSWISS)).not.toBeNull();
 			expect(target.textContent).toContain('Source: MeteoSwiss (ICON-CH1 model)');
-			expect(stored(key)).toMatchObject({ pressure: '1009', temperature: '8.1', humidity: '88', altitude: '499' });
+			expect(stored(key)).toMatchObject({ pressure: '950.8', temperature: '8.1', humidity: '88', altitude: '100' });
 		});
 
 		it('names only Open-Meteo for a Berlin-shaped answer', async () => {
@@ -243,7 +266,7 @@ for (const [name, path, key] of [
 			await vi.waitFor(() => expect(target.textContent).toContain('Filled from current weather at'));
 			expect(target.querySelector('a[href="https://open-meteo.com/"]')).not.toBeNull();
 			expect(target.querySelector(METEOSWISS)).toBeNull();
-			expect(stored(key)).toMatchObject({ pressure: '999.9', temperature: '7.9', humidity: '73' });
+			expect(stored(key)).toMatchObject({ pressure: '942.2', temperature: '7.9', humidity: '73' });
 		});
 
 		it('still fills, as the default, when the ICON-CH1 hourly values are null or odd', async () => {
@@ -253,7 +276,7 @@ for (const [name, path, key] of [
 			buttonsNamed(BUTTON)[0].click();
 			await vi.waitFor(() => expect(target.textContent).toContain('Filled from current weather at'));
 			expect(target.querySelector(METEOSWISS)).toBeNull();
-			expect(stored(key)).toMatchObject({ pressure: '1009', temperature: '8.1', humidity: '88' });
+			expect(stored(key)).toMatchObject({ pressure: '950.8', temperature: '8.1', humidity: '88' });
 		});
 
 		it('leaves the boxes unchanged on an error answer', async () => {
