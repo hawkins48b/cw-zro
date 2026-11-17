@@ -11,7 +11,7 @@
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { PDFDocument, PDFPage } from 'pdf-lib';
+import { PDFArray, PDFDocument, PDFPage } from 'pdf-lib';
 import { generatePrecisionDopeCard } from '#lib/utils/precisionCardPdf.js';
 import { computePrecisionCard } from '#lib/utils/precisionCard.js';
 import { LEFT, PAGE_SIZE, PX, RIGHT, precisionTemplatePath } from '#lib/utils/precisionCardLayout.js';
@@ -93,6 +93,22 @@ describe('generatePrecisionDopeCard', () => {
 		// It saves, and reloads with the same pages.
 		const reloaded = await PDFDocument.load(await doc.save());
 		expect(reloaded.getPageCount()).toBe(10);
+	});
+
+	it('prints each distance on its own page only (#158)', async () => {
+		// The content streams of a range page: the template's, plus what was drawn for its distance.
+		const streams = (page) => {
+			const contents = page.node.Contents();
+			return contents instanceof PDFArray ? contents.size() : 1;
+		};
+		const single = await generatePrecisionDopeCard(SAMPLE, { ...OPTIONS, maxDistance: 100 }, 'en');
+		const perPage = streams(single.getPage(1));
+		const doc = await generatePrecisionDopeCard(SAMPLE, OPTIONS, 'en');
+		const ranges = doc.getPages().slice(1, -1);
+		expect(ranges).toHaveLength(8);
+		// Pages copied together shared one /Contents, so each held the streams of all eight distances.
+		for (const page of ranges) expect(streams(page)).toBe(perPage);
+		expect(new Set(ranges.map((page) => page.node.Contents())).size).toBe(8);
 	});
 
 	it('uses the English template for another locale', async () => {

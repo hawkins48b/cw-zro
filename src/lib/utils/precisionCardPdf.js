@@ -54,8 +54,13 @@ export async function generatePrecisionDopeCard(profile, options, locale) {
 	const template = await PDFDocument.load(templateBytes);
 	const pdfDoc = await PDFDocument.create();
 	const indices = [TEMPLATE_PAGES.cover, ...data.pages.map(() => TEMPLATE_PAGES.range), TEMPLATE_PAGES.worksheet];
-	const pages = await pdfDoc.copyPages(template, indices);
-	for (const page of pages) pdfDoc.addPage(page);
+	// One copyPages call per page (#158): within a call pdf-lib copies an object once, so the range
+	// pages copied together would share one /Contents and every page would print every distance.
+	const pages = [];
+	for (const index of indices) {
+		const [page] = await pdfDoc.copyPages(template, [index]);
+		pages.push(pdfDoc.addPage(page));
+	}
 	const fonts = {
 		regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
 		bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold)
