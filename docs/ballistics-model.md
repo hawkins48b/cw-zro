@@ -127,7 +127,7 @@ One wind applies for the whole flight, with no vertical part. The direction is w
 | 180° | 6 | Tailwind, from behind | Drop 5.0 in less than with no wind |
 | 270° | 9 | From the left | 110.8 in to the right |
 
-On the wind dial, 0° is at the top, towards the target. The Wind icon sits at the entered angle, where the wind comes from, and the arrowhead points where it blows. Dragging the dial moves the Wind icon. A line under the direction box says what the angle means.
+The wind dial is a shooter's clock (#165): 12 o'clock (0°) is at the top, towards the target, and the shooter is in the centre. A blue circle marks the entered angle on the rim, where the wind comes from, and the arrow starts there and points at the shooter. Dragging the dial moves the circle and the arrow. A line under the direction box says what the angle means.
 
 An empty direction box counts as 0°, as its placeholder and the dial show ([#116](https://github.com/hawkins48b/cw-zro/issues/116)). Since #106 that is a headwind. So clearing the box with a wind speed above 0 gives a result for a wind the user did not enter.
 
