@@ -254,7 +254,7 @@
 				/>
 			</div>
 			<div class="flex flex-wrap items-center gap-1.5">
-				<div class="input !flex !items-center !p-0 h-11 w-36 shrink-0 overflow-hidden">
+				<div class="input !flex !items-center !p-0 h-11 w-full @md:w-48 shrink-0 overflow-hidden">
 					<button
 						type="button"
 						class="h-full w-11 shrink-0 flex items-center justify-center preset-tonal-surface focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500"
