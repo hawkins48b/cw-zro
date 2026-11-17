@@ -64,13 +64,13 @@ Calculations can hang with no way to stop them. See [Input guards](ballistics-mo
 
 ### Precision card templates
 
-The precision dope card (#157) is printed on static templates, `static/pdf/precision-<en|fr|de>-<metric|imperial>.pdf`, three A6 pages each (cover, range page, worksheet). [`scripts/precision-card-templates.js`](../scripts/precision-card-templates.js) draws them with pdf-lib; there is no SVG source. After changing the layout ([`precisionCardLayout.js`](../src/lib/utils/precisionCardLayout.js)), the words ([`precisionCardWords.js`](../src/lib/utils/precisionCardWords.js)) or the columns ([`precisionCardFormat.js`](../src/lib/utils/precisionCardFormat.js)), run:
+The precision dope card (#157) is printed on static templates, `static/pdf/precision-<en|fr|de>.pdf`, one per language, three A6 pages each (cover, range page, worksheet). [`scripts/precision-card-templates.js`](../scripts/precision-card-templates.js) draws them with pdf-lib; there is no SVG source. They hold no unit (#160): [`precisionCardPdf.js`](../src/lib/utils/precisionCardPdf.js) draws the wind, pressure and temperature units, the column values and the lines between the columns, the ring speeds and the cover's reference values, so a change to the columns in [`precisionCardFormat.js`](../src/lib/utils/precisionCardFormat.js) needs no new template. After changing the layout ([`precisionCardLayout.js`](../src/lib/utils/precisionCardLayout.js)) or the words ([`precisionCardWords.js`](../src/lib/utils/precisionCardWords.js)), run:
 
 ```bash
 npm run templates:precision
 ```
 
-and commit the six PDFs. The output has no date or id, so an unchanged layout writes the same bytes. `precisionCardPdf.test.js` fails when a committed template differs from what the script writes. The fill code reads the same layout and words, so the numbers stay in their cells.
+and commit the three PDFs. The output has no date or id, so an unchanged layout writes the same bytes. `precisionCardPdf.test.js` fails when a committed template differs from what the script writes. The fill code reads the same layout and words, so the numbers stay in their cells.
 
 ### Skeleton upgrades
 

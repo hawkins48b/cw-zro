@@ -1,7 +1,7 @@
 /**
  * The words of the precision dope card (#157), EN, FR and DE. One table for both sides:
  * `scripts/precision-card-templates.js` prints the static words into the templates
- * (`static/pdf/precision-<locale>-<units>.pdf`), and precisionCardPdf.js draws the words that
+ * (`static/pdf/precision-<locale>.pdf`), and precisionCardPdf.js draws the words that
  * depend on the data (clicks, MRAD or MOA, left or right, page) and measures the template words
  * it writes next to. Change a word here, then run `npm run templates:precision`.
  *

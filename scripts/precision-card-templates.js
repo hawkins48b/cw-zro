@@ -1,6 +1,8 @@
 /**
  * Draws the static templates of the precision dope card (#157) with pdf-lib and writes them to
- * `static/pdf/precision-<locale>-<metric|imperial>.pdf`, one per card language and unit system.
+ * `static/pdf/precision-<locale>.pdf`, one per card language. Since #160 they hold no unit: the
+ * wind, pressure and temperature units, the column values and lines, the ring speeds and the
+ * cover's reference values are drawn by precisionCardPdf.js, for the units the user picked.
  *
  * Run: npm run templates:precision
  *
@@ -8,9 +10,9 @@
  * precisionCardPdf.js) and the worksheet. The geometry comes from
  * src/lib/utils/precisionCardLayout.js and the words from src/lib/utils/precisionCardWords.js, the
  * modules the fill code reads, so the numbers land in the printed cells. The output is
- * deterministic (no dates or ids in the file), and src/test/precisionCardTemplates.test.js checks
- * that the committed files are what this script writes: run it after any change to the layout,
- * the words or the columns, and commit the PDFs.
+ * deterministic (no dates or ids in the file), and src/test/precisionCardPdf.test.js checks
+ * that the committed files are what this script writes: run it after any change to the layout or
+ * the words, and commit the PDFs.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -31,40 +33,34 @@ import {
 	dialPoint,
 	painter,
 	precisionTemplatePath,
-	tableCell,
 	worksheetRowTop,
 	worksheetSectionHeight
 } from '../src/lib/utils/precisionCardLayout.js';
 import { PRECISION_LOCALES, precisionWords } from '../src/lib/utils/precisionCardWords.js';
-import { PRECISION_UNITS, formatColumn, unitSymbol } from '../src/lib/utils/precisionCardFormat.js';
-
-export const TEMPLATE_UNITS = Object.freeze(['metric', 'imperial']);
 
 /** The path of a template, relative to `static/`. */
 export const templatePath = precisionTemplatePath;
 
 /**
- * The template of a language and unit system.
+ * The template of a language.
  * @param {'en'|'fr'|'de'} locale
- * @param {'metric'|'imperial'} units
  * @returns {Promise<Uint8Array>}
  */
-export async function buildPrecisionTemplate(locale, units) {
+export async function buildPrecisionTemplate(locale) {
 	const words = precisionWords(locale);
-	const columns = PRECISION_UNITS[units];
 	const doc = await PDFDocument.create({ updateMetadata: false });
 	const fonts = {
 		regular: await doc.embedFont(StandardFonts.Helvetica),
 		bold: await doc.embedFont(StandardFonts.HelveticaBold)
 	};
 	const size = [PAGE_SIZE.width, PAGE_SIZE.height];
-	drawCover(painter(doc.addPage(size), fonts), words, columns);
-	drawRange(painter(doc.addPage(size), fonts), words, columns);
-	drawWorksheet(painter(doc.addPage(size), fonts), words, columns);
+	drawCover(painter(doc.addPage(size), fonts), words);
+	drawRange(painter(doc.addPage(size), fonts), words);
+	drawWorksheet(painter(doc.addPage(size), fonts), words);
 	return doc.save({ useObjectStreams: false });
 }
 
-function drawCover(p, words, columns) {
+function drawCover(p, words) {
 	const h = COVER.header;
 	p.rect(LEFT, h.top, WIDTH, h.height, { fill: COLORS.ink });
 	p.text(words.title.toUpperCase(), h.textX, h.title.baseline, { size: h.title.size, bold: true, color: COLORS.white });
@@ -87,17 +83,6 @@ function drawCover(p, words, columns) {
 			}
 		}
 	});
-
-	// The card values that depend only on the unit system.
-	const fixed = {
-		refPressure: `${formatColumn(columns.pressure.reference, columns.pressure.unit)} ${unitSymbol(columns.pressure.unit)}`,
-		refTemperature: `${columns.temperature.reference} ${unitSymbol(columns.temperature.unit)}`,
-		wind: unitSymbol(columns.wind.unit)
-	};
-	for (const [key, value] of Object.entries(fixed)) {
-		const cell = /** @type {NonNullable<ReturnType<typeof coverCell>>} */ (coverCell(key));
-		p.text(value, cell.right - COVER.cell.padding, cell.baseline, { size: COVER.cell.size, bold: true, align: 'right' });
-	}
 
 	const d = COVER.disclaimer;
 	const lines = wrap(p, words.disclaimer, WIDTH, d.size);
@@ -122,7 +107,7 @@ function wrap(p, text, width, size) {
 	return lines;
 }
 
-function drawRange(p, words, columns) {
+function drawRange(p, words) {
 	// Distance and ① box
 	const t = RANGE.top;
 	p.rect(t.split, t.top, RIGHT - t.split, t.height, { fill: COLORS.ink });
@@ -140,21 +125,15 @@ function drawRange(p, words, columns) {
 	}
 	p.line(LEFT, e.rule, RIGHT, e.rule);
 
-	// ③ and ④ tables
+	// ③ and ④ tables: the unit, the column values and the lines between the columns are drawn
+	// at fill time (#160), since the number of columns depends on the unit.
 	const tb = RANGE.table;
 	for (const table of RANGE.tables) {
-		const spec = columns[table.key];
 		const top = table.top;
 		p.rect(LEFT, top, tb.labelRight - LEFT, tb.height, { fill: COLORS.band });
 		p.line(LEFT, top + tb.divider, RIGHT, top + tb.divider, { color: COLORS.grid });
 		p.line(tb.labelRight, top, tb.labelRight, top + tb.height);
 		p.badge(table.badge, tb.badgeCx, top + tb.divider / 2);
-		p.text(unitSymbol(spec.unit), tb.unitX, top + tb.headerBaseline, { size: tb.headerSize, bold: true });
-		spec.columns.forEach((value, i) => {
-			const cell = tableCell(i, spec.columns.length);
-			if (i > 0) p.line(cell.left, top, cell.left, top + tb.height, { color: COLORS.grid });
-			p.text(formatColumn(value, spec.unit), cell.centre, top + tb.headerBaseline, { size: tb.headerSize, color: COLORS.muted, align: 'center' });
-		});
 		p.rect(LEFT, top, WIDTH, tb.height, { border: COLORS.ink });
 	}
 
@@ -193,20 +172,10 @@ function drawRange(p, words, columns) {
 		const at = dialPoint(angle, dl.halfRayRadius);
 		p.text(`${angle}°`, at.x, at.y + dl.halfRaySize * dl.baselineDrop, { size: dl.halfRaySize, bold: true, align: 'center' });
 	}
-	columns.wind.speeds.forEach((speed, i) => {
-		const r = dl.radii[i];
-		const x = ox + cx;
-		const y = oy + cy - r + dl.ringLabelSize * dl.baselineDrop;
-		const text = String(speed);
-		const w = p.width(text, dl.ringLabelSize, true);
-		p.rect(x - w / 2 - 2, y - dl.ringLabelSize * 0.8, w + 4, dl.ringLabelSize, { fill: COLORS.white });
-		p.text(text, x, y, { size: dl.ringLabelSize, bold: true, align: 'center' });
-		p.line(x - w / 2, y + 1.5, x + w / 2, y + 1.5, { width: 1 });
-	});
-	p.text(unitSymbol(columns.wind.unit), ox + dl.unit.x, oy + dl.unit.y, { size: dl.unit.size, bold: true, color: COLORS.muted });
+	// The ring speeds and the wind unit are drawn at fill time (#160).
 }
 
-function drawWorksheet(p, words, columns) {
+function drawWorksheet(p, words) {
 	const h = WORKSHEET.header;
 	p.rect(LEFT, h.top, h.split - LEFT, h.height, { fill: COLORS.ink });
 	p.text(words.firingData, h.titleX, h.baseline, { size: h.titleSize, bold: true, color: COLORS.white });
@@ -215,11 +184,6 @@ function drawWorksheet(p, words, columns) {
 	p.rect(LEFT, h.top, WIDTH, h.height, { border: COLORS.ink, borderWidth: 1.5 });
 
 	const [c0, c1, c2, c3, c4] = WORKSHEET.columns;
-	const units = {
-		pressure: unitSymbol(columns.pressure.unit),
-		temperature: unitSymbol(columns.temperature.unit),
-		wind: unitSymbol(columns.wind.unit)
-	};
 	for (const section of WORKSHEET.sections) {
 		const top = section.top;
 		const height = worksheetSectionHeight(section);
@@ -240,7 +204,6 @@ function drawWorksheet(p, words, columns) {
 			p.badge(row.n, c0 + 8 + BADGE.r, mid);
 			p.text(words[row.label], c0 + 8 + 2 * BADGE.r + 6, mid + 4.5, { size: WORKSHEET.labelSize, bold: true });
 			if (row.clock) drawClockIcon(p, c1 - 8 - 12, mid);
-			if (units[row.unit]) p.text(units[row.unit], (c2 + c3) / 2, mid + 4, { size: WORKSHEET.unitSize, bold: true, align: 'center' });
 			const sign = row.sign === 'leftOrRight' ? words.leftOrRight : row.sign === 'spin' ? '' : row.sign;
 			p.text(sign, c3 + WORKSHEET.signX, mid + 5.5, { size: WORKSHEET.signSize, bold: true });
 			p.line(c1, rt, c1, rt + WORKSHEET.row);
@@ -274,11 +237,10 @@ function drawClockIcon(p, cx, cy) {
 export async function writePrecisionTemplates(root = process.cwd()) {
 	const written = [];
 	for (const locale of PRECISION_LOCALES) {
-		for (const units of TEMPLATE_UNITS) {
-			const file = path.join(root, 'static', templatePath(locale, units));
-			fs.writeFileSync(file, await buildPrecisionTemplate(/** @type {'en'|'fr'|'de'} */ (locale), units));
-			written.push(path.relative(root, file));
-		}
+		const lang = /** @type {'en'|'fr'|'de'} */ (locale);
+		const file = path.join(root, 'static', templatePath(lang));
+		fs.writeFileSync(file, await buildPrecisionTemplate(lang));
+		written.push(path.relative(root, file));
 	}
 	return written;
 }

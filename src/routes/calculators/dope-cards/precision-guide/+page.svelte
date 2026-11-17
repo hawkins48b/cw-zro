@@ -167,7 +167,7 @@
 			<li>{m.dope_guide_wind_side()}</li>
 			<li>{m.dope_guide_wind_rays()}</li>
 			<li>{m.dope_guide_wind_between()}</li>
-			<li>{m.dope_guide_wind_imperial()}</li>
+			<li>{m.dope_guide_wind_mph()}</li>
 		</ul>
 
 		<div class="overflow-x-auto">

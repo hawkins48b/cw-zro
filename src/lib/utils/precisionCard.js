@@ -11,8 +11,10 @@
  *   what a rifle zeroed in standard air does in other air, unlike the other calculators, which
  *   solve the zero again in each atmosphere.
  * - Pressure columns are at the reference temperature, temperature columns at the reference
- *   pressure. Powder sensitivity is applied as calculateShotPoint applies it, so the temperature
- *   columns include the change of muzzle velocity.
+ *   pressure. Each of wind, pressure and temperature has its own unit (#160), so its columns are
+ *   in that unit; the reference atmosphere is the same whatever the units. Powder sensitivity is
+ *   applied as calculateShotPoint applies it, so the temperature columns include the change of
+ *   muzzle velocity.
  * - Spin drift comes from the profile's twist (a negative twist is a left-hand barrel) and bullet
  *   length, whatever the profile's spin drift switch says, when both are within their limits.
  *   Otherwise the engine gets no twist and the card prints no spin drift.
@@ -38,7 +40,7 @@ import { Ammo, Atmo, DragModel, DragTables, Shot, TrajFlag, UNew, Unit, Weapon, 
 import { Calculator } from './ballisticEngine.js';
 import { powderSensitivity } from './ballisticCalculator.js';
 import { readDecimal } from './decimal.js';
-import { PRECISION_UNITS } from './precisionCardFormat.js';
+import { PRECISION_COLUMNS, PRECISION_UNIT_PRESETS, precisionColumns, precisionUnits } from './precisionCardFormat.js';
 import { hasFiniteElevation, isUsableZeroDistance, zeroDistanceValue } from './zeroDistance.js';
 import {
 	MAX_DISTANCE,
@@ -78,8 +80,16 @@ export const WIND_ANGLES = Object.freeze([15, 30, 45, 60, 75, 90]);
  */
 export const windFactor = (angle) => Math.sin((angle * Math.PI) / 180);
 
-/** The columns of each unit system, from precisionCardFormat.js. */
-export { PRECISION_UNITS };
+/** The columns of each unit and the two presets, from precisionCardFormat.js. */
+export { PRECISION_COLUMNS, PRECISION_UNIT_PRESETS, precisionColumns, precisionUnits };
+
+/**
+ * The engine value of a column in its unit (#160): each table is computed in the unit chosen for
+ * it, whatever the other two are.
+ */
+const PRESSURE_VALUE = { hpa: (v) => UNew.hPa(v), inhg: (v) => UNew.InHg(v) };
+const TEMPERATURE_VALUE = { c: (v) => UNew.Celsius(v), f: (v) => UNew.Fahrenheit(v) };
+const WIND_VALUE = { mps: (v) => UNew.MPS(v), mph: (v) => UNew.MPH(v) };
 
 const CORRECTIONS = new Set(['clicks', 'angle']);
 const ANGLE_UNITS = { MRAD: Unit.MRad, MOA: Unit.MOA };
@@ -189,12 +199,16 @@ const tenthOf = (value) => roundHalfAway(value * 10) / 10;
  * value is out of its limits, or not even the 100 page can be computed.
  *
  * @param {object} profile - flat v2 profile
- * @param {{ maxDistance: number, correction: 'clicks'|'angle', units: 'metric'|'imperial' }} options
+ * @param {{ maxDistance: number, correction: 'clicks'|'angle',
+ *   units: 'metric'|'imperial'|import('./precisionCardFormat.js').PrecisionUnits }} options
+ *   units: a preset name, or one unit per quantity (#160), read by precisionUnits; anything it
+ *   refuses gives null
  * @returns {PrecisionCard|null}
  *
  * @typedef {object} PrecisionCard
  * @property {'clicks'|'angle'} correction
- * @property {'metric'|'imperial'} units
+ * @property {Readonly<import('./precisionCardFormat.js').PrecisionUnits>} units - the choice, as an
+ *   object even for a preset name
  * @property {'m'|'yd'} distanceUnit - the zero's unit: the unit of every distance on the card
  * @property {'cm'|'in'} sizeUnit - of the click size in the footer
  * @property {'MRAD'|'MOA'} reticleUnit - the unit of the values in 'angle' mode
@@ -202,7 +216,7 @@ const tenthOf = (value) => roundHalfAway(value * 10) / 10;
  * @property {boolean} spinDrift - whether the card has spin drift (twist and length usable)
  * @property {number} maxDistance - as asked
  * @property {number} lastDistance - the last page
- * @property {object} columns - PRECISION_UNITS[units]
+ * @property {object} columns - precisionColumns(units): { pressure, temperature, wind }
  * @property {PrecisionPage[]} pages
  *
  * @typedef {object} PrecisionPage
@@ -221,10 +235,11 @@ const tenthOf = (value) => roundHalfAway(value * 10) / 10;
 export function computePrecisionCard(profile, options) {
 	try {
 		if (!profile || typeof profile !== 'object' || !options || typeof options !== 'object') return null;
-		const { maxDistance, correction, units } = options;
+		const { maxDistance, correction } = options;
 		if (!isUsableMaxDistance(maxDistance)) return null;
 		if (!CORRECTIONS.has(correction)) return null;
-		if (units !== 'metric' && units !== 'imperial') return null;
+		const units = precisionUnits(options.units);
+		if (!units) return null;
 
 		const req = precisionCardRequirements(profile);
 		if (!req.usable) return null;
@@ -315,17 +330,17 @@ export function computePrecisionCard(profile, options) {
 		if (pages.length === 0 || pages[0] !== PRECISION_PAGE_STEP) return null;
 		const lastReached = pages[pages.length - 1];
 
-		const columns = PRECISION_UNITS[units];
+		const columns = /** @type {NonNullable<ReturnType<typeof precisionColumns>>} */ (precisionColumns(units));
 		const pressureAtmo = (p) => new Atmo({
 			altitude: UNew.Meter(0),
-			pressure: units === 'metric' ? UNew.hPa(p) : UNew.InHg(p),
+			pressure: PRESSURE_VALUE[units.pressure](p),
 			temperature: UNew.Celsius(15),
 			humidity: 0
 		});
 		const temperatureAtmo = (t) => new Atmo({
 			altitude: UNew.Meter(0),
 			pressure: UNew.hPa(1013.25),
-			temperature: units === 'metric' ? UNew.Celsius(t) : UNew.Fahrenheit(t),
+			temperature: TEMPERATURE_VALUE[units.temperature](t),
 			humidity: 0
 		});
 		/** Rows of a variant at the page distances, or none when its velocity cannot be flown. */
@@ -335,7 +350,7 @@ export function computePrecisionCard(profile, options) {
 		};
 		const pressureRows = columns.pressure.columns.map((p) => variantRows(pressureAtmo(p)));
 		const temperatureRows = columns.temperature.columns.map((t) => variantRows(temperatureAtmo(t)));
-		const windVelocity = (v) => (units === 'metric' ? UNew.MPS(v) : UNew.MPH(v));
+		const windVelocity = WIND_VALUE[units.wind];
 		const windRows = columns.wind.speeds.map((v) =>
 			variantRows(reference, [new Wind({ velocity: windVelocity(v), directionFrom: UNew.Degree(90) })])
 		);

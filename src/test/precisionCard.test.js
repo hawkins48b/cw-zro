@@ -2,7 +2,8 @@
  * Precision dope card calculation (#157): options and requirement checks, the input guards with the
  * engine stubbed (never run a hang, see docs/testing.md#hangs), and the card's numbers on the real
  * engine: the owner's sample profile at 700 m, a 100 yd zero, MOA clicks, the angle mode, imperial
- * columns and a range past the flight limit.
+ * columns and a range past the flight limit. The unit choice of #160: the presets, a mixed choice,
+ * and the guard of the units option.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { UNew, Unit } from 'js-ballistics';
@@ -10,14 +11,18 @@ import { Calculator } from '#lib/utils/ballisticEngine.js';
 import {
 	PRECISION_MAX_DISTANCE,
 	PRECISION_MIN_DISTANCE,
-	PRECISION_UNITS,
+	PRECISION_COLUMNS,
+	PRECISION_UNIT_PRESETS,
 	WIND_ANGLES,
 	computePrecisionCard,
 	isUsableMaxDistance,
 	precisionCardRequirements,
 	precisionPageDistances,
+	precisionColumns,
+	precisionUnits,
 	windFactor
 } from '#lib/utils/precisionCard.js';
+import { precisionUnitPreset } from '#lib/utils/precisionCardFormat.js';
 import { P308_G1 } from './fixtures/ballisticProfiles.js';
 
 /**
@@ -253,7 +258,12 @@ describe('guards (engine stubbed)', () => {
 		['a NaN maximum distance', { maxDistance: NaN }],
 		['a maximum distance as text', { maxDistance: '800' }],
 		['an unknown correction', { correction: 'mils' }],
-		['unknown units', { units: 'si' }]
+		['unknown units', { units: 'si' }],
+		['units as an array', { units: ['mps', 'hpa', 'c'] }],
+		['an unknown wind unit', { units: { wind: 'kmh', pressure: 'hpa', temperature: 'c' } }],
+		['an inherited unit name', { units: { wind: 'mps', pressure: 'toString', temperature: 'c' } }],
+		['a missing temperature', { units: { wind: 'mps', pressure: 'hpa' } }],
+		['inherited units', { units: Object.create(PRECISION_UNIT_PRESETS.metric) }]
 	])('stops %s before the engine', (_, changes) => {
 		const { solve, fire } = stubEngine();
 		expect(computePrecisionCard(SAMPLE, { ...METRIC_CLICKS, ...changes })).toBeNull();
@@ -331,12 +341,17 @@ describe('the sample profile (real engine)', () => {
 		expect(card.lastDistance).toBe(1000);
 		expect(card.distanceUnit).toBe('m');
 		expect(card.sizeUnit).toBe('cm');
-		expect(card.columns).toBe(PRECISION_UNITS.metric);
+		expect(card.units).toEqual({ wind: 'mps', pressure: 'hpa', temperature: 'c' });
+		expect(card.columns).toEqual({
+			pressure: PRECISION_COLUMNS.pressure.hpa,
+			temperature: PRECISION_COLUMNS.temperature.c,
+			wind: PRECISION_COLUMNS.wind.mps
+		});
 	});
 
 	it('is zeroed at 100: no elevation there, and the reference column is 0 everywhere', () => {
 		expect(page(card, 100).elevation).toBe(0);
-		const ref = PRECISION_UNITS.metric.temperature.columns.indexOf(15);
+		const ref = PRECISION_COLUMNS.temperature.c.columns.indexOf(15);
 		for (const p of card.pages) expect(p.temperature[ref]).toBe(0);
 	});
 
@@ -497,5 +512,156 @@ describe('flight limit (real engine)', () => {
 	it('gives no card when the 100 page cannot be reached', () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		expect(computePrecisionCard({ ...SLOW, velocity: '60', bc: '0.01' }, METRIC_CLICKS)).toBeNull();
+	});
+});
+
+describe('the units option (#160)', () => {
+	const METRIC = { wind: 'mps', pressure: 'hpa', temperature: 'c' };
+	const IMPERIAL = { wind: 'mph', pressure: 'inhg', temperature: 'f' };
+
+	it('reads the preset names and the units of each quantity', () => {
+		expect(precisionUnits('metric')).toEqual(METRIC);
+		expect(precisionUnits('imperial')).toEqual(IMPERIAL);
+		const mixed = { wind: 'mph', pressure: 'hpa', temperature: 'f' };
+		const read = precisionUnits(mixed);
+		expect(read).toEqual(mixed);
+		// A frozen copy, never the caller's object.
+		expect(read).not.toBe(mixed);
+		expect(Object.isFrozen(read)).toBe(true);
+		expect(precisionUnits(Object.freeze({ ...METRIC }))).toEqual(METRIC);
+	});
+
+	it('names the preset of a choice, and none for a mixed one', () => {
+		expect(precisionUnitPreset(METRIC)).toBe('metric');
+		expect(precisionUnitPreset('imperial')).toBe('imperial');
+		expect(precisionUnitPreset({ ...IMPERIAL, wind: 'mps' })).toBeNull();
+		expect(precisionUnitPreset(null)).toBeNull();
+	});
+
+	it.each([
+		['an unknown preset', 'si'],
+		['a preset in capitals', 'Metric'],
+		['an inherited preset name', 'toString'],
+		['__proto__ as a preset', '__proto__'],
+		['null', null],
+		['undefined', undefined],
+		['a number', 1],
+		['a function', () => METRIC],
+		['an array', ['mps', 'hpa', 'c']],
+		['an array with the keys', Object.assign([], METRIC)],
+		['an empty object', {}],
+		['a missing key', { wind: 'mps', pressure: 'hpa' }],
+		['an extra key', { ...METRIC, distance: 'm' }],
+		['an unknown unit', { ...METRIC, temperature: 'k' }],
+		['a unit in capitals', { ...METRIC, pressure: 'hPa' }],
+		['the printed symbol', { ...METRIC, wind: 'm/s' }],
+		['an inherited unit name', { ...METRIC, wind: 'constructor' }],
+		['__proto__ as a unit', { ...METRIC, temperature: '__proto__' }],
+		['hasOwnProperty as a unit', { ...METRIC, pressure: 'hasOwnProperty' }],
+		['a unit as an object', { ...METRIC, wind: { toString: () => 'mps' } }],
+		['a unit as a String object', { ...METRIC, wind: new String('mps') }],
+		['inherited keys', Object.create(METRIC)],
+		['a __proto__ key from JSON', JSON.parse('{"wind":"mps","pressure":"hpa","__proto__":{"temperature":"c"}}')],
+		['a symbol key added', { ...METRIC, [Symbol('x')]: 1 }]
+	])('refuses %s', (_, units) => {
+		expect(precisionUnits(units)).toBeNull();
+		expect(precisionColumns(units)).toBeNull();
+	});
+
+	it('refuses an object that throws when read, without throwing', () => {
+		const getter = { wind: 'mps', pressure: 'hpa', get temperature() { throw new Error('read'); } };
+		const proxy = new Proxy({}, { ownKeys() { throw new Error('keys'); } });
+		expect(precisionUnits(getter)).toBeNull();
+		expect(precisionUnits(proxy)).toBeNull();
+	});
+
+	it('reads each key once, so a getter cannot change its answer', () => {
+		let reads = 0;
+		const units = {
+			wind: 'mps',
+			pressure: 'hpa',
+			get temperature() {
+				reads += 1;
+				return reads === 1 ? 'c' : 'kelvin';
+			}
+		};
+		expect(precisionUnits(units)).toEqual(METRIC);
+		expect(reads).toBe(1);
+	});
+
+	it('stops a damaged units option before the engine', () => {
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const solve = vi.spyOn(Calculator.prototype, 'setWeaponZero').mockImplementation(() => {
+			throw new Error('setWeaponZero reached');
+		});
+		const throwing = { wind: 'mps', pressure: 'hpa', get temperature() { throw new Error('read'); } };
+		for (const units of [throwing, { ...METRIC, wind: '__proto__' }, [], 'si']) {
+			expect(computePrecisionCard(SAMPLE, { ...METRIC_CLICKS, units })).toBeNull();
+		}
+		expect(solve).not.toHaveBeenCalled();
+	});
+});
+
+describe('unit presets and mixed units (real engine, #160)', () => {
+	const METRIC = { wind: 'mps', pressure: 'hpa', temperature: 'c' };
+	const IMPERIAL = { wind: 'mph', pressure: 'inhg', temperature: 'f' };
+
+	it.each([
+		['the sample, clicks', SAMPLE, 'clicks'],
+		['the sample, angle', SAMPLE, 'angle'],
+		['P308 MOA (yd), clicks', P308_MOA, 'clicks'],
+		['P308 MOA (yd), angle', P308_MOA, 'angle']
+	])('%s: a preset name and its units give the same card', (_, profile, correction) => {
+		for (const [name, units] of [['metric', METRIC], ['imperial', IMPERIAL]]) {
+			const byName = computePrecisionCard(profile, { maxDistance: 1200, correction, units: name });
+			const byUnits = computePrecisionCard(profile, { maxDistance: 1200, correction, units });
+			expect(byName).not.toBeNull();
+			expect(byUnits).toEqual(byName);
+			expect(byName.units).toEqual(units);
+		}
+	});
+
+	it('computes each table from its own unit: mph rings, hPa columns, °F columns', () => {
+		const options = { maxDistance: 1000, correction: 'clicks' };
+		const metric = computePrecisionCard(SAMPLE, { ...options, units: 'metric' });
+		const imperial = computePrecisionCard(SAMPLE, { ...options, units: 'imperial' });
+		const mixed = computePrecisionCard(SAMPLE, { ...options, units: { wind: 'mph', pressure: 'hpa', temperature: 'f' } });
+		expect(mixed.units).toEqual({ wind: 'mph', pressure: 'hpa', temperature: 'f' });
+		expect(mixed.columns.pressure).toBe(PRECISION_COLUMNS.pressure.hpa);
+		expect(mixed.columns.temperature).toBe(PRECISION_COLUMNS.temperature.f);
+		expect(mixed.columns.wind).toBe(PRECISION_COLUMNS.wind.mph);
+		// Distances follow the zero, whatever the units.
+		expect(mixed.distanceUnit).toBe('m');
+		expect(mixed.sizeUnit).toBe('cm');
+		mixed.pages.forEach((p, i) => {
+			const m = metric.pages[i];
+			const im = imperial.pages[i];
+			expect(p.distance).toBe(m.distance);
+			expect(p.elevation).toBe(m.elevation);
+			expect(p.extras).toEqual(m.extras);
+			expect(p.spinDrift).toEqual(m.spinDrift);
+			expect(p.time).toBe(m.time);
+			expect(p.clickSize).toBe(m.clickSize);
+			expect(p.pressure).toEqual(m.pressure);
+			expect(p.temperature).toEqual(im.temperature);
+			expect(p.temperature).toHaveLength(7);
+			expect(p.wind).toEqual(im.wind);
+		});
+		// And the other way round: m/s rings with inHg and °C.
+		const other = computePrecisionCard(SAMPLE, { ...options, units: { wind: 'mps', pressure: 'inhg', temperature: 'c' } });
+		other.pages.forEach((p, i) => {
+			expect(p.pressure).toEqual(imperial.pages[i].pressure);
+			expect(p.temperature).toEqual(metric.pages[i].temperature);
+			expect(p.wind).toEqual(metric.pages[i].wind);
+		});
+	});
+
+	it('mph rings give more windage than the m/s rings of the same index past the first', () => {
+		// 5 mph is 2.24 m/s, 20 mph 8.94 m/s: every mph ring is a little stronger.
+		const options = { maxDistance: 1000, correction: 'angle' };
+		const mps = computePrecisionCard(SAMPLE, { ...options, units: { wind: 'mps', pressure: 'hpa', temperature: 'c' } });
+		const mph = computePrecisionCard(SAMPLE, { ...options, units: { wind: 'mph', pressure: 'hpa', temperature: 'c' } });
+		const at = (card) => page(card, 1000).wind.map((w) => w.values.at(-1));
+		at(mph).forEach((v, i) => expect(v).toBeGreaterThanOrEqual(at(mps)[i]));
 	});
 });

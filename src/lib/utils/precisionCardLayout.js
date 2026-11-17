@@ -9,6 +9,9 @@
  *
  * Template pages, in this order in each template file: COVER, RANGE (copied once per distance),
  * WORKSHEET.
+ *
+ * Since #160 the templates hold no unit: precisionCardPdf.js draws the units, the column values,
+ * the column lines and the ring speeds at the positions given here.
  */
 import { rgb } from 'pdf-lib';
 
@@ -367,8 +370,8 @@ export function painter(page, fonts) {
 }
 
 /**
- * The template of a card language and unit system, as fetched by the app (under `static/`).
+ * The template of a card language, as fetched by the app (under `static/`). One per language
+ * (#160): the units and their numbers are drawn at fill time.
  * @param {'en'|'fr'|'de'} locale
- * @param {'metric'|'imperial'} units
  */
-export const precisionTemplatePath = (locale, units) => `/pdf/precision-${locale}-${units}.pdf`;
+export const precisionTemplatePath = (locale) => `/pdf/precision-${locale}.pdf`;

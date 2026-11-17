@@ -1,9 +1,9 @@
 // @vitest-environment node
 /**
  * Precision dope card PDF (#157), on the real templates, pdf-lib and Helvetica widths: the page
- * count and size, the template of each language and unit system, every drawn text inside the
- * content area, profile text that the font cannot encode or that is too long, and no PDF without
- * data. Also that the committed templates in `static/pdf/` are what
+ * count and size, the template of each language, the units of each of the 8 unit choices (#160),
+ * every drawn text inside the content area, profile text that the font cannot encode or that is too
+ * long, and no PDF without data. Also that the committed templates in `static/pdf/` are what
  * `scripts/precision-card-templates.js` writes, so that no one edits one without the other.
  *
  * jsdom breaks pdf-lib's ArrayBuffer check, hence the node environment. fetch reads `static/`.
@@ -16,8 +16,8 @@ import { generatePrecisionDopeCard } from '#lib/utils/precisionCardPdf.js';
 import { computePrecisionCard } from '#lib/utils/precisionCard.js';
 import { FOOTER, LEFT, PAGE_SIZE, PX, RANGE, RIGHT, precisionTemplatePath } from '#lib/utils/precisionCardLayout.js';
 import { PRECISION_LOCALES, precisionWords } from '#lib/utils/precisionCardWords.js';
-import { formatDate } from '#lib/utils/precisionCardFormat.js';
-import { TEMPLATE_UNITS, buildPrecisionTemplate } from '../../scripts/precision-card-templates.js';
+import { PRECISION_COLUMNS, PRECISION_QUANTITIES, formatColumn, formatDate, unitSymbol } from '#lib/utils/precisionCardFormat.js';
+import { buildPrecisionTemplate } from '../../scripts/precision-card-templates.js';
 import { P223_G1 } from './fixtures/ballisticProfiles.js';
 
 const SAMPLE = Object.freeze({
@@ -53,6 +53,16 @@ const SAMPLE = Object.freeze({
 });
 
 const OPTIONS = { maxDistance: 800, correction: 'clicks', units: 'metric', date: new Date(2026, 10, 17) };
+
+/** The 8 unit choices of #160: every wind, pressure and temperature unit with every other. */
+const UNIT_CHOICES = Object.keys(PRECISION_COLUMNS.wind).flatMap((wind) =>
+	Object.keys(PRECISION_COLUMNS.pressure).flatMap((pressure) =>
+		Object.keys(PRECISION_COLUMNS.temperature).map((temperature) => ({ wind, pressure, temperature }))
+	)
+);
+/** A mixed choice: mph rings with hPa and °F. */
+const MIXED = Object.freeze({ wind: 'mph', pressure: 'hpa', temperature: 'f' });
+const choiceName = (u) => `${u.wind}/${u.pressure}/${u.temperature}`;
 const texts = [];
 const fetched = [];
 
@@ -85,10 +95,10 @@ const isA6 = (page) => {
 };
 
 describe('generatePrecisionDopeCard', () => {
-	it.each(PRECISION_LOCALES.flatMap((l) => TEMPLATE_UNITS.map((u) => [l, u])))('%s %s: cover, one page per distance and the worksheet, all A6', async (locale, units) => {
+	it.each(PRECISION_LOCALES.flatMap((l) => ['metric', 'imperial', MIXED].map((u) => [l, u])))('%s %o: cover, one page per distance and the worksheet, all A6', async (locale, units) => {
 		const doc = await generatePrecisionDopeCard(SAMPLE, { ...OPTIONS, units }, locale);
 		expect(doc).not.toBeNull();
-		expect(fetched).toEqual([precisionTemplatePath(locale, units)]);
+		expect(fetched).toEqual([precisionTemplatePath(locale)]);
 		expect(doc.getPageCount()).toBe(8 + 2);
 		expect(doc.getPages().every(isA6)).toBe(true);
 		// It saves, and reloads with the same pages.
@@ -116,7 +126,7 @@ describe('generatePrecisionDopeCard', () => {
 		for (const locale of ['it', '', undefined, null, 'FR']) {
 			fetched.length = 0;
 			await generatePrecisionDopeCard(SAMPLE, OPTIONS, locale);
-			expect(fetched).toEqual(['/pdf/precision-en-metric.pdf']);
+			expect(fetched).toEqual(['/pdf/precision-en.pdf']);
 		}
 	});
 
@@ -136,11 +146,11 @@ describe('generatePrecisionDopeCard', () => {
 	});
 
 	it('prints the 700 m values of the design', async () => {
-		await generatePrecisionDopeCard(SAMPLE, OPTIONS, 'en');
+		const doc = await generatePrecisionDopeCard(SAMPLE, OPTIONS, 'en');
 		const all = texts.map((t) => t.text);
-		const at700 = all.indexOf('700');
-		expect(at700).toBeGreaterThan(0);
-		const pageTexts = all.slice(at700, all.indexOf('800'));
+		// The 700 m page; selected by page, since 800 is also a pressure column (#160).
+		const pageTexts = texts.filter((t) => t.page === doc.getPage(7).ref).map((t) => t.text);
+		expect(pageTexts[0]).toBe('700');
 		for (const expected of ['+58', '725 =', '+3', '750 =', '+7', '775 =', '+10', 'Left +1 click', '1.07 s', '1 click = 0.1 MRAD = 7.0 cm', 'Tikka T3x · ']) {
 			expect(pageTexts).toContain(expected);
 		}
@@ -153,9 +163,9 @@ describe('generatePrecisionDopeCard', () => {
 	});
 
 	it.each(PRECISION_LOCALES)('%s: every drawn text stays inside the content area', async (locale) => {
-		for (const correction of ['clicks', 'angle']) {
+		for (const [correction, units] of [['clicks', 'metric'], ['angle', 'metric'], ['clicks', MIXED], ['angle', { wind: 'mps', pressure: 'inhg', temperature: 'f' }]]) {
 			texts.length = 0;
-			await generatePrecisionDopeCard(SAMPLE, { ...OPTIONS, correction, maxDistance: 1500 }, locale);
+			await generatePrecisionDopeCard(SAMPLE, { ...OPTIONS, correction, units, maxDistance: 1500 }, locale);
 			expect(texts.length).toBeGreaterThan(100);
 			for (const t of texts) {
 				expect(t.x, t.text).toBeGreaterThanOrEqual(LEFT * PX - 0.5);
@@ -214,13 +224,15 @@ describe('wind dial (#159)', () => {
 	const overlap = (a, b) => a.left < b.right && b.left < a.right && a.bottom < b.top && b.bottom < a.top;
 	const label = (t) => `"${t.text}" at ${(t.x / PX).toFixed(1)},${((PAGE_SIZE.height - t.y) / PX).toFixed(1)}`;
 
-	/** The texts of the template's range page in the dial: badge, clock, angle, ring and unit labels. */
-	const templateDial = async (units) => {
+	/** The texts of the template's range page in the dial: badge, clock and angle labels. */
+	const templateDial = async () => {
 		texts.length = 0;
-		await buildPrecisionTemplate('en', units);
+		await buildPrecisionTemplate('en');
 		const pages = [...new Set(texts.map((t) => t.page))];
 		return texts.filter((t) => t.page === pages[1] && inDial(t));
 	};
+	/** A dial value, as drawn by the fill; the ring speeds and the unit are larger (#160). */
+	const isValue = (t) => Math.abs(t.size - RANGE.dial.valueSize * PX) < 1e-9;
 
 	/** P223_G1 with 1/4 MOA clicks: past 2000 yd it has three-digit clicks on every ring, and 100+ MOA. */
 	const LONG = { ...P223_G1, reticleType: 'moa', elevationClickValue: '0.25', elevationClickUnit: 'MOA', windageClickValue: '0.25', windageClickUnit: 'MOA' };
@@ -231,12 +243,15 @@ describe('wind dial (#159)', () => {
 		['clicks', LONG, 'imperial', 3],
 		['angle', LONG, 'imperial', 5],
 		['clicks', SAMPLE_MOA, 'metric', 3],
-		['angle', SAMPLE_MOA, 'metric', 4]
-	])('%s, %s units: no dial value overlaps another, a ring label or a ray label', async (correction, profile, units, longest) => {
-		const labels = await templateDial(units);
-		// XII, I, II, III, 30°, 60°, 90°, 15°, 45°, 75°, four ring speeds, the unit and the badge.
-		expect(labels.map((t) => t.text)).toEqual(expect.arrayContaining(['XII', 'I', 'II', 'III', '15°', '30°', '45°', '60°', '75°', '90°']));
-		expect(labels).toHaveLength(16);
+		['angle', SAMPLE_MOA, 'metric', 4],
+		// Mixed units (#160): mph rings with hPa and °F, m/s rings with inHg and °F.
+		['clicks', LONG, MIXED, 3],
+		['angle', SAMPLE_MOA, { wind: 'mps', pressure: 'inhg', temperature: 'f' }, 4]
+	])('%s, %s, %o: no dial value overlaps another, a ring label or a ray label', async (correction, profile, units, longest) => {
+		const template = await templateDial();
+		// XII, I, II, III, 30°, 60°, 90°, 15°, 45°, 75° and the badge.
+		expect(template.map((t) => t.text)).toEqual(expect.arrayContaining(['XII', 'I', 'II', 'III', '15°', '30°', '45°', '60°', '75°', '90°']));
+		expect(template).toHaveLength(11);
 
 		texts.length = 0;
 		const doc = await generatePrecisionDopeCard(profile, { ...OPTIONS, maxDistance: 3000, correction, units }, 'en');
@@ -245,7 +260,11 @@ describe('wind dial (#159)', () => {
 		const pad = RANGE.dial.halo.padding * PX;
 		let widest = 0;
 		for (const page of ranges) {
-			const values = texts.filter((t) => t.page === page.ref && inDial(t));
+			const drawn = texts.filter((t) => t.page === page.ref && inDial(t));
+			const values = drawn.filter(isValue);
+			// The four ring speeds and the unit, drawn by the fill since #160.
+			const labels = [...template, ...drawn.filter((t) => !isValue(t))];
+			expect(labels).toHaveLength(16);
 			expect(values).toHaveLength(24);
 			for (const v of values) widest = Math.max(widest, v.text.length);
 			for (let i = 0; i < values.length; i++) {
@@ -263,22 +282,89 @@ describe('wind dial (#159)', () => {
 	it('prints the 700 m values of the sample, ring by ring from 15° to 90°', async () => {
 		const doc = await generatePrecisionDopeCard(SAMPLE, OPTIONS, 'en');
 		const p700 = doc.getPage(7);
-		const values = texts.filter((t) => t.page === p700.ref && inDial(t)).map((t) => t.text);
+		const values = texts.filter((t) => t.page === p700.ref && inDial(t) && isValue(t)).map((t) => t.text);
 		const card = computePrecisionCard(SAMPLE, OPTIONS);
 		const wind = card.pages.find((p) => p.distance === 700).wind;
 		expect(values).toEqual(wind.flatMap((ring) => ring.values.map(String)));
 	});
 });
 
+describe('units (#160)', () => {
+	const SYMBOLS = ['hPa', 'inHg', '°C', '°F', 'm/s', 'mph'];
+	/** The unit symbols in a list of texts. */
+	const symbolsIn = (list) => SYMBOLS.filter((u) => list.some((t) => t.text.includes(u))).sort();
+
+	it.each(PRECISION_LOCALES.flatMap((l) => UNIT_CHOICES.map((u) => [l, choiceName(u), u])))('%s %s: the cover, columns, rings and worksheet follow the choice', async (locale, _, units) => {
+		// In fps, so that the cover's muzzle velocity prints no m/s.
+		const profile = { ...SAMPLE, velocity: '2690', velocityUnit: 'fps' };
+		const doc = await generatePrecisionDopeCard(profile, { ...OPTIONS, maxDistance: 300, units }, locale);
+		const card = computePrecisionCard(profile, { ...OPTIONS, maxDistance: 300, units });
+		const pressure = PRECISION_COLUMNS.pressure[units.pressure];
+		const temperature = PRECISION_COLUMNS.temperature[units.temperature];
+		const wind = PRECISION_COLUMNS.wind[units.wind];
+		expect(card.units).toEqual(units);
+		expect(card.columns).toEqual({ pressure, temperature, wind });
+		const chosen = [unitSymbol(pressure.unit), unitSymbol(temperature.unit), unitSymbol(wind.unit)].sort();
+
+		const pages = doc.getPages();
+		const on = (page) => texts.filter((t) => t.page === page.ref);
+		// Cover: the reference values and the wind unit, and no other unit.
+		const cover = on(pages[0]).map((t) => t.text);
+		expect(cover).toContain(`${formatColumn(pressure.reference, pressure.unit)} ${unitSymbol(pressure.unit)}`);
+		expect(cover).toContain(`${temperature.reference} ${unitSymbol(temperature.unit)}`);
+		expect(cover).toContain(unitSymbol(wind.unit));
+		expect(symbolsIn(on(pages[0]))).toEqual(chosen);
+		// Each range page: the units, every column value and every ring speed; one correction per column.
+		for (const page of pages.slice(1, -1)) {
+			const range = on(page);
+			const all = range.map((t) => t.text);
+			expect(symbolsIn(range)).toEqual(chosen);
+			for (const c of pressure.columns) expect(all).toContain(formatColumn(c, pressure.unit));
+			for (const c of temperature.columns) expect(all).toContain(formatColumn(c, temperature.unit));
+			for (const v of wind.speeds) expect(all).toContain(String(v));
+		}
+		for (const p of card.pages) {
+			expect(p.pressure).toHaveLength(pressure.columns.length);
+			expect(p.temperature).toHaveLength(temperature.columns.length);
+			expect(p.wind.map((w) => w.speed)).toEqual([...wind.speeds]);
+		}
+		// Worksheet.
+		expect(symbolsIn(on(pages.at(-1)))).toEqual(chosen);
+	});
+
+	it.each(PRECISION_LOCALES)('%s: the template holds no unit', async (locale) => {
+		texts.length = 0;
+		await buildPrecisionTemplate(locale);
+		expect(texts.length).toBeGreaterThan(50);
+		expect(symbolsIn(texts)).toEqual([]);
+	});
+
+	it('a preset name and its units give the same PDF', async () => {
+		const drawn = async (units) => {
+			texts.length = 0;
+			await generatePrecisionDopeCard(SAMPLE, { ...OPTIONS, units }, 'en');
+			return texts.map((t) => [t.text, t.x, t.y, t.size]);
+		};
+		expect(await drawn({ wind: 'mph', pressure: 'inhg', temperature: 'f' })).toEqual(await drawn('imperial'));
+		expect(await drawn({ wind: 'mps', pressure: 'hpa', temperature: 'c' })).toEqual(await drawn('metric'));
+	});
+
+	it.each(PRECISION_QUANTITIES)('gives no PDF for an unknown %s unit', async (quantity) => {
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		expect(await generatePrecisionDopeCard(SAMPLE, { ...OPTIONS, units: { ...MIXED, [quantity]: 'kelvin' } }, 'en')).toBeNull();
+		expect(fetched).toEqual([]);
+	});
+});
+
 describe('templates', () => {
-	it.each(PRECISION_LOCALES.flatMap((l) => TEMPLATE_UNITS.map((u) => [l, u])))('%s %s: the committed file is what the script writes', async (locale, units) => {
-		const file = path.join(process.cwd(), 'static', precisionTemplatePath(locale, units));
+	it.each(PRECISION_LOCALES)('%s: the committed file is what the script writes', async (locale) => {
+		const file = path.join(process.cwd(), 'static', precisionTemplatePath(locale));
 		expect(fs.existsSync(file)).toBe(true);
 		const committed = fs.readFileSync(file);
 		const doc = await PDFDocument.load(committed);
 		expect(doc.getPageCount()).toBe(3);
 		expect(doc.getPages().every(isA6)).toBe(true);
-		const built = Buffer.from(await buildPrecisionTemplate(locale, units));
+		const built = Buffer.from(await buildPrecisionTemplate(locale));
 		expect(built.equals(committed), 'run npm run templates:precision and commit static/pdf').toBe(true);
 	});
 });

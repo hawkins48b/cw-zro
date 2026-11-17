@@ -4,6 +4,8 @@
 	 *
 	 * The user picks a saved profile (the active one by default), sees whether it can make the card
 	 * (precisionCardRequirements), sets the last distance and the units, and downloads an A6 PDF.
+	 * The units of wind, pressure and temperature are chosen apart (#160), with a Metric and an
+	 * Imperial preset that set all three; a mixed choice selects neither preset.
 	 * A profile that cannot make the card dims the form and disables the download; the warning says
 	 * why and links to the profile.
 	 *
@@ -24,6 +26,7 @@
 		precisionPageDistances,
 		precisionCardRequirements
 	} from '#lib/utils/precisionCard.js';
+	import { PRECISION_UNIT_PRESETS, precisionUnitPreset } from '#lib/utils/precisionCardFormat.js';
 	import ChipGroup from '#lib/components/ChipGroup.svelte';
 	import UnitField from '#lib/components/UnitField.svelte';
 	import {
@@ -168,9 +171,51 @@
 	let correction = $state('clicks');
 	let angleLabel = $derived(req?.reticle?.unit ?? 'MRAD');
 
-	/** @type {'metric'|'imperial'|null} Null follows the zero: metric for m, imperial for yd. */
-	let unitsChoice = $state(null);
-	let units = $derived(unitsChoice ?? (distUnit === 'yd' ? 'imperial' : 'metric'));
+	/**
+	 * The units of wind, pressure and temperature (#160), a plain frozen object (raw state, so that
+	 * the PDF code gets no proxy). Null follows the zero: the metric preset for m, imperial for yd.
+	 * @type {Readonly<import('#lib/utils/precisionCardFormat.js').PrecisionUnits>|null}
+	 */
+	let unitsChoice = $state.raw(null);
+	let units = $derived(unitsChoice ?? PRECISION_UNIT_PRESETS[distUnit === 'yd' ? 'imperial' : 'metric']);
+	/** The preset the units match, or null for a mixed choice (neither preset pressed). */
+	let unitPreset = $derived(precisionUnitPreset(units));
+
+	/** The unit toggles, one per quantity. */
+	const UNIT_ROWS = [
+		{
+			key: 'wind',
+			label: () => m.dope_precision_units_wind(),
+			options: () => [
+				{ value: 'mps', label: m.unit_mps() },
+				{ value: 'mph', label: m.unit_mph() }
+			]
+		},
+		{
+			key: 'pressure',
+			label: () => m.dope_precision_units_pressure(),
+			options: () => [
+				{ value: 'hpa', label: m.unit_hpa() },
+				{ value: 'inhg', label: m.unit_inhg() }
+			]
+		},
+		{
+			key: 'temperature',
+			label: () => m.dope_precision_units_temperature(),
+			options: () => [
+				{ value: 'c', label: m.unit_c() },
+				{ value: 'f', label: m.unit_f() }
+			]
+		}
+	];
+
+	function pickPreset(name) {
+		if (Object.hasOwn(PRECISION_UNIT_PRESETS, name)) unitsChoice = PRECISION_UNIT_PRESETS[name];
+	}
+
+	function pickUnit(key, value) {
+		unitsChoice = Object.freeze({ ...units, [key]: value });
+	}
 
 	let distances = $derived(maxValid ? precisionPageDistances(maxDistance) : []);
 
@@ -326,19 +371,34 @@
 					/>
 				</div>
 
-				<div class="space-y-1.5">
+				<!-- Units (#160): the presets above one toggle per quantity -->
+				<div class="space-y-2">
 					<p class="text-sm font-medium">{m.dope_precision_units()}</p>
 					<ChipGroup
 						variant="segmented"
 						stretch
-						label={m.dope_precision_units()}
-						value={units}
-						onselect={(v) => (unitsChoice = /** @type {'metric'|'imperial'} */ (v))}
+						label={m.dope_precision_units_presets()}
+						value={unitPreset}
+						onselect={pickPreset}
 						options={[
-							{ value: 'metric', label: m.dope_precision_units_metric() },
-							{ value: 'imperial', label: m.dope_precision_units_imperial() }
+							{ value: 'metric', label: m.dope_metric() },
+							{ value: 'imperial', label: m.dope_imperial() }
 						]}
 					/>
+					<div class="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1.5">
+						{#each UNIT_ROWS as row (row.key)}
+							<!-- The group's aria-label names it; the visible label is for sight only. -->
+							<span class="text-[13px] text-surface-600-400" aria-hidden="true">{row.label()}</span>
+							<ChipGroup
+								variant="segmented"
+								stretch
+								label={row.label()}
+								value={units[row.key]}
+								onselect={(v) => pickUnit(row.key, v)}
+								options={row.options()}
+							/>
+						{/each}
+					</div>
 				</div>
 			</fieldset>
 

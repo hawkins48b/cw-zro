@@ -1,13 +1,18 @@
 /**
  * The precision dope card PDF (#157): the cover, one A6 page per distance and the worksheet, filled
- * into the static templates of `static/pdf/precision-<locale>-<units>.pdf`
+ * into the static template of its language, `static/pdf/precision-<locale>.pdf`
  * (scripts/precision-card-templates.js). The numbers come from computePrecisionCard; their
  * positions and the words drawn here come from the same layout and word modules as the templates.
  *
+ * The units of wind, pressure and temperature are chosen apart (#160), so everything that depends
+ * on them is drawn here, not in the template: the unit symbols, the column values and the lines
+ * between the columns of ③ and ④, the ring speeds of ⑥, the worksheet units and the cover's
+ * reference pressure, reference temperature and wind unit.
+ *
  * Words that depend on the data are drawn here, from precisionCardWords.js: click or clicks, MRAD
- * or MOA, the spin drift direction, the distance unit (the zero's, independent of the unit
- * system), and "page". Profile text goes through encodableText (#140) and is shrunk, then cut with
- * an ellipsis, to fit its place (#137).
+ * or MOA, the spin drift direction, the distance unit (the zero's, independent of the units
+ * chosen for the columns), and "page". Profile text goes through encodableText (#140) and is
+ * shrunk, then cut with an ellipsis, to fit its place (#137).
  */
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { computePrecisionCard, precisionCardRequirements } from './precisionCard.js';
@@ -33,14 +38,15 @@ import {
 	worksheetRowTop
 } from './precisionCardLayout.js';
 import { precisionLocale, precisionWords } from './precisionCardWords.js';
-import { NO_VALUE, formatCorrection, formatDate } from './precisionCardFormat.js';
+import { NO_VALUE, formatColumn, formatCorrection, formatDate, unitSymbol } from './precisionCardFormat.js';
 
 /**
  * Generate the precision dope card.
  *
  * @param {object} profile - flat v2 profile
- * @param {{ maxDistance: number, correction: 'clicks'|'angle', units: 'metric'|'imperial', date?: Date }} options
- *   date: printed on the cover, today by default
+ * @param {{ maxDistance: number, correction: 'clicks'|'angle',
+ *   units: 'metric'|'imperial'|import('./precisionCardFormat.js').PrecisionUnits, date?: Date }} options
+ *   units: as computePrecisionCard reads them; date: printed on the cover, today by default
  * @param {unknown} locale - 'en', 'fr' or 'de'; anything else is 'en'
  * @returns {Promise<PDFDocument|null>} null when the card has no data (see dopeCardDownload.js)
  */
@@ -50,7 +56,7 @@ export async function generatePrecisionDopeCard(profile, options, locale) {
 	const lang = precisionLocale(locale);
 	const words = precisionWords(lang);
 
-	const templateBytes = await fetch(precisionTemplatePath(lang, data.units)).then((r) => r.arrayBuffer());
+	const templateBytes = await fetch(precisionTemplatePath(lang)).then((r) => r.arrayBuffer());
 	const template = await PDFDocument.load(templateBytes);
 	const pdfDoc = await PDFDocument.create();
 	const indices = [TEMPLATE_PAGES.cover, ...data.pages.map(() => TEMPLATE_PAGES.range), TEMPLATE_PAGES.worksheet];
@@ -133,6 +139,7 @@ function coverValues(ctx) {
 		powder = `${modifier} fps/${profile.temperatureUnit === 'c' ? '°C' : '°F'}`;
 	}
 	const last = data.lastDistance;
+	const { pressure, temperature, wind } = data.columns;
 	return {
 		zero: `100 ${data.distanceUnit}`,
 		sightHeight: `${readDecimal(profile.opticHeight)} ${profile.opticHeightUnit === 'cm' ? 'cm' : 'in'}`,
@@ -148,6 +155,9 @@ function coverValues(ctx) {
 		powder,
 		distances: last > 100 ? `100–${last} ${data.distanceUnit}` : `100 ${data.distanceUnit}`,
 		corrections: columnWord(ctx, false),
+		refPressure: `${formatColumn(pressure.reference, pressure.unit)} ${unitSymbol(pressure.unit)}`,
+		refTemperature: `${temperature.reference} ${unitSymbol(temperature.unit)}`,
+		wind: unitSymbol(wind.unit),
 		worksheet: `${words.page} ${total}`
 	};
 }
@@ -210,9 +220,18 @@ function fillRange(p, ctx, page, number) {
 		p.text(right, start + lw + space, e.baseline, { size: e.size, bold: true });
 	});
 
-	// ③ and ④
+	// ③ and ④: the unit, the column values and the lines between the columns (#160), then the
+	// corrections.
 	const tb = RANGE.table;
 	for (const table of RANGE.tables) {
+		const spec = data.columns[table.key];
+		p.text(unitSymbol(spec.unit), tb.unitX, table.top + tb.headerBaseline, { size: tb.headerSize, bold: true });
+		spec.columns.forEach((column, i) => {
+			const cell = tableCell(i, spec.columns.length);
+			// Inside the table's 1 px border, which the template drew.
+			if (i > 0) p.line(cell.left, table.top + 0.5, cell.left, table.top + tb.height - 0.5, { color: COLORS.grid });
+			p.text(formatColumn(column, spec.unit), cell.centre, table.top + tb.headerBaseline, { size: tb.headerSize, color: COLORS.muted, align: 'center' });
+		});
 		const values = page[table.key];
 		drawFitted(p, fonts, columnWord(ctx, false), LEFT + tb.clicksX, table.top + tb.valueBaseline - 1, tb.labelRight - LEFT - tb.clicksX - 2, {
 			size: 12,
@@ -247,9 +266,21 @@ function fillRange(p, ctx, page, number) {
 	p.text(timeText, RIGHT, s.baseline, { size: s.size, bold: true, align: 'right' });
 
 	// ⑥ Wind dial
+	// The ring speeds, underlined on a white patch over the XII axis, and the wind unit (#160).
+	const dl = RANGE.dial;
+	const axisX = dl.origin.x + dl.centre.x;
+	data.columns.wind.speeds.forEach((speed, i) => {
+		const y = dl.origin.y + dl.centre.y - dl.radii[i] + dl.ringLabelSize * dl.baselineDrop;
+		const text = String(speed);
+		const w = p.width(text, dl.ringLabelSize, true);
+		p.rect(axisX - w / 2 - 2, y - dl.ringLabelSize * 0.8, w + 4, dl.ringLabelSize, { fill: COLORS.white });
+		p.text(text, axisX, y, { size: dl.ringLabelSize, bold: true, align: 'center' });
+		p.line(axisX - w / 2, y + 1.5, axisX + w / 2, y + 1.5, { width: 1 });
+	});
+	p.text(unitSymbol(data.columns.wind.unit), dl.origin.x + dl.unit.x, dl.origin.y + dl.unit.y, { size: dl.unit.size, bold: true, color: COLORS.muted });
+
 	// One value per ray and ring (#159), on a white halo; staggered on the inner rings
 	// (dialValuePoint).
-	const dl = RANGE.dial;
 	const size = dl.valueSize;
 	const halo = dl.halo;
 	page.wind.forEach((ring, i) => {
@@ -293,12 +324,14 @@ function fillWorksheet(p, ctx) {
 	const [, , c2, c3, c4] = WORKSHEET.columns;
 	const heading = columnWord(ctx, true);
 	const twist = readDecimal(ctx.profile.barrelTwist);
+	const { pressure, temperature, wind } = data.columns;
+	const units = { distance: data.distanceUnit, pressure: unitSymbol(pressure.unit), temperature: unitSymbol(temperature.unit), wind: unitSymbol(wind.unit) };
 	for (const section of WORKSHEET.sections) {
 		const sub = section.top + WORKSHEET.band;
 		p.text(heading, (c3 + c4) / 2, sub + 12.5, { size: WORKSHEET.unitSize, color: COLORS.muted, align: 'center' });
 		section.rows.forEach((row, i) => {
 			const mid = worksheetRowTop(section, i) + WORKSHEET.row / 2;
-			if (row.unit === 'distance') p.text(data.distanceUnit, (c2 + c3) / 2, mid + 4, { size: WORKSHEET.unitSize, bold: true, align: 'center' });
+			if (Object.hasOwn(units, row.unit)) p.text(units[row.unit], (c2 + c3) / 2, mid + 4, { size: WORKSHEET.unitSize, bold: true, align: 'center' });
 			if (row.sign === 'spin') {
 				const sign = data.spinDrift ? (twist < 0 ? words.rightShort : words.leftShort) : NO_VALUE;
 				p.text(sign, c3 + WORKSHEET.signX, mid + 5.5, { size: WORKSHEET.signSize, bold: true });
