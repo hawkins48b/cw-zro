@@ -112,6 +112,9 @@
 	// ── Scene ─────────────────────────────────────────────────────────
 	/** @type {HTMLDivElement|null} */
 	let sceneEl = $state(null);
+	/** The HUD bracket around the target (#195): TutorialScene's element, placed by the scene. */
+	/** @type {HTMLDivElement|null} */
+	let hudEl = $state(null);
 	/** @type {'loading'|'ready'|'error'|'lost'} */
 	let sceneStatus = $state('loading');
 	/** @type {'shooter'|'optic'|'side'|'target'|null} */
@@ -146,6 +149,7 @@
 			const { createTutorialScene } = await import('#lib/tutorial/scene.js');
 			if (run !== sceneRun || !sceneEl) return;
 			const api = await createTutorialScene(sceneEl, untrack(() => sceneSettings), {
+				hud: hudEl,
 				onorbit: () => (camera = null),
 				onlost: () => {
 					if (run === sceneRun) sceneStatus = 'lost';
@@ -369,6 +373,8 @@
 					onfire={fire}
 					onrestart={restartScene}
 					{reticle}
+					bind:hud={hudEl}
+					hudLabel={distanceText ? m.tutorial_hud_target({ distance: distanceText }) : ''}
 				/>
 			</div>
 

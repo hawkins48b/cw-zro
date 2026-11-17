@@ -1,30 +1,48 @@
 /**
- * The three.js scene of the 3D ballistic tutorial (#182). The tutorial page loads this module with
- * `await import()` once step 2 opens, so three.js is only in this route's lazily loaded chunk: never
- * import it, or anything that imports three, from another module.
+ * The three.js scene of the 3D ballistic tutorial (#182), in the neon-grid look (#195). The tutorial
+ * page loads this module with `await import()` once step 2 opens, so three.js is only in this
+ * route's lazily loaded chunk: never import it, or anything that imports three, from another module.
+ * The mobile build has no tutorial and never loads it (tutorialAvailability.js).
  *
  * The scene holds no calculation: the page hands it the geometry and path of utils/tutorialPath.js,
- * and the layout, terrain, wind, weather and quality numbers come from utils/tutorialScene.js.
+ * and the layout, terrain, backstop, grass, wind, weather, quality and HUD numbers come from
+ * utils/tutorialScene.js.
+ *
+ * Look (#195, owner choice of 2026-11-17): near-black sky with a horizon glow, black ground with a
+ * cyan grid (1 m and 10 m lines, drawn in the ground's shader from world x and z, so they follow the
+ * slope), models as dark solids with neon edge lines, grass and leaves as glowing wireframes, a
+ * magenta tracer, and bloom (EffectComposer + UnrealBloomPass) from Medium quality up. No lights.
  *
  * Models are the .glb files of static/models (#181), fetched from the app's own origin (`/models/`,
- * as the precision card fetches `/pdf/`): no texture, no worker, no blob URL, so the
- * Content-Security-Policy needs nothing more (connect-src 'self').
+ * as the precision card fetches `/pdf/`): no texture, no worker, no blob URL. The post-processing
+ * passes are shaders and render targets only. So the Content-Security-Policy needs nothing more.
  */
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import {
 	FORE_END_BELOW_BORE,
+	NEON,
 	REST_AHEAD_OF_BOLT,
 	SANDBAG_REST_HEIGHT,
 	SCOPE_ABOVE_RAIL,
+	TARGET_FACE_BOTTOM,
+	TARGET_FACE_HEIGHT,
+	TARGET_HALF_WIDTH,
+	backstopBox,
 	cameraPose,
 	grassPlacements,
+	gridIndex,
+	hudBracket,
 	modelPath,
 	qualityPreset,
 	sceneLayout,
+	targetFaceCorners,
 	terrainHeight,
-	gridIndex,
 	treePlacements,
 	weatherLook,
 	windSway
@@ -43,6 +61,15 @@ const MOVE_TIME = 1.2;
 /** The bullet is drawn this many times its real size, so it can be seen. */
 const BULLET_SCALE = 4;
 
+/** Edges between faces that meet at more than this angle get a neon line, degrees. */
+const EDGE_ANGLE = 25;
+
+/** Bloom: strength, radius, threshold (UnrealBloomPass). The scene is near-black, so only the lines glow. */
+const BLOOM = { strength: 1.1, radius: 0.45, threshold: 0.05 };
+
+/** Edge colour per target node: the board outline and the A, C and D zones glow (#195). */
+const TARGET_EDGES = { board: NEON.target, 'zone-a': NEON.zoneA, 'zone-c': NEON.zoneC, 'zone-d': NEON.zoneD };
+
 const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 /**
@@ -60,14 +87,15 @@ const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) 
  *
  * @param {HTMLElement} container
  * @param {SceneSettings} settings
- * @param {{ onorbit?: () => void, onlost?: () => void }} [events] - onorbit: the user moved the
- *   camera by hand; onlost: the WebGL context was lost (the page offers a restart)
+ * @param {{ onorbit?: () => void, onlost?: () => void, hud?: HTMLElement|null }} [events] - onorbit:
+ *   the user moved the camera by hand; onlost: the WebGL context was lost (the page offers a
+ *   restart); hud: the element of the HUD bracket around the target, which the scene places over the
+ *   target each frame (TutorialScene)
  */
 export async function createTutorialScene(container, settings, events = {}) {
 	const preset0 = qualityPreset(settings.quality, window.devicePixelRatio);
 	const renderer = new THREE.WebGLRenderer({ antialias: preset0.antialias, logarithmicDepthBuffer: true, powerPreference: 'high-performance' });
 	renderer.outputColorSpace = THREE.SRGBColorSpace;
-	renderer.shadowMap.type = THREE.PCFShadowMap;
 	const canvas = renderer.domElement;
 	canvas.style.display = 'block';
 	canvas.style.width = '100%';
@@ -114,20 +142,94 @@ export async function createTutorialScene(container, settings, events = {}) {
 
 	container.append(canvas);
 
-	// ── Scene, lights, camera ─────────────────────────────────────────
+	// ── Neon materials ────────────────────────────────────────────────
+	/** The dark fill of every model, pushed back a little so its edge lines win the depth test. */
+	const solid = own(new THREE.MeshBasicMaterial({ color: NEON.solid, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }));
+	/** @type {Map<string, THREE.LineBasicMaterial>} */
+	const edgeMaterials = new Map();
+	/** A glowing line material per colour, brighter than 1 so bloom picks it up. */
+	function edgeMaterial(color, strength = 1.6) {
+		const key = `${color}:${strength}`;
+		if (!edgeMaterials.has(key)) {
+			const material = own(new THREE.LineBasicMaterial({ color: new THREE.Color(color).multiplyScalar(strength), toneMapped: false }));
+			edgeMaterials.set(key, material);
+		}
+		return /** @type {THREE.LineBasicMaterial} */ (edgeMaterials.get(key));
+	}
+	/** A glowing wireframe (grass, leaves), the wind shader added where needed. */
+	const wire = (color) => own(new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(1.4), wireframe: true, toneMapped: false }));
+
+	const isUnder = (o, test) => {
+		for (let p = o; p; p = p.parent) if (test(p)) return true;
+		return false;
+	};
+
+	/**
+	 * Turn a loaded model into the neon look: each mesh gets the dark fill and a child of neon edge
+	 * lines (named `edges`, so no node name of the model changes), or a glowing wireframe when
+	 * `wireframe` says so. Edge geometry is made once here; clones share it.
+	 *
+	 * @param {THREE.Object3D} root
+	 * @param {(mesh: THREE.Mesh) => number} colorOf - edge colour of a mesh
+	 * @param {(mesh: THREE.Mesh) => THREE.Material | null} [wireframe] - a wireframe material, or null for edges
+	 */
+	function neonize(root, colorOf, wireframe = () => null) {
+		const meshes = [];
+		root.traverse((o) => {
+			if (/** @type {THREE.Mesh} */ (o).isMesh) meshes.push(o);
+		});
+		for (const mesh of meshes) {
+			const wired = wireframe(mesh);
+			if (wired) {
+				mesh.material = wired;
+				continue;
+			}
+			mesh.material = solid;
+			const edges = new THREE.LineSegments(own(new THREE.EdgesGeometry(mesh.geometry, EDGE_ANGLE)), edgeMaterial(colorOf(mesh)));
+			edges.name = 'edges';
+			edges.userData.edge = true;
+			mesh.add(edges);
+		}
+	}
+
+	// ── Scene, sky, camera ────────────────────────────────────────────
 	const scene = new THREE.Scene();
-	const hemi = new THREE.HemisphereLight(0xdde8ff, 0x4b5a2c, 1);
-	scene.add(hemi);
-	const sun = new THREE.DirectionalLight(0xffffff, 2.5);
-	sun.shadow.camera.left = -14;
-	sun.shadow.camera.right = 14;
-	sun.shadow.camera.top = 14;
-	sun.shadow.camera.bottom = -14;
-	sun.shadow.camera.near = 1;
-	sun.shadow.camera.far = 80;
-	sun.shadow.bias = -0.0005;
-	scene.add(sun, sun.target);
-	scene.fog = new THREE.FogExp2(0xffffff, 0.002);
+	scene.fog = new THREE.FogExp2(0x000000, 0.001);
+	const skyUniforms = {
+		uSky: { value: new THREE.Color() },
+		uHorizon: { value: new THREE.Color() },
+		uHeight: { value: 0.15 }
+	};
+	// A dome around the camera: near-black overhead, a glow at the horizon. Drawn first, behind all.
+	const sky = new THREE.Mesh(
+		own(new THREE.SphereGeometry(2000, 32, 16)),
+		own(
+			new THREE.ShaderMaterial({
+				uniforms: skyUniforms,
+				side: THREE.BackSide,
+				depthTest: false,
+				depthWrite: false,
+				fog: false,
+				vertexShader: `varying vec3 vDir;
+				void main() {
+					vDir = normalize(position);
+					gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+				}`,
+				fragmentShader: `uniform vec3 uSky; uniform vec3 uHorizon; uniform float uHeight;
+				varying vec3 vDir;
+				void main() {
+					float h = vDir.y;
+					float glow = 1.0 - smoothstep(0.0, uHeight, abs(h));
+					vec3 c = mix(uSky, uHorizon, glow * (h >= 0.0 ? 1.0 : 0.5));
+					gl_FragColor = vec4(c, 1.0);
+					#include <colorspace_fragment>
+				}`
+			})
+		)
+	);
+	sky.renderOrder = -1000;
+	sky.frustumCulled = false;
+	scene.add(sky);
 
 	const camera = new THREE.PerspectiveCamera(50, 1, 0.03, 5000);
 	const controls = new OrbitControls(camera, canvas);
@@ -135,6 +237,44 @@ export async function createTutorialScene(container, settings, events = {}) {
 	controls.dampingFactor = 0.08;
 	controls.minDistance = 0.3;
 	controls.maxPolarAngle = Math.PI * 0.495;
+
+	// ── Ground and backstop grids ─────────────────────────────────────
+	const gridUniforms = { uGridColor: { value: new THREE.Color() }, uGridStrength: { value: 1 } };
+	/**
+	 * Black with neon grid lines: 1 m (faint) and 10 m (bright), antialiased with fwidth, from world
+	 * coordinates on a plane: `xz` for the ground (the lines follow its slope), `xy` for the
+	 * backstop's face. The 1 m lines fade where they would be thinner than a pixel apart.
+	 * @param {'xz'|'xy'} plane
+	 */
+	function gridMaterial(plane) {
+		const material = own(new THREE.MeshBasicMaterial({ color: 0x000000, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }));
+		material.onBeforeCompile = (shader) => {
+			Object.assign(shader.uniforms, gridUniforms);
+			shader.vertexShader = shader.vertexShader
+				.replace('#include <common>', '#include <common>\nvarying vec3 vGridPos;')
+				.replace('#include <begin_vertex>', '#include <begin_vertex>\nvGridPos = (modelMatrix * vec4(position, 1.0)).xyz;');
+			shader.fragmentShader = shader.fragmentShader
+				.replace('#include <common>', '#include <common>\nvarying vec3 vGridPos;\nuniform vec3 uGridColor;\nuniform float uGridStrength;')
+				.replace(
+					'#include <opaque_fragment>',
+					`#include <opaque_fragment>
+					vec2 gc = vGridPos.${plane};
+					vec2 gw = fwidth(gc);
+					vec2 g1 = abs(fract(gc - 0.5) - 0.5) / max(gw, vec2(1e-5));
+					float l1 = 1.0 - min(min(g1.x, g1.y), 1.0);
+					vec2 g10 = abs(fract(gc / 10.0 - 0.5) - 0.5) / max(gw / 10.0, vec2(1e-6));
+					float l10 = 1.0 - min(min(g10.x, g10.y), 1.0);
+					float minorFade = 1.0 - smoothstep(0.12, 0.45, max(gw.x, gw.y));
+					float gridLine = max(l1 * 0.3 * minorFade, l10);
+					gl_FragColor.rgb += uGridColor * gridLine * uGridStrength;`
+				);
+		};
+		// The two planes compile to different programs.
+		material.customProgramCacheKey = () => `tutorial-grid-${plane}`;
+		return material;
+	}
+	const groundMaterial = gridMaterial('xz');
+	const wallMaterial = gridMaterial('xy');
 
 	// ── Rifle on the sandbag, with its optic ──────────────────────────
 	const sandbag = models['sandbag'];
@@ -158,27 +298,45 @@ export async function createTutorialScene(container, settings, events = {}) {
 
 	const target = models['ipsc-target'];
 	scene.add(target);
-	const castAll = (object) => object.traverse((o) => o.isMesh && (o.castShadow = true));
-	[sandbag, rifle, target].forEach(castAll);
+
+	// Edge colours: the rifle and sandbag cyan, the optics magenta, the target by zone.
+	neonize(rifle, () => NEON.cyan);
+	neonize(scope, () => NEON.magenta);
+	neonize(holo, () => NEON.magenta);
+	neonize(sandbag, () => NEON.cyan);
+	neonize(target, (mesh) => TARGET_EDGES[/** @type {keyof typeof TARGET_EDGES} */ (mesh.name)] ?? NEON.cyan);
+	// The target outline glows brighter than the rest (#195).
+	target.traverse((o) => {
+		if (o.userData.edge && o.parent && o.parent.name in TARGET_EDGES) {
+			/** @type {THREE.LineSegments} */ (o).material = edgeMaterial(TARGET_EDGES[/** @type {keyof typeof TARGET_EDGES} */ (o.parent.name)], 3);
+		}
+	});
+
+	// Backstop: a dark wall with a grid face and magenta edges, behind the target (#195).
+	const backstop = new THREE.Mesh(own(new THREE.BoxGeometry(1, 1, 1)), wallMaterial);
+	const backstopEdges = new THREE.LineSegments(own(new THREE.EdgesGeometry(backstop.geometry)), edgeMaterial(NEON.backstop, 2));
+	backstop.add(backstopEdges);
+	scene.add(backstop);
 
 	// ── Bullet, tracer, impact ────────────────────────────────────────
 	const dot = own(dotTexture());
 	const bullet = models['bullet'];
+	neonize(bullet, () => NEON.magenta);
 	bullet.scale.setScalar(BULLET_SCALE);
 	bullet.visible = false;
 	scene.add(bullet);
-	const glow = new THREE.Sprite(own(new THREE.SpriteMaterial({ map: dot, color: 0xffb347, sizeAttenuation: false, depthWrite: false, fog: false })));
+	const glow = new THREE.Sprite(own(new THREE.SpriteMaterial({ map: dot, color: new THREE.Color(NEON.tracer).multiplyScalar(2), sizeAttenuation: false, depthWrite: false, fog: false, toneMapped: false })));
 	glow.scale.setScalar(0.022);
 	glow.visible = false;
 	scene.add(glow);
-	const tracer = new THREE.Line(own(new THREE.BufferGeometry()), own(new THREE.LineBasicMaterial({ color: 0xff8a1f, fog: false })));
+	const tracer = new THREE.Line(own(new THREE.BufferGeometry()), own(new THREE.LineBasicMaterial({ color: new THREE.Color(NEON.tracer).multiplyScalar(2.5), fog: false, toneMapped: false })));
 	tracer.visible = false;
 	tracer.frustumCulled = false;
 	scene.add(tracer);
-	const hole = new THREE.Mesh(own(new THREE.CircleGeometry(0.012, 16)), own(new THREE.MeshBasicMaterial({ color: 0x111111 })));
+	const hole = new THREE.Mesh(own(new THREE.CircleGeometry(0.012, 16)), own(new THREE.MeshBasicMaterial({ color: new THREE.Color(NEON.hit).multiplyScalar(2), toneMapped: false })));
 	hole.visible = false;
 	scene.add(hole);
-	const impactMark = new THREE.Sprite(own(new THREE.SpriteMaterial({ map: dot, color: 0xff3b30, sizeAttenuation: false, depthTest: false, fog: false })));
+	const impactMark = new THREE.Sprite(own(new THREE.SpriteMaterial({ map: dot, color: NEON.hit, sizeAttenuation: false, depthTest: false, fog: false, toneMapped: false })));
 	impactMark.scale.setScalar(0.03);
 	impactMark.renderOrder = 10;
 	impactMark.visible = false;
@@ -208,7 +366,7 @@ export async function createTutorialScene(container, settings, events = {}) {
 	/** @type {THREE.Object3D|null} */
 	let precipitation = null;
 
-	const groundMaterial = own(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 }));
+	// Grass: a glowing wireframe that sways with the wind (vertex shader).
 	const swayUniforms = {
 		uTime: { value: 0 },
 		uBlow: { value: new THREE.Vector2() },
@@ -217,7 +375,7 @@ export async function createTutorialScene(container, settings, events = {}) {
 		uFreq: { value: 0 }
 	};
 	const grassSource = /** @type {THREE.Mesh} */ (models['grass'].getObjectByName('grass'));
-	const grassMaterial = own(/** @type {THREE.MeshStandardMaterial} */ (grassSource.material).clone());
+	const grassMaterial = wire(NEON.grass);
 	grassMaterial.onBeforeCompile = (shader) => {
 		Object.assign(shader.uniforms, swayUniforms);
 		shader.vertexShader = shader.vertexShader
@@ -239,7 +397,35 @@ export async function createTutorialScene(container, settings, events = {}) {
 				#endif`
 			);
 	};
+	grassMaterial.customProgramCacheKey = () => 'tutorial-grass';
+
+	// Trees: trunk and branches dark with cyan edges, leaves as a glowing wireframe.
+	const leafMaterial = wire(NEON.grass);
+	for (const name of ['tree-broadleaf', 'tree-birch', 'tree-conifer']) {
+		neonize(
+			models[name],
+			() => NEON.cyan,
+			(mesh) => (isUnder(mesh, (p) => /^leaves/.test(p.name)) ? leafMaterial : null)
+		);
+	}
+
+	// Flags: pole with edges, cloth as a magenta wireframe that waves.
 	const clothUniforms = { uTime: swayUniforms.uTime, uWave: { value: 0 } };
+	const clothMaterial = wire(NEON.magenta);
+	clothMaterial.side = THREE.DoubleSide;
+	clothMaterial.onBeforeCompile = (shader) => {
+		Object.assign(shader.uniforms, clothUniforms);
+		shader.vertexShader = shader.vertexShader
+			.replace('#include <common>', `#include <common>\nuniform float uTime; uniform float uWave;`)
+			.replace(
+				'#include <begin_vertex>',
+				`#include <begin_vertex>
+				float along = clamp(position.x / 0.9, 0.0, 1.0);
+				transformed.z += sin(position.x * 9.0 - uTime * (4.0 + uWave * 10.0)) * 0.05 * along * (0.3 + uWave);`
+			);
+	};
+	clothMaterial.customProgramCacheKey = () => 'tutorial-cloth';
+	neonize(models['flag'], () => NEON.cyan, (mesh) => (mesh.name === 'cloth' ? clothMaterial : null));
 
 	function setOptic(optic) {
 		scope.visible = optic === 'scope';
@@ -261,7 +447,11 @@ export async function createTutorialScene(container, settings, events = {}) {
 		const los = lineOfSight(slope);
 		layout = sceneLayout(current.geometry, { losHeight: los.y, losZ: los.z });
 		target.position.set(0, layout.targetGroundY, layout.targetZ);
+		const box = backstopBox(layout);
+		backstop.position.set(box.x, box.y, box.z);
+		backstop.scale.set(box.width, box.height, box.depth);
 		controls.maxDistance = Math.max(60, layout.horizontal * 1.6);
+		faceCorners = targetFaceCorners(layout).map((c) => new THREE.Vector3(...c));
 	}
 
 	function buildTerrain() {
@@ -284,28 +474,17 @@ export async function createTutorialScene(container, settings, events = {}) {
 			z -= nearShooter || nearTarget ? 2 : 12;
 		}
 		const positions = new Float32Array(xs.length * zs.length * 3);
-		const colors = new Float32Array(xs.length * zs.length * 3);
-		// Wet ground is darker (and shinier: groundMaterial.roughness).
-		const base = new THREE.Color(look.groundColor).multiplyScalar(1 - look.wet);
-		const lane = base.clone().offsetHSL(0, -0.04, 0.05);
 		let k = 0;
 		for (const z of zs) {
 			for (const x of xs) {
 				positions.set([x, terrainHeight(x, z, layout), z], k * 3);
-				const c = Math.abs(x) < 10 && z < 4 && z > layout.targetZ ? lane : base;
-				const n = 0.92 + 0.08 * Math.sin(x * 0.7 + z * 0.3) * Math.sin(z * 0.11);
-				colors.set([c.r * n, c.g * n, c.b * n], k * 3);
 				k++;
 			}
 		}
-		const index = gridIndex(xs.length, zs.length);
 		const geometry = own(new THREE.BufferGeometry());
 		geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-		geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-		geometry.setIndex(index);
-		geometry.computeVertexNormals();
+		geometry.setIndex(gridIndex(xs.length, zs.length));
 		terrain = new THREE.Mesh(geometry, groundMaterial);
-		terrain.receiveShadow = true;
 		scene.add(terrain);
 	}
 
@@ -328,14 +507,12 @@ export async function createTutorialScene(container, settings, events = {}) {
 			grass.setMatrixAt(i, m);
 		}
 		grass.instanceMatrix.needsUpdate = true;
-		grass.receiveShadow = true;
 		grass.frustumCulled = false;
-		applyGrassTint();
+		applyGrassShown();
 		scene.add(grass);
 	}
 
-	function applyGrassTint() {
-		grassMaterial.color.set(look.grassTint);
+	function applyGrassShown() {
 		if (grass) grass.count = Math.floor(placementsCount * look.grassShown);
 	}
 
@@ -347,7 +524,6 @@ export async function createTutorialScene(container, settings, events = {}) {
 			root.position.set(t.x, t.y, t.z);
 			root.rotation.y = t.rotation;
 			root.scale.setScalar(t.scale);
-			if (quality.shadows) castAll(root);
 			const branches = [];
 			const leaves = [];
 			root.traverse((o) => {
@@ -378,22 +554,6 @@ export async function createTutorialScene(container, settings, events = {}) {
 		}
 		applyFlagWind();
 	}
-
-	/** The cloth of the flags: one shared material with a wave. */
-	const flagSource = /** @type {THREE.Mesh} */ (models['flag'].getObjectByName('cloth'));
-	const clothMaterial = own(/** @type {THREE.MeshStandardMaterial} */ (flagSource.material).clone());
-	clothMaterial.onBeforeCompile = (shader) => {
-		Object.assign(shader.uniforms, clothUniforms);
-		shader.vertexShader = shader.vertexShader
-			.replace('#include <common>', `#include <common>\nuniform float uTime; uniform float uWave;`)
-			.replace(
-				'#include <begin_vertex>',
-				`#include <begin_vertex>
-				float along = clamp(position.x / 0.9, 0.0, 1.0);
-				transformed.z += sin(position.x * 9.0 - uTime * (4.0 + uWave * 10.0)) * 0.05 * along * (0.3 + uWave);`
-			);
-	};
-	flagSource.material = clothMaterial;
 
 	function applyFlagWind() {
 		const strength = Math.min(1, sway.speed / 8);
@@ -430,23 +590,25 @@ export async function createTutorialScene(container, settings, events = {}) {
 	function applyWeather() {
 		look = weatherLook(current.weather);
 		scene.background = new THREE.Color(look.sky);
+		skyUniforms.uSky.value.set(look.sky);
+		skyUniforms.uHorizon.value.set(look.horizon);
+		skyUniforms.uHeight.value = look.horizonHeight;
 		/** @type {THREE.FogExp2} */ (scene.fog).color.set(look.fog);
 		/** @type {THREE.FogExp2} */ (scene.fog).density = look.fogDensity / Math.max(1, layout.horizontal / 600);
-		sun.intensity = look.sun;
-		sun.color.set(look.sunColor);
-		hemi.intensity = look.ambient;
-		hemi.color.set(look.sky).lerp(new THREE.Color(0xffffff), 0.5);
-		groundMaterial.roughness = look.roughness;
-		applyGrassTint();
-		buildTerrain();
+		gridUniforms.uGridColor.value.set(look.grid);
+		gridUniforms.uGridStrength.value = look.gridStrength;
+		applyGrassShown();
 		buildPrecipitation();
 	}
 
 	function buildPrecipitation() {
 		if (precipitation) {
+			const old = /** @type {any} */ (precipitation);
 			scene.remove(precipitation);
-			/** @type {any} */ (precipitation).geometry.dispose();
-			owned.geometries.delete(/** @type {any} */ (precipitation).geometry);
+			old.geometry.dispose();
+			owned.geometries.delete(old.geometry);
+			old.material.dispose();
+			owned.materials.delete(old.material);
 			precipitation = null;
 		}
 		if (look.precipitation === 'none') return;
@@ -459,36 +621,58 @@ export async function createTutorialScene(container, settings, events = {}) {
 			const x = (random() - 0.5) * 60;
 			const y = random() * 30;
 			const z = (random() - 0.5) * 60;
-			if (rain) positions.set([x, y, z, x, y + 0.35, z], i * 6);
+			if (rain) positions.set([x, y, z, x, y + 0.5, z], i * 6);
 			else positions.set([x, y, z], i * 3);
 		}
 		geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+		const color = new THREE.Color(look.precipitationColor).multiplyScalar(rain ? 1.6 : 1.3);
+		// Neon rain streaks, glowing snow flakes: added light, no depth writes.
 		precipitation = rain
-			? new THREE.LineSegments(geometry, own(new THREE.LineBasicMaterial({ color: 0xaab8c6, transparent: true, opacity: 0.55 })))
-			: new THREE.Points(geometry, own(new THREE.PointsMaterial({ color: 0xffffff, size: 0.07, map: dot, transparent: true, depthWrite: false })));
+			? new THREE.LineSegments(geometry, precipitationMaterial(new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.7 })))
+			: new THREE.Points(geometry, precipitationMaterial(new THREE.PointsMaterial({ color, size: 0.08, map: dot, transparent: true })));
 		precipitation.frustumCulled = false;
 		scene.add(precipitation);
+	}
+
+	/** Additive, no depth writes, no fog, and freed with the scene. */
+	function precipitationMaterial(material) {
+		material.blending = THREE.AdditiveBlending;
+		material.depthWrite = false;
+		material.fog = false;
+		material.toneMapped = false;
+		return own(material);
+	}
+
+	// ── Bloom (Medium and High) ───────────────────────────────────────
+	/** @type {EffectComposer|null} */
+	let composer = null;
+	/** @type {UnrealBloomPass|null} */
+	let bloomPass = null;
+	/** @type {OutputPass|null} */
+	let outputPass = null;
+
+	/** Make the composer the first time bloom is on; it stays (and is resized) until dispose. */
+	function ensureComposer() {
+		if (composer) return;
+		composer = new EffectComposer(renderer);
+		composer.addPass(new RenderPass(scene, camera));
+		bloomPass = new UnrealBloomPass(new THREE.Vector2(256, 256), BLOOM.strength, BLOOM.radius, BLOOM.threshold);
+		composer.addPass(bloomPass);
+		outputPass = new OutputPass();
+		composer.addPass(outputPass);
 	}
 
 	function applyQuality() {
 		quality = qualityPreset(current.quality, window.devicePixelRatio);
 		renderer.setPixelRatio(quality.pixelRatio);
-		renderer.shadowMap.enabled = quality.shadows;
-		sun.castShadow = quality.shadows;
-		if (quality.shadows) {
-			sun.shadow.mapSize.set(quality.shadowMapSize, quality.shadowMapSize);
-			sun.shadow.map?.dispose();
-			sun.shadow.map = null;
-		}
-		scene.traverse((o) => {
-			for (const mat of [/** @type {any} */ (o).material].flat()) if (mat) mat.needsUpdate = true;
-		});
+		if (quality.bloom) ensureComposer();
+		composer?.setPixelRatio(quality.pixelRatio);
 		resize();
 	}
 
 	function buildAll() {
 		buildLayout();
-		// applyWeather builds the terrain, in the weather's colours.
+		buildTerrain();
 		buildGrass();
 		buildTrees();
 		buildFlags();
@@ -620,18 +804,19 @@ export async function createTutorialScene(container, settings, events = {}) {
 	});
 
 	// ── Highlight ─────────────────────────────────────────────────────
-	/** @type {Array<{ mesh: THREE.Mesh, original: THREE.Material }>} */
+	/** @type {Array<{ line: THREE.LineSegments, original: THREE.Material }>} */
 	let highlighted = [];
 
 	/**
-	 * Make a model, or one of its named nodes, glow; null clears it. Highlighted meshes get their own
-	 * copy of the material, so a material shared with other parts does not glow with them.
+	 * Make a model, or one of its named nodes, glow: its edge lines turn bright and pulse (the
+	 * highlighted lines get their own material, so other parts with the same colour stay as they
+	 * are). Null clears it.
 	 * @param {{ model: string, node?: string } | null} spec
 	 */
 	function highlight(spec) {
 		for (const h of highlighted) {
-			h.mesh.material.dispose();
-			h.mesh.material = h.original;
+			/** @type {THREE.Material} */ (h.line.material).dispose();
+			h.line.material = h.original;
 		}
 		highlighted = [];
 		if (!spec) return;
@@ -639,22 +824,15 @@ export async function createTutorialScene(container, settings, events = {}) {
 		const node = spec.node ? root.getObjectByName(spec.node) : root;
 		if (!node) return;
 		node.traverse((o) => {
-			const mesh = /** @type {THREE.Mesh} */ (o);
-			if (!mesh.isMesh) return;
+			if (!o.userData.edge) return;
 			// The optic is a child of the rifle: highlighting the rifle leaves it as it is.
-			if (spec.model === 'rifle' && (isInside(o, scope) || isInside(o, holo))) return;
-			const original = /** @type {THREE.Material} */ (mesh.material);
-			const copy = /** @type {THREE.MeshStandardMaterial} */ (original.clone());
-			copy.emissive = new THREE.Color(0xffb020);
-			mesh.material = copy;
-			highlighted.push({ mesh, original });
+			if (spec.model === 'rifle' && (isUnder(o, (p) => p === scope) || isUnder(o, (p) => p === holo))) return;
+			const line = /** @type {THREE.LineSegments} */ (o);
+			const original = /** @type {THREE.Material} */ (line.material);
+			line.material = new THREE.LineBasicMaterial({ color: NEON.highlight, toneMapped: false });
+			highlighted.push({ line, original });
 		});
 	}
-
-	const isInside = (o, root) => {
-		for (let p = o; p; p = p.parent) if (p === root) return true;
-		return false;
-	};
 
 	// ── Fire ──────────────────────────────────────────────────────────
 	/** @type {{ points: Array<{x:number,y:number,z:number,t:number}>, duration: number, flight: number, t: number, resolve: () => void } | null} */
@@ -673,8 +851,9 @@ export async function createTutorialScene(container, settings, events = {}) {
 	}
 
 	/**
-	 * Fire along the current path: the bullet flies it in animationDuration seconds, then the impact
-	 * is marked. Resolves when it lands (or the shot is cleared). Without a path, resolves at once.
+	 * Fire along the current path: the bullet flies it in animationDuration seconds, drawing a magenta
+	 * tracer, then the impact is marked. Resolves when it lands (or the shot is cleared). Without a
+	 * path, resolves at once.
 	 * @returns {Promise<void>}
 	 */
 	function fire() {
@@ -723,18 +902,52 @@ export async function createTutorialScene(container, settings, events = {}) {
 
 	function markImpact(end) {
 		const face = layout.targetZ + 0.002;
-		const onBoard = Math.abs(end.x) <= 0.23 && end.y >= layout.targetGroundY + 0.8 && end.y <= layout.targetGroundY + 1.56;
+		const bottom = layout.targetGroundY + TARGET_FACE_BOTTOM;
+		const onBoard = Math.abs(end.x) <= TARGET_HALF_WIDTH && end.y >= bottom && end.y <= bottom + TARGET_FACE_HEIGHT;
 		hole.position.set(end.x, end.y, face);
 		hole.visible = onBoard;
 		impactMark.position.set(end.x, end.y, face + 0.01);
-		impactMark.material.color.set(onBoard ? 0xff3b30 : 0xffd60a);
+		impactMark.material.color.set(onBoard ? NEON.hit : NEON.miss);
 		impactMark.visible = true;
+	}
+
+	// ── HUD bracket around the target (#195) ──────────────────────────
+	const hud = events.hud ?? null;
+	/** @type {THREE.Vector3[]} */
+	let faceCorners = [];
+	const projected = new THREE.Vector3();
+	let hudShown = '';
+	/** The drawing's size in CSS pixels, from resize(). */
+	let viewWidth = 1;
+	let viewHeight = 1;
+
+	/** Place the HUD element over the target, or hide it (through the optic, off screen, or big enough). */
+	function placeHud() {
+		if (!hud) return;
+		let box = null;
+		if (cameraPreset !== 'optic') {
+			const ndc = faceCorners.map((c) => {
+				projected.copy(c).project(camera);
+				return { x: projected.x, y: projected.y, z: projected.z };
+			});
+			box = hudBracket(ndc, viewWidth, viewHeight);
+		}
+		const key = box ? `${Math.round(box.x)},${Math.round(box.y)},${Math.round(box.width)},${Math.round(box.height)}` : 'none';
+		if (key === hudShown) return;
+		hudShown = key;
+		if (!box) {
+			hud.style.display = 'none';
+			return;
+		}
+		hud.style.display = 'block';
+		hud.style.transform = `translate(${Math.round(box.x)}px, ${Math.round(box.y)}px)`;
+		hud.style.width = `${Math.round(box.width)}px`;
+		hud.style.height = `${Math.round(box.height)}px`;
 	}
 
 	// ── Drawing ───────────────────────────────────────────────────────
 	let lastFrame = 0;
 	let elapsed = 0;
-	const sunOffset = new THREE.Vector3(18, 30, 12);
 
 	function frame() {
 		const now = performance.now();
@@ -754,6 +967,7 @@ export async function createTutorialScene(container, settings, events = {}) {
 		}
 		if (cameraPreset === 'optic') camera.lookAt(controls.target);
 		else controls.update();
+		sky.position.copy(camera.position);
 
 		// Trees: the trunk leans, the branches gust, the leaves flutter.
 		const gustBase = elapsed * sway.frequency * Math.PI * 2;
@@ -796,25 +1010,23 @@ export async function createTutorialScene(container, settings, events = {}) {
 					// The streak leans with the wind.
 					const lean = Math.min(sway.speed, 15) * 0.02;
 					a[i + 3] = x - sway.blow.x * lean;
-					a[i + 4] = y + 0.35;
+					a[i + 4] = y + 0.5;
 					a[i + 5] = z - sway.blow.z * lean;
 				}
 			}
 			attr.needsUpdate = true;
 		}
 
-		// The shadows follow what the camera looks at.
-		sun.target.position.copy(controls.target);
-		sun.position.copy(controls.target).add(sunOffset);
-
 		// Highlight pulse.
 		if (highlighted.length > 0) {
-			const pulse = 0.35 + 0.35 * Math.sin(elapsed * 4);
-			for (const h of highlighted) /** @type {THREE.MeshStandardMaterial} */ (h.mesh.material).emissiveIntensity = pulse;
+			const pulse = 1.5 + 1.5 * (0.5 + 0.5 * Math.sin(elapsed * 4));
+			for (const h of highlighted) /** @type {THREE.LineBasicMaterial} */ (h.line.material).color.set(NEON.highlight).multiplyScalar(pulse);
 		}
 
 		stepFlight(dt);
-		renderer.render(scene, camera);
+		if (quality.bloom && composer) composer.render(dt);
+		else renderer.render(scene, camera);
+		placeHud();
 	}
 
 	function syncRunning() {
@@ -830,8 +1042,17 @@ export async function createTutorialScene(container, settings, events = {}) {
 		const w = Math.max(1, container.clientWidth);
 		const h = Math.max(1, container.clientHeight);
 		renderer.setSize(w, h, false);
+		viewWidth = w;
+		viewHeight = h;
 		camera.aspect = w / h;
 		camera.updateProjectionMatrix();
+		if (composer) {
+			composer.setSize(w, h);
+			// Bloom works at a share of the drawing size (quality), which the composer's size reset.
+			const scale = quality.bloomScale || 0.5;
+			bloomPass?.setSize(Math.round(w * quality.pixelRatio * scale), Math.round(h * quality.pixelRatio * scale));
+		}
+		hudShown = '';
 	}
 
 	const resizeObserver = new ResizeObserver(resize);
@@ -850,6 +1071,7 @@ export async function createTutorialScene(container, settings, events = {}) {
 		event.preventDefault();
 		running = false;
 		renderer.setAnimationLoop(null);
+		if (hud) hud.style.display = 'none';
 		events.onlost?.();
 	};
 	canvas.addEventListener('webglcontextlost', onLost);
@@ -861,7 +1083,7 @@ export async function createTutorialScene(container, settings, events = {}) {
 	setCamera('shooter', false);
 	onVisibility();
 
-	/** Stop drawing and free everything: GPU memory, listeners, observers, timers. */
+	/** Stop drawing and free everything: GPU memory, post-processing, listeners, observers, timers. */
 	function dispose() {
 		if (disposed) return;
 		disposed = true;
@@ -869,12 +1091,16 @@ export async function createTutorialScene(container, settings, events = {}) {
 		clearShot();
 		highlight(null);
 		renderer.setAnimationLoop(null);
+		if (hud) hud.style.display = 'none';
 		document.removeEventListener('visibilitychange', onVisibility);
 		canvas.removeEventListener('webglcontextlost', onLost);
 		resizeObserver.disconnect();
 		intersection.disconnect();
 		controls.dispose();
 		grass?.dispose();
+		bloomPass?.dispose();
+		outputPass?.dispose();
+		composer?.dispose();
 		scene.traverse((o) => {
 			const any = /** @type {any} */ (o);
 			if (any.geometry) own(any.geometry);
@@ -886,7 +1112,6 @@ export async function createTutorialScene(container, settings, events = {}) {
 		}
 		for (const geometry of owned.geometries) geometry.dispose();
 		for (const texture of owned.textures) texture.dispose();
-		sun.shadow.map?.dispose();
 		renderer.dispose();
 		renderer.forceContextLoss();
 		canvas.remove();

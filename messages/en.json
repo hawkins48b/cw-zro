@@ -1024,5 +1024,6 @@
 	"tutorial_tour_fire_title": "The shot",
 	"tutorial_tour_fire_text": "The bullet flies the trajectory of the app's engine, slowed down so you can follow it. The drop at the target is the value of the Ballistic calculator for the same inputs.\n\nPress Fire again whenever you like.",
 	"tutorial_mobile_unavailable_title": "Not available in the mobile app",
-	"tutorial_mobile_unavailable_text": "The 3D ballistic tutorial needs more graphics power than the mobile app is built for. Use the web version or the desktop app."
+	"tutorial_mobile_unavailable_text": "The 3D ballistic tutorial needs more graphics power than the mobile app is built for. Use the web version or the desktop app.",
+	"tutorial_hud_target": "Target {distance}"
 }

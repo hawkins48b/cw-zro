@@ -1,6 +1,7 @@
 /**
- * The pure part of the 3D tutorial scene (#182): layout, terrain heights, quality presets, wind sway,
- * weather looks, tree and grass placement, camera poses. Plain numbers, no three.js, so it is tested
+ * The pure part of the 3D tutorial scene (#182, neon-grid look #195): layout, terrain heights,
+ * backstop, quality presets, wind sway, weather looks, tree and grass placement, camera poses, the HUD
+ * bracket around the target. Plain numbers, no three.js, so it is tested
  * (tutorialScene.test.js); src/lib/tutorial/scene.js turns it into meshes.
  *
  * Axes as the models (docs/development.md#tutorial-models): metres, +Y up, the range along -Z, +X to
@@ -30,13 +31,15 @@ export const TARGET_FACE_HEIGHT = 0.76;
 export const TARGET_CENTRE_HEIGHT = TARGET_FACE_BOTTOM + TARGET_FACE_HEIGHT / 2;
 
 /**
- * Quality presets (#182). pixelRatio is the most device pixels per CSS pixel drawn; grass the
- * tufts of instanced grass; particles the rain drops or snow flakes; trees per side of the range.
+ * Quality presets (#182, #195). pixelRatio is the most device pixels per CSS pixel drawn; grass the
+ * tufts of instanced grass; particles the rain streaks or snow flakes; trees per side of the range;
+ * bloom the glow post-processing (off on Low), bloomScale the share of the drawing size it works at.
+ * The neon-grid look has no lights, so no shadows.
  */
 export const QUALITY_PRESETS = Object.freeze({
-	low: Object.freeze({ pixelRatio: 1, antialias: false, shadows: false, shadowMapSize: 0, grass: 1500, particles: 800, trees: 14 }),
-	medium: Object.freeze({ pixelRatio: 1.5, antialias: true, shadows: true, shadowMapSize: 1024, grass: 6000, particles: 3000, trees: 24 }),
-	high: Object.freeze({ pixelRatio: 2, antialias: true, shadows: true, shadowMapSize: 2048, grass: 16000, particles: 8000, trees: 36 })
+	low: Object.freeze({ pixelRatio: 1, antialias: false, bloom: false, bloomScale: 0, grass: 1500, particles: 800, trees: 14 }),
+	medium: Object.freeze({ pixelRatio: 1.5, antialias: true, bloom: true, bloomScale: 0.5, grass: 6000, particles: 3000, trees: 24 }),
+	high: Object.freeze({ pixelRatio: 2, antialias: true, bloom: true, bloomScale: 1, grass: 16000, particles: 8000, trees: 36 })
 });
 
 /**
@@ -210,19 +213,43 @@ export function windSway(wind) {
 }
 
 /**
- * The look of each scene weather (visual only, #180). Colours as 0xRRGGBB.
- * - sky, fog: background and fog colour; fogDensity of FogExp2;
- * - sun, ambient: light intensities; sunColor;
- * - groundColor; roughness of the ground (wet is lower) and wet (0..1: the ground is that much darker);
- * - grassTint: multiplies the grass model's own vertex colours (white leaves them as they are);
- *   grassShown: the share of the grass tufts drawn (snow covers most of them);
- * - precipitation: 'none', 'rain' or 'snow'.
+ * Neon palette of the scene (#195, owner choice of 2026-11-17: neon grid). Colours as 0xRRGGBB.
+ * - solid: the dark fill of every model; cyan and magenta: edge lines; grass: the grass and leaves;
+ * - tracer: the bullet's path; hit, miss: the impact mark on and off the target board;
+ * - target: the board outline; zoneA, zoneC, zoneD: the zone outlines; backstop: its edges;
+ * - highlight: edges of a part a tutorial step points at (pulsing).
+ */
+export const NEON = Object.freeze({
+	solid: 0x05070b,
+	cyan: 0x22e6ff,
+	magenta: 0xff2bd6,
+	grass: 0x2bff9c,
+	tracer: 0xff2bd6,
+	hit: 0xff2bd6,
+	miss: 0xffd60a,
+	target: 0x22e6ff,
+	zoneA: 0xff2bd6,
+	zoneC: 0x22e6ff,
+	zoneD: 0x1b8fa8,
+	backstop: 0xff2bd6,
+	highlight: 0xfff27a
+});
+
+/**
+ * The look of each scene weather in the neon grid (visual only, #180, #195): digital variants of
+ * the four choices. Colours as 0xRRGGBB.
+ * - sky: the sky overhead (near-black); horizon: the glow at the horizon; horizonHeight: how high the
+ *   glow reaches (0..1 of the way up);
+ * - fog, fogDensity: FogExp2 that fades the grid and the far models into the horizon;
+ * - grid, gridStrength: colour and brightness of the ground grid lines;
+ * - grassShown: the share of the grass tufts drawn (snow covers most of them);
+ * - precipitation: 'none', 'rain' (neon streaks) or 'snow' (glowing flakes), in precipitationColor.
  */
 export const WEATHER_LOOKS = Object.freeze({
-	sunny: Object.freeze({ grassShown: 1, sky: 0x8ec5ee, fog: 0xc9e2f5, fogDensity: 0.0012, sun: 2.6, sunColor: 0xfff3dc, ambient: 0.9, groundColor: 0x6f8f3e, grassTint: 0xffffff, roughness: 0.95, wet: 0, precipitation: 'none' }),
-	cloudy: Object.freeze({ grassShown: 1, sky: 0xaab4bd, fog: 0xb5bdc4, fogDensity: 0.0022, sun: 0.9, sunColor: 0xe8ecf0, ambient: 1.3, groundColor: 0x5f7a3a, grassTint: 0xd9ddd0, roughness: 0.95, wet: 0, precipitation: 'none' }),
-	rain: Object.freeze({ grassShown: 1, sky: 0x6f7a84, fog: 0x7d8790, fogDensity: 0.0045, sun: 0.45, sunColor: 0xd8dde2, ambient: 1.0, groundColor: 0x46602b, grassTint: 0xa9b59c, roughness: 0.45, wet: 0.35, precipitation: 'rain' }),
-	snow: Object.freeze({ grassShown: 0.3, sky: 0xc9d1d8, fog: 0xdfe5ea, fogDensity: 0.004, sun: 0.7, sunColor: 0xf2f6fa, ambient: 1.4, groundColor: 0xe6ebef, grassTint: 0xe2e6dc, roughness: 0.8, wet: 0, precipitation: 'snow' })
+	sunny: Object.freeze({ sky: 0x020309, horizon: 0x1a2f5c, horizonHeight: 0.12, fog: 0x050a18, fogDensity: 0.0009, grid: 0x22e6ff, gridStrength: 1, grassShown: 1, precipitation: 'none', precipitationColor: 0 }),
+	cloudy: Object.freeze({ sky: 0x07070d, horizon: 0x4a2a5e, horizonHeight: 0.3, fog: 0x1a1428, fogDensity: 0.0045, grid: 0x22e6ff, gridStrength: 0.7, grassShown: 1, precipitation: 'none', precipitationColor: 0 }),
+	rain: Object.freeze({ sky: 0x010208, horizon: 0x0f3a52, horizonHeight: 0.2, fog: 0x06121c, fogDensity: 0.003, grid: 0x1fb8ff, gridStrength: 0.85, grassShown: 1, precipitation: 'rain', precipitationColor: 0x3fd8ff }),
+	snow: Object.freeze({ sky: 0x0a0c14, horizon: 0x5a6a8a, horizonHeight: 0.25, fog: 0x2a3040, fogDensity: 0.0035, grid: 0xb8e8ff, gridStrength: 0.6, grassShown: 0.3, precipitation: 'snow', precipitationColor: 0xe8f6ff })
 });
 
 /**
@@ -295,38 +322,164 @@ export function treePlacements(layout, perSide) {
 	return trees;
 }
 
+/** How far the grass reaches either side of the line of fire, metres. */
+export const GRASS_HALF_WIDTH = LANE_HALF_WIDTH + 10;
+
 /**
- * Grass tufts: half around the shooter (25 m), a quarter around the target (20 m), the rest along the
- * lane. Seeded.
+ * The band the grass covers (#195): GRASS_HALF_WIDTH either side of the line of fire, from 6 m behind
+ * the shooter to 10 m past the target.
+ *
+ * @param {SceneLayout} layout
+ * @returns {{ x0: number, x1: number, z0: number, z1: number }} z0 nearer the shooter (z0 > z1)
+ */
+export function grassBand(layout) {
+	return { x0: -GRASS_HALF_WIDTH, x1: GRASS_HALF_WIDTH, z0: 6, z1: layout.targetZ - 10 };
+}
+
+/**
+ * The cells of the grass grid: about `count` cells over the band, as square as the band allows.
+ *
+ * @param {{ x0: number, x1: number, z0: number, z1: number }} band
+ * @param {number} count
+ * @returns {{ columns: number, rows: number, width: number, length: number }} width and length of a cell, m
+ */
+export function grassGrid(band, count) {
+	const w = band.x1 - band.x0;
+	const l = band.z0 - band.z1;
+	const n = Math.max(0, Math.floor(count));
+	if (n === 0 || !(w > 0) || !(l > 0)) return { columns: 0, rows: 0, width: 0, length: 0 };
+	const columns = Math.max(1, Math.min(n, Math.round(Math.sqrt((n * w) / l))));
+	const rows = Math.max(1, Math.floor(n / columns));
+	return { columns, rows, width: w / columns, length: l / rows };
+}
+
+/** Grass is kept this far from the sandbag (x, z) and from the target stand, metres. */
+const CLEAR = { x: 0.6, z: 1.2 };
+
+/** A tuft stays this share of a cell away from the cell's sides, so float rounding keeps it in its cell. */
+const CELL_MARGIN = 0.05;
+
+/**
+ * Grass tufts spread evenly over the range (#195): a jittered grid over grassBand, one tuft per cell,
+ * at a seeded random place in it (away from the cell's sides by CELL_MARGIN), so there are no clumps
+ * and no bare stripes. A tuft that would stand on the sandbag or the target stand moves to the mirror
+ * place in its own cell, and is left out if that place is blocked too (cells smaller than the cleared
+ * area). Density by quality: about `count` tufts whatever the distance, so a longer range has sparser
+ * grass.
  *
  * @param {SceneLayout} layout
  * @param {number} count - from the quality preset
- * @returns {Float32Array} x, y, z, rotation, scale for each tuft (5 numbers each)
+ * @returns {Float32Array} x, y, z, rotation, scale for each tuft (5 numbers each), cell by cell
  */
 export function grassPlacements(layout, count) {
 	const random = seededRandom(1822);
-	const n = Math.max(0, Math.floor(count));
-	const out = new Float32Array(n * 5);
-	const near = Math.floor(n / 2);
-	const atTarget = Math.floor(n / 4);
-	for (let i = 0; i < n; i++) {
-		let x;
-		let z;
-		if (i < near) {
-			x = (random() * 2 - 1) * 25;
-			z = 6 - random() * 30;
-		} else if (i < near + atTarget) {
-			x = (random() * 2 - 1) * 20;
-			z = layout.targetZ + 10 - random() * 25;
-		} else {
-			x = (random() * 2 - 1) * (LANE_HALF_WIDTH + 10);
-			z = 6 + (layout.targetZ - 6) * random();
+	const band = grassBand(layout);
+	const grid = grassGrid(band, count);
+	const out = new Float32Array(grid.columns * grid.rows * 5);
+	const blocked = (px, pz) => Math.abs(px) < CLEAR.x && (Math.abs(pz) < CLEAR.z || Math.abs(pz - layout.targetZ) < CLEAR.z);
+	const jitter = () => CELL_MARGIN + random() * (1 - 2 * CELL_MARGIN);
+	let i = 0;
+	for (let r = 0; r < grid.rows; r++) {
+		for (let c = 0; c < grid.columns; c++) {
+			const cellX = band.x0 + c * grid.width;
+			const cellZ = band.z0 - r * grid.length;
+			const fx = jitter();
+			const fz = jitter();
+			const rotation = random() * Math.PI * 2;
+			const scale = 0.7 + random() * 0.6;
+			let x = cellX + fx * grid.width;
+			let z = cellZ - fz * grid.length;
+			if (blocked(x, z)) {
+				x = cellX + (1 - fx) * grid.width;
+				z = cellZ - (1 - fz) * grid.length;
+				if (blocked(x, z)) continue;
+			}
+			out.set([x, terrainHeight(x, z, layout), z, rotation, scale], i * 5);
+			i++;
 		}
-		// Keep the sandbag and the target stand clear.
-		if (Math.abs(x) < 0.6 && Math.abs(z) < 1.2) x += 1.2;
-		out.set([x, terrainHeight(x, z, layout), z, random() * Math.PI * 2, 0.7 + random() * 0.6], i * 5);
 	}
-	return out;
+	return out.slice(0, i * 5);
+}
+
+/** Distance from the target face to the backstop's front, metres. */
+export const BACKSTOP_GAP = 3;
+
+/**
+ * The backstop behind the target (#195): a wall wide and high enough to frame the target as seen
+ * from the shooter at any distance and elevation. It stands BACKSTOP_GAP behind the target face, is
+ * 3% of the distance wide (at least 6 m) and 2% of it high above the target's ground (at least
+ * 3.5 m), and goes 1 m into the ground, below the lowest ground under it, so no gap shows.
+ *
+ * @param {SceneLayout} layout
+ * @returns {{ x: number, y: number, z: number, width: number, height: number, depth: number }} centre and size, m
+ */
+export function backstopBox(layout) {
+	const distance = Math.hypot(layout.horizontal, layout.aim.y - layout.los.y);
+	const width = Math.max(6, distance * 0.03);
+	const above = Math.max(3.5, distance * 0.02);
+	const z = layout.targetZ - BACKSTOP_GAP;
+	const depth = 1;
+	let ground = Infinity;
+	for (const x of [-width / 2, 0, width / 2]) {
+		for (const dz of [-depth / 2, depth / 2]) ground = Math.min(ground, terrainHeight(x, z + dz, layout));
+	}
+	const bottom = Math.min(ground, layout.targetGroundY) - 1;
+	const top = layout.targetGroundY + above;
+	return { x: 0, y: (top + bottom) / 2, z, width, height: top - bottom, depth };
+}
+
+/** Half the width of the target board, metres (#181: 46 cm). */
+export const TARGET_HALF_WIDTH = 0.23;
+
+/**
+ * The four corners of the target face in the scene: what the HUD bracket frames.
+ * @param {SceneLayout} layout
+ * @returns {Array<[number, number, number]>}
+ */
+export function targetFaceCorners(layout) {
+	const bottom = layout.targetGroundY + TARGET_FACE_BOTTOM;
+	const top = bottom + TARGET_FACE_HEIGHT;
+	const z = layout.targetZ;
+	return [
+		[-TARGET_HALF_WIDTH, bottom, z],
+		[TARGET_HALF_WIDTH, bottom, z],
+		[-TARGET_HALF_WIDTH, top, z],
+		[TARGET_HALF_WIDTH, top, z]
+	];
+}
+
+/** Smallest and largest HUD bracket, CSS pixels. */
+export const HUD_MIN_SIZE = 28;
+export const HUD_MAX_SIZE = 160;
+
+/**
+ * The HUD bracket around the target (#195), from the target's corners projected to normalized device
+ * coordinates (x and y in -1..1, z in -1..1 in front of the camera). At least HUD_MIN_SIZE wide and
+ * high, centred on the target, so a target of a few pixels gets a bracket that can be seen. Null when
+ * a corner is behind the camera, when the target is off screen, or when it is already big on screen
+ * (the bracket would be larger than HUD_MAX_SIZE: no help needed).
+ *
+ * @param {Array<{ x: number, y: number, z: number }>} ndc - projected corners
+ * @param {number} width - viewport, CSS pixels
+ * @param {number} height
+ * @returns {{ x: number, y: number, width: number, height: number } | null} top-left corner and size, CSS pixels
+ */
+export function hudBracket(ndc, width, height) {
+	if (!(width > 0) || !(height > 0) || ndc.length === 0) return null;
+	if (ndc.some((p) => !Number.isFinite(p.x) || !Number.isFinite(p.y) || !(p.z > -1 && p.z < 1))) return null;
+	const xs = ndc.map((p) => ((p.x + 1) / 2) * width);
+	const ys = ndc.map((p) => ((1 - p.y) / 2) * height);
+	const left = Math.min(...xs);
+	const right = Math.max(...xs);
+	const top = Math.min(...ys);
+	const bottom = Math.max(...ys);
+	if (right < 0 || left > width || bottom < 0 || top > height) return null;
+	const w = Math.max(HUD_MIN_SIZE, right - left + 12);
+	const h = Math.max(HUD_MIN_SIZE, bottom - top + 12);
+	if (w > HUD_MAX_SIZE || h > HUD_MAX_SIZE) return null;
+	const cx = (left + right) / 2;
+	const cy = (top + bottom) / 2;
+	return { x: cx - w / 2, y: cy - h / 2, width: w, height: h };
 }
 
 /** Half the height of the view through a riflescope, in mrad (about 6 mrad up and down). */
@@ -343,10 +496,15 @@ export function opticFov(optic) {
 	return optic === 'scope' ? (2 * Math.atan(SCOPE_HALF_VIEW_MRAD / 1000) * 180) / Math.PI : HOLO_FOV_DEG;
 }
 
+/** Vertical field of view of the shooter view, degrees (#195: narrower, so the target is bigger). */
+export const SHOOTER_FOV_DEG = 32;
+
 /**
  * Where each camera preset puts the camera and what it looks at.
  *
- * - shooter: behind and to the right of the shooter, looking down the range;
+ * - shooter: behind and to the right of the shooter, looking at the target, through a narrower field
+ *   of view (SHOOTER_FOV_DEG); the look-at point (the orbit centre) is 25 m along that line, so the
+ *   camera still turns around the shooter;
  * - optic: on the line of sight, looking at the aim point, through the optic's field of view;
  * - side: off to the right of the middle of the range, far enough to see the whole flight;
  * - target: in front of the target, to its right, looking at it.
@@ -370,7 +528,13 @@ export function cameraPose(preset, layout, optic) {
 		case 'target':
 			return { position: [aim.x + 2.2, aim.y + 0.4, aim.z + 6], target: [aim.x, aim.y - 0.1, aim.z], fov: 45 };
 		case 'shooter':
-		default:
-			return { position: [0.9, los.y + 1.3, los.z + 3.2], target: [0, los.y + 25 * Math.tan(layout.slope), los.z - 25], fov: 50 };
+		default: {
+			const position = [0.9, los.y + 1.3, los.z + 3.2];
+			const d = [aim.x - position[0], aim.y - position[1], aim.z - position[2]];
+			const n = Math.hypot(...d) || 1;
+			const k = Math.min(25, n) / n;
+			const target = [position[0] + d[0] * k, position[1] + d[1] * k, position[2] + d[2] * k];
+			return { position: /** @type {[number, number, number]} */ (position), target: /** @type {[number, number, number]} */ (target), fov: SHOOTER_FOV_DEG };
+		}
 	}
 }

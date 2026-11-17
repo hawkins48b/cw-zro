@@ -1024,5 +1024,6 @@
 	"tutorial_tour_fire_title": "Le tir",
 	"tutorial_tour_fire_text": "La balle suit la trajectoire calculée par le moteur de l'application, au ralenti pour qu'on puisse la suivre. La chute à la cible est la valeur du calculateur balistique pour les mêmes données.\n\nAppuyez sur Tirer quand vous voulez.",
 	"tutorial_mobile_unavailable_title": "Non disponible dans l'application mobile",
-	"tutorial_mobile_unavailable_text": "Le tutoriel balistique 3D demande plus de puissance graphique que l'application mobile n'en prévoit. Utilisez la version web ou l'application de bureau."
+	"tutorial_mobile_unavailable_text": "Le tutoriel balistique 3D demande plus de puissance graphique que l'application mobile n'en prévoit. Utilisez la version web ou l'application de bureau.",
+	"tutorial_hud_target": "Cible {distance}"
 }

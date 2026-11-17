@@ -1024,5 +1024,6 @@
 	"tutorial_tour_fire_title": "Der Schuss",
 	"tutorial_tour_fire_text": "Das Geschoss fliegt die Flugbahn der App-Berechnung, verlangsamt, damit man ihr folgen kann. Der Abfall am Ziel ist der Wert des Ballistikrechners für dieselben Eingaben.\n\nDrücken Sie Schießen, so oft Sie wollen.",
 	"tutorial_mobile_unavailable_title": "In der mobilen App nicht verfügbar",
-	"tutorial_mobile_unavailable_text": "Das 3D-Ballistik-Tutorial braucht mehr Grafikleistung, als die mobile App vorsieht. Nutzen Sie die Webversion oder die Desktop-App."
+	"tutorial_mobile_unavailable_text": "Das 3D-Ballistik-Tutorial braucht mehr Grafikleistung, als die mobile App vorsieht. Nutzen Sie die Webversion oder die Desktop-App.",
+	"tutorial_hud_target": "Ziel {distance}"
 }

@@ -25,6 +25,10 @@
 	 * @prop {() => void} onrestart - Restart after error or lost.
 	 * @prop {{ type: 'red-dot'|'mil-dot'|'mrad'|'moa', halfView: number } | null} [reticle] - Shown over
 	 *   the scene (TutorialReticle) while the camera looks through the optic; null hides it.
+	 * @prop {HTMLDivElement|null} hud - Bindable: the HUD bracket around the target (#195). The scene
+	 *   places and sizes it each frame from the target's projected corners, and hides it when it is
+	 *   not needed; the page hands it to the scene.
+	 * @prop {string} [hudLabel] - Under the bracket: the target and its distance ('Target 300 m').
 	 */
 	import { m } from '#lib/paraglide/messages.js';
 	import { Crosshair, Loader, RefreshCw, TriangleAlert } from '@lucide/svelte';
@@ -41,7 +45,9 @@
 		canFire = true,
 		onfire,
 		onrestart,
-		reticle = null
+		reticle = null,
+		hud = $bindable(null),
+		hudLabel = ''
 	} = $props();
 
 	const uid = $props.id();
@@ -73,6 +79,25 @@
 			role="img"
 			aria-label={m.tutorial_scene_label()}
 		></div>
+
+		<!-- HUD bracket around the target (#195): placed by the scene, hidden until it is -->
+		<div
+			bind:this={hud}
+			class="absolute left-0 top-0 pointer-events-none {status === 'ready' ? '' : 'invisible'}"
+			style="display: none"
+			aria-hidden="true"
+		>
+			<span class="absolute -left-px -top-px size-2.5 border-l-2 border-t-2 border-[#22e6ff]"></span>
+			<span class="absolute -right-px -top-px size-2.5 border-r-2 border-t-2 border-[#22e6ff]"></span>
+			<span class="absolute -left-px -bottom-px size-2.5 border-l-2 border-b-2 border-[#22e6ff]"></span>
+			<span class="absolute -right-px -bottom-px size-2.5 border-r-2 border-b-2 border-[#22e6ff]"></span>
+			{#if hudLabel}
+				<span
+					class="absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap px-1.5 rounded-sm bg-surface-950/70 text-[11px] font-semibold tabular-nums text-[#22e6ff]"
+					>{hudLabel}</span
+				>
+			{/if}
+		</div>
 
 		<!-- Reticle, through the optic -->
 		{#if reticle && status === 'ready'}
