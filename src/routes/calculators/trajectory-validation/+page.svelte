@@ -13,17 +13,24 @@
 		validationPatch
 	} from '#lib/utils/validationView.js';
 	import { altitudeTooLowMessage } from '#lib/components/altitudeMessage.js';
-	import { calculateFullTrajectory } from '#lib/utils/ballisticCalculator.js';
+	import { calculateFullTrajectory, hasNoAirDensity } from '#lib/utils/ballisticCalculator.js';
+	import {
+		formatUsedAtmosphere,
+		scopeAtmosphereParams,
+		usedScopeAtmosphere
+	} from '#lib/utils/scopeAtmosphere.js';
+	import { useCurrentWeather } from '#lib/components/currentWeather.svelte.js';
 	import { readDecimal } from '#lib/utils/decimal.js';
 	import { formatLimit, formatNumber } from '#lib/utils/format.js';
 	import { MAX_DISTANCE } from '#lib/utils/inputLimits.js';
 	import { chartLabelAnchor } from '#lib/utils/mpbrView.js';
 	import { profileName } from '#lib/components/profile/profileLabels.js';
 	import { Unit } from 'js-ballistics';
-	import AtmosphereCard from '#lib/components/AtmosphereCard.svelte';
+	import ScopeAtmosphereCard from '#lib/components/ScopeAtmosphereCard.svelte';
 	import ChipGroup from '#lib/components/ChipGroup.svelte';
 	import ProfileInUseChip from '#lib/components/ProfileInUseChip.svelte';
 	import ApplyChangeCard from '#lib/components/calc/ApplyChangeCard.svelte';
+	import ValidationImpactPicture from '#lib/components/calc/ValidationImpactPicture.svelte';
 
 	// ── ApexCharts (lazy-loaded, browser-only) ───────────────────────
 	let ApexCharts = $state(null);
@@ -66,9 +73,21 @@
 			: (measureUnit === 'mrad' ? m.unit_mrad() : m.unit_moa())
 	);
 
-	let atmoParams = $derived(
-		trajectoryValidation.atmosphere.useISA ? null : trajectoryValidation.atmosphere
+	// ── Atmosphere (#194): ISA, Estimate or Accurate, as on the Scope View and Ballistic page ──
+	let atmosphere = $derived(trajectoryValidation.atmosphere);
+	// "Use current weather here" (#152): nothing is asked or sent before a tap on the card's button.
+	const weather = useCurrentWeather(trajectoryValidation);
+	/** What the calculation is given: null is the standard atmosphere at sea level. */
+	let atmoParams = $derived(scopeAtmosphereParams(atmosphere));
+	/** What ISA and Estimate use, in the units of the boxes, for the line under the card. */
+	let atmosphereUsed = $derived(
+		formatUsedAtmosphere(usedScopeAtmosphere(atmosphere), {
+			number: formatNumber,
+			units: { hpa: m.unit_hpa(), inhg: m.unit_inhg(), c: m.unit_c(), f: m.unit_f() }
+		})
 	);
+	// Values within their limits whose air density is not above 0 give no result (#107).
+	let noAirDensity = $derived(hasNoAirDensity(atmoParams));
 
 	let isMetric = $derived(trajectoryValidation.range.unit === 'm');
 	let distLabel = $derived(isMetric ? m.unit_m() : m.unit_yd());
@@ -478,6 +497,16 @@
 		</div>
 	</section>
 
+	<!-- What to measure, through the scope (#194) -->
+	<ValidationImpactPicture
+		type={measureType}
+		direction={measureDirection}
+		predicted={validationResult && !validationResult.error ? validationResult.initialMeasure : null}
+		observed={measureValue}
+		unit={measureLabel}
+		format={(v) => num(v)}
+	/>
+
 	<!-- 2 · What to correct -->
 	<section class={cardClass} aria-labelledby="{uid}-step2">
 		<h2 id="{uid}-step2" class="text-[15px] font-semibold">{m.traj_val_step_correct()}</h2>
@@ -498,12 +527,16 @@
 	</section>
 
 	<!-- 3 · Weather that day -->
-	<AtmosphereCard
+	<ScopeAtmosphereCard
 		title={m.traj_val_step_weather()}
-		isaHint={m.traj_val_isa_hint()}
-		atmosphere={trajectoryValidation.atmosphere}
+		{atmosphere}
+		used={atmosphereUsed}
 		altitudeTooLow={validationResult?.error === 'minimum_altitude'}
-		onchange={(patch) => trajectoryValidation.setAtmosphere(patch)}
+		{noAirDensity}
+		onchange={weather.onchange}
+		weatherAvailable={weather.available}
+		weatherStatus={weather.status}
+		onweather={weather.request}
 	/>
 {/snippet}
 

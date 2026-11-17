@@ -208,20 +208,6 @@ export function storedValidationMeasure(stored) {
 export const storedSolveFor = (stored) => (stored === 'bc' ? 'bc' : 'velocity');
 
 /**
- * The stored atmosphere of the Trajectory Validation page (#127). State saved before the field
- * existed has none, and the page read a missing or `null` atmosphere as the standard one: that is
- * kept, so no result changes. Anything else is read by storedAtmosphere: a section that is not an
- * object is a custom atmosphere with empty boxes, which gives no result.
- *
- * @param {unknown} stored
- * @param {ReturnType<typeof storedAtmosphere>} standard - the standard atmosphere of the page
- * @returns {ReturnType<typeof storedAtmosphere>}
- */
-export function storedValidationAtmosphere(stored, standard) {
-	return stored === undefined || stored === null ? { ...standard } : storedAtmosphere(stored);
-}
-
-/**
  * The stored atmosphere of the Scope View and Ballistic pages as stored, before the conversion of
  * #172: the boxes, mode, weather and pressure reference. See storedScopeAtmosphere.
  *
@@ -345,4 +331,23 @@ export function storedBallisticAtmosphere(stored) {
 	// Saved before #151: as the page computed it then, then converted as any QNH state (#172).
 	const before151 = { ...atmosphere, pressureRef: DEFAULT_PRESSURE_REF };
 	return accurateStationAtmosphere(before151.mode === 'isa' ? { ...before151, altitude: '0' } : before151);
+}
+
+/**
+ * The stored atmosphere of the Trajectory Validation page. Since #194 the page uses the Scope View
+ * card (ISA / Estimate / Accurate), so it is read as the Ballistic page reads its own
+ * (storedBallisticAtmosphere): before #194 the page had the same switch as the Ballistic page before
+ * #151 (`useISA` → the sea-level standard atmosphere, else the boxes with the pressure as QNH), so a
+ * saved state gives the same result, up to the rounding of a QNH box converted to station pressure
+ * (#172).
+ *
+ * State saved before the field existed has none, and the page read a missing or `null` atmosphere
+ * as the standard one (#127): that is kept. A section that is not an object is a custom atmosphere
+ * with empty boxes, which gives no result.
+ *
+ * @param {unknown} stored
+ * @returns {ReturnType<typeof storedBallisticAtmosphere>}
+ */
+export function storedValidationAtmosphere(stored) {
+	return stored === undefined || stored === null ? { ...ISA_ATMOSPHERE } : storedBallisticAtmosphere(stored);
 }

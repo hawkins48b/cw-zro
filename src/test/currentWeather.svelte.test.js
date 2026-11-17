@@ -3,7 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { SAMPLE_PROFILE } from '#lib/utils/sampleProfile.js';
 import { WEATHER_ENDPOINT } from '#lib/utils/currentWeather.js';
 
-// "Use current weather here" (#152), on the card and on the two pages that show it, mounted in
+// "Use current weather here" (#152), on the card and on the three pages that show it (#194), mounted in
 // jsdom (the `components` Vitest project, Svelte's client build). fetch and geolocation are spies:
 // nothing reaches the network or a real location.
 
@@ -190,7 +190,8 @@ describe('ScopeAtmosphereCard', () => {
 
 for (const [name, path, key] of [
 	['Scope View', '../routes/scope-view/+page.svelte', 'zro-scope-view'],
-	['Ballistic page', '../routes/calculators/ballistic/+page.svelte', 'zro-ballistic']
+	['Ballistic page', '../routes/calculators/ballistic/+page.svelte', 'zro-ballistic'],
+	['Trajectory Validation (#194)', '../routes/calculators/trajectory-validation/+page.svelte', 'zro-traj-validation']
 ]) {
 	describe(name, () => {
 		let Page;
@@ -200,8 +201,10 @@ for (const [name, path, key] of [
 			const module =
 				key === 'zro-scope-view'
 					? await import('#lib/stores/scopeView.svelte.js')
-					: await import('#lib/stores/ballistic.svelte.js');
-			store = module.scopeView ?? module.ballistic;
+					: key === 'zro-ballistic'
+						? await import('#lib/stores/ballistic.svelte.js')
+						: await import('#lib/stores/trajectoryValidation.svelte.js');
+			store = module.scopeView ?? module.ballistic ?? module.trajectoryValidation;
 		}, 60_000);
 
 		beforeEach(() => {
