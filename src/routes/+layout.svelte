@@ -3,7 +3,7 @@
 	import favicon from '#lib/assets/favicon.svg';
 	import { page } from '$app/state';
 	import { m } from '#lib/paraglide/messages.js';
-	import { localizeHref, deLocalizeHref, getLocale } from '#lib/paraglide/runtime.js';
+	import { localizeHref, deLocalizeHref, extractLocaleFromUrl, baseLocale } from '#lib/paraglide/runtime.js';
 	import { ArrowLeftIcon, ListIcon, CalculatorIcon, SlidersHorizontalIcon } from '@lucide/svelte';
 	import ReticleIcon from '#lib/components/ReticleIcon.svelte';
 	import DarkModeToggle from '#lib/components/DarkModeToggle.svelte';
@@ -121,10 +121,14 @@
 		applyDarkMode(settings.darkMode);
 	});
 
+	// The language of the URL (/fr, /de, none for English). The language buttons switch it without a
+	// reload (#178): the app below is keyed on it, so every message renders again in that language.
+	// SvelteKit updates the address bar before page.url, so Paraglide's getLocale() agrees with it.
+	let locale = $derived(extractLocaleFromUrl(page.url.href) ?? baseLocale);
+
 	// The static build serves one index.html for every locale, so its lang is always the base one.
-	// The language buttons reload the page, so this runs again after each switch.
 	$effect(() => {
-		document.documentElement.lang = getLocale();
+		document.documentElement.lang = locale;
 	});
 </script>
 
@@ -132,6 +136,7 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
+{#key locale}
 <div class="h-dvh flex flex-col" style="padding-top: var(--safe-area-top); padding-bottom: var(--safe-area-bottom);">
 	{#if bare}
 	<main class="flex-1 min-h-0">
@@ -275,3 +280,4 @@
 	</nav>
 	{/if}
 </div>
+{/key}

@@ -817,7 +817,7 @@
 	"settings_display": "Display",
 	"settings_theme_hint": "Until you choose, ZRO uses the light or dark setting of the device.",
 	"settings_theme_sidebar_hint": "The theme switch at the bottom of the sidebar does the same.",
-	"settings_language_hint": "The app reloads in the language you pick.",
+	"settings_language_hint": "Applies at once and is kept on this device.",
 	"settings_data": "Data",
 	"settings_data_profiles": "{count} on this device · export or import them in Profiles",
 	"settings_data_profiles_one": "1 on this device · export or import them in Profiles",

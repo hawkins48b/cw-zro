@@ -817,7 +817,7 @@
 	"settings_display": "Anzeige",
 	"settings_theme_hint": "Bis Sie wählen, verwendet ZRO die helle oder dunkle Einstellung des Geräts.",
 	"settings_theme_sidebar_hint": "Die Design-Auswahl unten in der Seitenleiste bewirkt dasselbe.",
-	"settings_language_hint": "Die App wird in der gewählten Sprache neu geladen.",
+	"settings_language_hint": "Gilt sofort und bleibt auf diesem Gerät gespeichert.",
 	"settings_data": "Daten",
 	"settings_data_profiles": "{count} auf diesem Gerät · unter Profile exportieren oder importieren",
 	"settings_data_profiles_one": "1 auf diesem Gerät · unter Profile exportieren oder importieren",

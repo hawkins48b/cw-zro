@@ -817,7 +817,7 @@
 	"settings_display": "Affichage",
 	"settings_theme_hint": "Tant que vous n'avez pas choisi, ZRO utilise le réglage clair ou sombre de l'appareil.",
 	"settings_theme_sidebar_hint": "Le choix du thème en bas de la barre latérale fait la même chose.",
-	"settings_language_hint": "L'application se recharge dans la langue choisie.",
+	"settings_language_hint": "S'applique aussitôt et reste mémorisée sur cet appareil.",
 	"settings_data": "Données",
 	"settings_data_profiles": "{count} sur cet appareil · exportez-les ou importez-en dans Profils",
 	"settings_data_profiles_one": "1 sur cet appareil · exportez-le ou importez-en dans Profils",
