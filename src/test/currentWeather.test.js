@@ -23,6 +23,8 @@ import {
 	weatherTime,
 	weatherUrl
 } from '#lib/utils/currentWeather.js';
+import { UNew, Unit } from 'js-ballistics';
+import { stationPressure } from '#lib/utils/stationPressure.js';
 
 // Current weather at the location (#152). Every browser API is injected: nothing here reaches the
 // network or a real geolocation.
@@ -402,53 +404,71 @@ describe('siteAltitude', () => {
 describe('weatherPatch', () => {
 	const weather = { temperature: 8.44, humidity: 70.6, pressure: 1018.64 };
 
-	it('fills metric boxes: whole metres, 1 decimal hPa and °C, whole percent, as QNH', () => {
+	// Since #172 the sea-level pressure_msl is converted to the station pressure at the site altitude
+	// (stationPressure, as the calculators converted a QNH box), and the altitude box is not filled.
+	it('fills metric boxes: station pressure with 1 decimal hPa, 1 decimal °C, whole percent, no altitude', () => {
 		expect(weatherPatch(weather, 498.7, { altitudeUnit: 'm', pressureUnit: 'hpa', temperatureUnit: 'c' })).toEqual({
 			mode: 'accurate',
-			pressureRef: 'qnh',
-			altitude: '499',
-			pressure: '1018.6',
+			pressureRef: 'station',
+			pressure: '959.8', // 1018.64 hPa at 498.7 m: 959.836
 			temperature: '8.4',
 			humidity: '71'
 		});
 	});
 
-	it('fills imperial boxes: whole feet, 2 decimal inHg, 1 decimal °F', () => {
+	it('fills imperial boxes: station pressure with 2 decimal inHg, 1 decimal °F', () => {
 		expect(weatherPatch(weather, 498.7, { altitudeUnit: 'ft', pressureUnit: 'inhg', temperatureUnit: 'f' })).toEqual({
 			mode: 'accurate',
-			pressureRef: 'qnh',
-			altitude: '1636', // 498.7 m / 0.3048
-			pressure: '30.08', // 1018.64 hPa / 33.8639
+			pressureRef: 'station',
+			pressure: '28.34', // 959.836 hPa / 33.8639
 			temperature: '47.2', // 8.44 * 1.8 + 32 = 47.192
 			humidity: '71'
 		});
 	});
 
-	it('mixes units as the boxes show them, and reads unknown units as the calculators do', () => {
-		expect(weatherPatch(weather, 100, { altitudeUnit: 'm', pressureUnit: 'inhg', temperatureUnit: 'c' })).toMatchObject({
-			altitude: '100',
-			pressure: '30.08',
-			temperature: '8.4'
-		});
-		expect(weatherPatch(weather, 100, {})).toMatchObject({ altitude: '328', pressure: '30.08', temperature: '47.2' });
+	it('gives the result of the QNH box it replaces, up to its rounding', () => {
+		// Before #172 the fill wrote QNH 1018.6 hPa and altitude 499 m; the calculators then used
+		// 1018.6 hPa scaled to 499 m.
+		const station = stationPressure(UNew.hPa(1018.64), UNew.Meter(498.7)).In(Unit.hPa);
+		expect(Number(weatherPatch(weather, 498.7, { pressureUnit: 'hpa' }).pressure)).toBeCloseTo(station, 1);
+		expect(Math.abs(Number(weatherPatch(weather, 498.7, { pressureUnit: 'hpa' }).pressure) - station)).toBeLessThanOrEqual(0.05);
 	});
 
-	it('gives standard air as the standard boxes', () => {
+	it('mixes units as the boxes show them, and reads unknown units as the calculators do', () => {
+		expect(weatherPatch(weather, 100, { altitudeUnit: 'm', pressureUnit: 'inhg', temperatureUnit: 'c' })).toMatchObject({
+			pressure: '29.73', // 1006.62 hPa
+			temperature: '8.4'
+		});
+		expect(weatherPatch(weather, 100, {})).toMatchObject({ pressure: '29.73', temperature: '47.2' });
+		expect(weatherPatch(weather, 100, {})).not.toHaveProperty('altitude');
+	});
+
+	it('gives standard air as the standard boxes at sea level', () => {
 		const patch = weatherPatch({ temperature: 15, humidity: 0, pressure: 1013.25 }, 0, { altitudeUnit: 'ft', pressureUnit: 'inhg', temperatureUnit: 'f' });
-		expect(patch).toMatchObject({ altitude: '0', pressure: '29.92', temperature: '59', humidity: '0' });
+		expect(patch).toEqual({ mode: 'accurate', pressureRef: 'station', pressure: '29.92', temperature: '59', humidity: '0' });
 	});
 
 	it('writes no -0 and reads back with the app reader', () => {
 		const patch = weatherPatch({ temperature: -0.04, humidity: 0.2, pressure: 1000 }, -0.3, { altitudeUnit: 'm', pressureUnit: 'hpa', temperatureUnit: 'c' });
-		expect(patch).toMatchObject({ altitude: '0', temperature: '0', humidity: '0', pressure: '1000' });
+		expect(patch).toMatchObject({ temperature: '0', humidity: '0', pressure: '1000' });
 		const negative = weatherPatch({ temperature: -12.36, humidity: 50, pressure: 990 }, -400, { altitudeUnit: 'm', pressureUnit: 'hpa', temperatureUnit: 'f' });
-		expect(negative).toMatchObject({ altitude: '-400', temperature: '9.8' });
+		expect(negative).toMatchObject({ pressure: '1037.9', temperature: '9.8' });
 	});
 
 	it('rejects a value that converts outside its box limits', async () => {
 		// 1200 hPa is within the hPa limit but 35.44 inHg is above the inHg one (35.4).
 		await expectCode(() => weatherPatch({ temperature: 10, humidity: 50, pressure: 1200 }, 0, { pressureUnit: 'inhg' }), 'invalid');
 		expect(weatherPatch({ temperature: 10, humidity: 50, pressure: 1200 }, 0, { pressureUnit: 'hpa' }).pressure).toBe('1200');
+		// Below sea level the station pressure is higher: 1200 hPa at -1000 m is 1349 hPa.
+		await expectCode(() => weatherPatch({ temperature: 10, humidity: 50, pressure: 1200 }, -1000, { pressureUnit: 'hpa' }), 'invalid');
+		// High up it is lower: 1013.25 hPa at 10000 m is 264 hPa, under the 300 hPa limit.
+		await expectCode(() => weatherPatch({ temperature: 10, humidity: 50, pressure: 1013.25 }, 10000, { pressureUnit: 'hpa' }), 'invalid');
+	});
+
+	it('rejects an altitude that is not a usable number, instead of converting with it', async () => {
+		for (const altitude of [NaN, Infinity, -1001, 10001, '500', null, undefined]) {
+			await expectCode(() => weatherPatch(weather, altitude, { pressureUnit: 'hpa' }), 'invalid');
+		}
 	});
 });
 
@@ -630,11 +650,12 @@ describe('createWeatherFill', () => {
 		expect(statuses).toEqual([]);
 	});
 
-	it('fills the four boxes in one change, as QNH, then reports the time', async () => {
+	it('fills the three boxes in one change, as station pressure, then reports the time', async () => {
 		const { fill, apply, statuses, state } = setup();
 		await fill.request();
 		expect(apply).toHaveBeenCalledOnce();
-		expect(apply.mock.calls[0][0]).toEqual({ mode: 'accurate', pressureRef: 'qnh', altitude: '499', pressure: '1018.6', temperature: '8.4', humidity: '71' });
+		// 1018.6 hPa at sea level is 959.8 hPa at 498.7 m (#172).
+		expect(apply.mock.calls[0][0]).toEqual({ mode: 'accurate', pressureRef: 'station', pressure: '959.8', temperature: '8.4', humidity: '71' });
 		expect(statuses).toEqual([{ state: 'loading' }, { state: 'done', time: '14:05', model: BEST_MATCH }]);
 		expect(state.atmosphere.mode).toBe('accurate');
 	});
@@ -665,7 +686,8 @@ describe('createWeatherFill', () => {
 	});
 
 	it('leaves the boxes unchanged when a value converts outside the box limits', async () => {
-		const read = vi.fn(async () => ({ ...reading, weather: { ...reading.weather, pressure: 1200 } }));
+		// 1200 hPa at sea level stays 1200 hPa, 35.44 inHg: above the inHg limit (35.4).
+		const read = vi.fn(async () => ({ ...reading, altitude: 0, weather: { ...reading.weather, pressure: 1200 } }));
 		const { fill, apply, statuses } = setup({ read, atmosphere: { ...metric, pressureUnit: 'inhg' } });
 		await fill.request();
 		expect(apply).not.toHaveBeenCalled();
@@ -703,7 +725,7 @@ describe('createWeatherFill', () => {
 		state.atmosphere = { ...state.atmosphere, altitudeUnit: 'ft', pressureUnit: 'inhg', temperatureUnit: 'f' };
 		deferred.resolve(reading);
 		await pending;
-		expect(apply.mock.calls[0][0]).toMatchObject({ altitude: '1636', pressure: '30.08', temperature: '47.1' });
+		expect(apply.mock.calls[0][0]).toMatchObject({ pressure: '28.34', temperature: '47.1' });
 	});
 
 	it('writes nothing for a late answer after cancel, and aborts the request', async () => {
@@ -760,7 +782,7 @@ describe('createWeatherFill', () => {
 
 		const failing = setup({ read: vi.fn(async () => Promise.reject(new WeatherError('network'))) });
 		await failing.fill.request();
-		failing.fill.changed({ pressureRef: 'station' });
+		failing.fill.changed({ pressureUnit: 'hpa' });
 		expect(failing.statuses.at(-1)).toEqual({ state: 'idle' });
 
 		const deferred = deferredRead();

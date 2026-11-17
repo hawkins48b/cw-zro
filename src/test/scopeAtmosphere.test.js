@@ -10,6 +10,7 @@ import { Atmo, UNew, Unit } from 'js-ballistics';
 import { Calculator } from '#lib/utils/ballisticEngine.js';
 import { calculateShotPoint, hasNoAirDensity } from '#lib/utils/ballisticCalculator.js';
 import {
+	ACCURATE_ENGINE_ALTITUDE_M,
 	WEATHER_HUMIDITY,
 	formatUsedAtmosphere,
 	scopeAtmosphereParams,
@@ -76,9 +77,10 @@ describe('storedScopeAtmosphere', () => {
 		expect(read).toEqual({ useISA: true, ...ISA_BOXES, mode: 'isa', weather: 'cloudy', pressureRef: 'qnh' });
 	});
 
-	it('reads a custom state saved before #148 as Accurate with QNH', () => {
+	it('reads a custom state saved before #148 as Accurate with QNH, converted to station pressure (#172)', () => {
+		// ATMO_HOT_ALTITUDE holds the QNH equivalent of 24.9 inHg measured at 5000 ft (#107).
 		const read = storedScopeAtmosphere({ useISA: false, ...ATMO_HOT_ALTITUDE });
-		expect(read).toMatchObject({ useISA: false, mode: 'accurate', pressureRef: 'qnh', ...ATMO_HOT_ALTITUDE });
+		expect(read).toMatchObject({ useISA: false, mode: 'accurate', pressureRef: 'station', ...ATMO_HOT_ALTITUDE, pressure: '24.9' });
 	});
 
 	it.each(['isa', 'estimate', 'accurate'])('keeps the stored mode %s, and useISA follows it', (mode) => {
@@ -181,11 +183,18 @@ describe('scopeAtmosphereParams', () => {
 		expect(params.humidity).toBe(65);
 	});
 
-	it('passes the boxes as entered in Accurate, with the reference', () => {
-		expect(scopeAtmosphereParams(atmo({ mode: 'accurate', ...ATMO_COLD_METRIC }))).toEqual({ ...ATMO_COLD_METRIC, pressureRef: 'qnh' });
+	it('passes the boxes as station pressure in Accurate, at the fixed engine altitude (#172)', () => {
 		expect(scopeAtmosphereParams(atmo({ mode: 'accurate', pressureRef: 'station', ...ATMO_COLD_METRIC }))).toEqual({
 			...ATMO_COLD_METRIC,
+			altitude: ACCURATE_ENGINE_ALTITUDE_M,
+			altitudeUnit: 'm',
 			pressureRef: 'station'
+		});
+		// A QNH state is converted first: ATMO_COLD_METRIC is the QNH of 845 hPa at 1500 m.
+		expect(scopeAtmosphereParams({ mode: 'accurate', ...ATMO_COLD_METRIC, pressureRef: 'qnh' })).toMatchObject({
+			pressure: '845',
+			pressureRef: 'station',
+			altitude: ACCURATE_ENGINE_ALTITUDE_M
 		});
 	});
 });
@@ -219,14 +228,15 @@ describe('the atmosphere modes in calculateShotPoint', () => {
 		expect(isa.drop).not.toBeCloseTo(seaLevel.drop, 1);
 	});
 
-	it('Estimate equals Accurate with the standard sea-level pressure, the temperature and the weather humidity', () => {
+	it('Estimate equals the custom QNH atmosphere of the standard sea-level pressure, the temperature and the weather humidity', () => {
 		const estimate = shot(P308_G1, scopeAtmosphereParams(atmo({ mode: 'estimate', weather: 'rain', altitude: '5000', temperature: '85' })), WIND_10MPH);
-		const accurate = shot(
+		// The Accurate mode of before #172; the trajectory validation page still passes this shape.
+		const qnh = shot(
 			P308_G1,
-			scopeAtmosphereParams(atmo({ mode: 'accurate', altitude: '5000', pressure: '1013.25', pressureUnit: 'hpa', temperature: '85', humidity: '90' })),
+			{ ...ISA_BOXES, altitude: '5000', pressure: '1013.25', pressureUnit: 'hpa', temperature: '85', humidity: '90' },
 			WIND_10MPH
 		);
-		expect(estimate).toEqual(accurate);
+		expect(estimate).toEqual(qnh);
 	});
 
 	it('gives a different result for each weather (humidity is used)', () => {
@@ -255,11 +265,16 @@ describe('the atmosphere modes in calculateShotPoint', () => {
 	});
 
 	it('checks the air density on the atmosphere actually used', () => {
-		// At 10000 m, 70 °C and 100 % (#107): 300 hPa as QNH is about 79 hPa at the site, where the
-		// air has no density; 300 hPa measured at the site has one.
+		// At 70 °C and 100 % (#107): 300 hPa measured at the site has a density.
 		const box = { mode: 'accurate', altitude: '10000', altitudeUnit: 'm', pressure: '300', pressureUnit: 'hpa', temperature: '70', temperatureUnit: 'c', humidity: '100' };
-		expect(hasNoAirDensity(scopeAtmosphereParams(atmo({ ...box, pressureRef: 'qnh' })))).toBe(true);
 		expect(hasNoAirDensity(scopeAtmosphereParams(atmo({ ...box, pressureRef: 'station' })))).toBe(false);
+		// The same box saved as QNH was about 79 hPa at the site, where the air had no density. It
+		// now reads as that station pressure, out of the pressure limits: still no result, and the
+		// box shows its range message instead of the density one (#172).
+		const read = atmo({ ...box, pressureRef: 'qnh' });
+		expect(read.pressure).toBe('78.3');
+		expect(hasNoAirDensity(scopeAtmosphereParams(read))).toBe(false);
+		expect(shot(P308_G1, scopeAtmosphereParams(read))).toBeNull();
 		expect(hasNoAirDensity(null)).toBe(false);
 	});
 
@@ -308,11 +323,27 @@ describe('the atmosphere guards apply in every mode, before the engine', () => {
 
 	const BAD_ALTITUDES = ['', 'x', '32809', '-3282', 'Infinity', '1e9', throwsAsText, null, ['100']];
 
-	it.each(['isa', 'estimate', 'accurate'])('stops an altitude out of its limits in %s', (mode) => {
+	it.each(['isa', 'estimate'])('stops an altitude out of its limits in %s', (mode) => {
 		for (const altitude of BAD_ALTITUDES) {
 			expect(run({ mode, altitude })).toBeNull();
 		}
 		expect(reached()).toBe(false);
+	});
+
+	it('stops a saved Accurate QNH state whose altitude is out of its limits: its pressure reads empty (#172)', () => {
+		for (const altitude of BAD_ALTITUDES) {
+			expect(atmo({ mode: 'accurate', pressureRef: 'qnh', altitude }).pressure).toBe('');
+			expect(run({ mode: 'accurate', pressureRef: 'qnh', altitude })).toBeNull();
+		}
+		expect(reached()).toBe(false);
+	});
+
+	it('does not read the stored altitude in Accurate with station pressure (#172)', () => {
+		for (const altitude of BAD_ALTITUDES) {
+			expect(scopeAtmosphereParams(atmo({ mode: 'accurate', pressureRef: 'station', altitude }))).toEqual(
+				scopeAtmosphereParams(atmo({ mode: 'accurate', pressureRef: 'station', altitude: '0' }))
+			);
+		}
 	});
 
 	it.each(['estimate', 'accurate'])('stops a temperature out of its limits in %s', (mode) => {

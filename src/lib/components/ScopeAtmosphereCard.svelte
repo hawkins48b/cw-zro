@@ -20,7 +20,8 @@
 	 *
 	 * - isa: altitude only; a line shows the standard pressure and temperature used (`used`).
 	 * - estimate: altitude, weather, temperature (± 1 and quick picks); a line shows what is used.
-	 * - accurate: pressure with QNH / Station, altitude, temperature, humidity.
+	 * - accurate: station pressure, temperature, humidity (#172: no QNH / Station choice, no altitude;
+	 *   the page hands the engine a fixed altitude, see scopeAtmosphereParams).
 	 *
 	 * The card computes nothing: the page gives what is used, already formatted with units.
  *
@@ -32,17 +33,18 @@
 	 * @prop {'isa'|'estimate'|'accurate'} atmosphere.mode
 	 * @prop {string} atmosphere.altitude          @prop {'ft'|'m'} atmosphere.altitudeUnit
 	 * @prop {string} atmosphere.pressure          @prop {'inhg'|'hpa'} atmosphere.pressureUnit
-	 * @prop {'qnh'|'station'} atmosphere.pressureRef
 	 * @prop {string} atmosphere.temperature       @prop {'f'|'c'} atmosphere.temperatureUnit
 	 * @prop {string} atmosphere.humidity
 	 * @prop {'sunny'|'cloudy'|'rain'|'snow'|null} atmosphere.weather
 	 * @prop {{ pressure: string, temperature: string, humidity: string } | null} used
 	 *   What the calculation uses in isa and estimate modes, formatted with units ('960 hPa', '12 °C',
 	 *   '65 %'). Null shows dashes (no usable altitude, or not computed yet).
-	 * @prop {boolean} altitudeTooLow - The engine stopped at its minimum altitude (#125).
+	 * @prop {boolean} altitudeTooLow - The engine stopped at its minimum altitude (#125); shown under
+	 *   the altitude box of isa and estimate. Accurate has no altitude box, and its fixed engine
+	 *   altitude never reaches that stop (#172).
 	 * @prop {boolean} noAirDensity   - Values within limits that give no air density (#107), accurate mode.
 	 * @prop {(patch: object) => void} onchange - Called with the changed fields, e.g. { mode: 'estimate' },
-	 *   { weather: 'rain' }, { pressureRef: 'station' }, { temperature: '9' }.
+	 *   { weather: 'rain' }, { temperature: '9' }.
 	 *
 	 * Current weather (#152), accurate mode only. The page owns the request; the card only shows it.
 	 * @prop {boolean} weatherAvailable - Show the button (web and mobile; false on the desktop build).
@@ -153,7 +155,7 @@
 	];
 </script>
 
-<!-- Altitude with − / +, full width with the unit chips inside the box (every mode, #167). -->
+<!-- Altitude with − / +, full width with the unit chips inside the box (isa and estimate, #167, #172). -->
 {#snippet altitudeField()}
 	{@const message = altitudeError || (altitudeTooLow ? altitudeTooLowMessage(atmosphere.altitudeUnit) : '')}
 	<StepperField
@@ -266,23 +268,12 @@
 			<strong>{used?.temperature ?? '—'}</strong>
 		</p>
 	{:else}
-		<!-- Accurate: pressure (QNH / Station), altitude, temperature and humidity, each on its own
-			full-width line with its unit chips inside the box (#167). -->
-		{#snippet pressureRefChips()}
-			<ChipGroup
-				label={m.scope_view_pressure_ref()}
-				options={[
-					{ value: 'qnh', label: m.scope_view_pressure_qnh() },
-					{ value: 'station', label: m.scope_view_pressure_station() }
-				]}
-				value={atmosphere.pressureRef}
-				onselect={(pressureRef) => onchange({ pressureRef })}
-			/>
-		{/snippet}
+		<!-- Accurate: station pressure, temperature and humidity, each on its own full-width line with
+			its unit chips inside the box (#167). No altitude: with station pressure it changes no
+			result (#172). -->
 		<StepperField
 			id="{uid}-press"
 			label={m.scope_view_pressure_label()}
-			labelEnd={pressureRefChips}
 			value={atmosphere.pressure}
 			onchange={(text) => onchange({ pressure: text })}
 			spec={pressureSpec}
@@ -297,17 +288,11 @@
 			onunitchange={(value) => onchange({ pressureUnit: value })}
 			placeholder=""
 			invalid={!!pressureError || noAirDensity}
-			message={pressureError ||
-				(noAirDensity
-					? m.ballistic_air_too_thin()
-					: atmosphere.pressureRef === 'station'
-						? m.scope_view_pressure_station_hint()
-						: m.scope_view_pressure_qnh_hint())}
+			message={pressureError || (noAirDensity ? m.ballistic_air_too_thin() : m.scope_view_pressure_station_hint())}
 			messageType={pressureError || noAirDensity ? 'error' : 'hint'}
 		/>
 
 		<div class="flex flex-col gap-2.5">
-			{@render altitudeField()}
 			<StepperField
 				id="{uid}-temp"
 				label={m.scope_view_atmo_temp()}
@@ -340,7 +325,8 @@
 		</div>
 
 		{#if weatherAvailable && onweather}
-			<!-- Current weather (#152): fills the four fields once; the user can edit them after. -->
+			<!-- Current weather (#152): fills the three fields once, the pressure converted to station
+				pressure (#172); the user can edit them after. -->
 			<div class="space-y-1.5 pt-0.5">
 				<button
 					type="button"

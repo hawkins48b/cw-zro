@@ -21,6 +21,7 @@ import { isNumberOrText } from './storedWind.js';
 import {
 	DEFAULT_PRESSURE_REF,
 	DEFAULT_WEATHER,
+	accurateStationAtmosphere,
 	isAtmosphereMode,
 	isPressureRef,
 	isWeather
@@ -221,22 +222,14 @@ export function storedValidationAtmosphere(stored, standard) {
 }
 
 /**
- * The stored atmosphere of the Scope View (#148): the boxes as storedAtmosphere reads them, plus
- * the mode, the weather of the estimate mode and the pressure reference of the accurate mode.
- *
- * State saved before #148 has no mode: `useISA` gives `isa`, anything else `accurate` with `qnh`,
- * which is what the page computed then, so no saved result changes. A mode that is not one of the
- * three is read the same way, from `useISA`, so a damaged mode gives the atmosphere the page used
- * before. A damaged section is a custom atmosphere of empty boxes, as in storedAtmosphere, so no
- * result appears for air the user did not choose. The weather is `cloudy` and the pressure
- * reference `qnh` unless one of the others is stored. `useISA` is read back from the mode, so the
- * two always agree.
+ * The stored atmosphere of the Scope View and Ballistic pages as stored, before the conversion of
+ * #172: the boxes, mode, weather and pressure reference. See storedScopeAtmosphere.
  *
  * @param {unknown} stored
  * @returns {ReturnType<typeof storedAtmosphere> & { mode: 'isa'|'estimate'|'accurate',
  *   weather: 'sunny'|'cloudy'|'rain'|'snow', pressureRef: 'qnh'|'station' }}
  */
-export function storedScopeAtmosphere(stored) {
+function readScopeAtmosphere(stored) {
 	const atmosphere = storedObject(stored);
 	const boxes = storedAtmosphere(atmosphere);
 	const mode = isAtmosphereMode(atmosphere.mode) ? atmosphere.mode : boxes.useISA ? 'isa' : 'accurate';
@@ -247,6 +240,30 @@ export function storedScopeAtmosphere(stored) {
 		weather: isWeather(atmosphere.weather) ? atmosphere.weather : DEFAULT_WEATHER,
 		pressureRef: isPressureRef(atmosphere.pressureRef) ? atmosphere.pressureRef : DEFAULT_PRESSURE_REF
 	};
+}
+
+/**
+ * The stored atmosphere of the Scope View (#148): the boxes as storedAtmosphere reads them, plus
+ * the mode, the weather of the estimate mode and the pressure reference.
+ *
+ * State saved before #148 has no mode: `useISA` gives `isa`, anything else `accurate` with `qnh`,
+ * which is what the page computed then. A mode that is not one of the three is read the same way,
+ * from `useISA`, so a damaged mode gives the atmosphere the page used before. A damaged section is a
+ * custom atmosphere of empty boxes, as in storedAtmosphere, so no result appears for air the user
+ * did not choose. The weather is `cloudy` and the pressure reference `qnh` unless one of the others
+ * is stored. `useISA` is read back from the mode, so the two always agree.
+ *
+ * Since #172 the Accurate mode is always station pressure: an Accurate state with `qnh` is read with
+ * its pressure converted to station pressure at its saved altitude and `pressureRef` `station`
+ * (accurateStationAtmosphere), so its result stays the same up to the rounding of the box. Reading
+ * writes nothing; the next change on the card stores the converted values, after which the state
+ * reads as it is.
+ *
+ * @param {unknown} stored
+ * @returns {ReturnType<typeof readScopeAtmosphere>}
+ */
+export function storedScopeAtmosphere(stored) {
+	return accurateStationAtmosphere(readScopeAtmosphere(stored));
 }
 
 /**
@@ -262,12 +279,13 @@ export const storedResultMode = (stored) => (stored === 'hold' ? 'hold' : 'dial'
  * The standard atmosphere as the Scope View and Ballistic stores write it: the default boxes (sea
  * level, 29.92 inHg, 59 °F, 0 %), the mode, weather and pressure reference (#148, #151). useISA is
  * kept beside the mode, so state written now reads the same in a build from before #148 or #151.
+ * The pressure reference is `station` since #172: the Accurate pressure box is station pressure.
  */
 export const ISA_ATMOSPHERE = Object.freeze({
 	useISA: true,
 	mode: 'isa',
 	weather: DEFAULT_WEATHER,
-	pressureRef: DEFAULT_PRESSURE_REF,
+	pressureRef: 'station',
 	altitude: '0',
 	altitudeUnit: 'ft',
 	pressure: '29.92',
@@ -311,16 +329,20 @@ export function patchedAtmosphere(current, patch) {
  *   the pressure was always QNH. A `pressureRef` in such a state (edited by hand) is read as `qnh`
  *   (security review of #151).
  *
- * So every saved result stays the same. Reading writes nothing; the next change stores these
- * values with the mode.
+ * Then, as on the Scope View, an Accurate state with QNH is converted to station pressure at its
+ * saved altitude (#172): a custom state saved before #151 is therefore always converted, whatever
+ * `pressureRef` it holds, since the page always read it as QNH.
+ *
+ * So every saved result stays the same, up to the rounding of the converted box. Reading writes
+ * nothing; the next change stores these values with the mode.
  *
  * @param {unknown} stored
  * @returns {ReturnType<typeof storedScopeAtmosphere>}
  */
 export function storedBallisticAtmosphere(stored) {
-	const atmosphere = storedScopeAtmosphere(stored);
-	if (isAtmosphereMode(storedObject(stored).mode)) return atmosphere;
-	// Saved before #151: as the page computed it then.
+	const atmosphere = readScopeAtmosphere(stored);
+	if (isAtmosphereMode(storedObject(stored).mode)) return accurateStationAtmosphere(atmosphere);
+	// Saved before #151: as the page computed it then, then converted as any QNH state (#172).
 	const before151 = { ...atmosphere, pressureRef: DEFAULT_PRESSURE_REF };
-	return before151.mode === 'isa' ? { ...before151, altitude: '0' } : before151;
+	return accurateStationAtmosphere(before151.mode === 'isa' ? { ...before151, altitude: '0' } : before151);
 }

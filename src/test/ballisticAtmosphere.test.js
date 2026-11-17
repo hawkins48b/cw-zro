@@ -108,11 +108,6 @@ describe('a Ballistic state saved on develop gives the same result after #151', 
 			P338_G7_METRIC
 		],
 		[
-			'the imperial defaults as a custom atmosphere',
-			{ range: { distance: '600', unit: 'yd', step: '50' }, atmosphere: { useISA: false, ...ISA_BOXES, altitude: '3000' }, wind: NO_WIND },
-			P223_G1
-		],
-		[
 			'a custom atmosphere with a station reference edited by hand (the page read QNH)',
 			{ range: { distance: '700', unit: 'yd', step: '25' }, atmosphere: { useISA: false, ...ATMO_HOT_ALTITUDE, pressureRef: 'station' }, wind: NO_WIND },
 			P308_G1
@@ -140,6 +135,26 @@ describe('a Ballistic state saved on develop gives the same result after #151', 
 		expect(nowResult(state, profile)).toEqual(before);
 	});
 
+	it('the imperial defaults as a custom atmosphere: the same result up to the rounding of the converted box (#172)', () => {
+		// 29.92 inHg as QNH at 3000 ft is 26.8167 inHg at the site; the box now reads 26.82 (#172).
+		const state = { range: { distance: '600', unit: 'yd', step: '50' }, atmosphere: { useISA: false, ...ISA_BOXES, altitude: '3000' }, wind: NO_WIND };
+		expect(storedBallisticAtmosphere(state.atmosphere)).toMatchObject({ mode: 'accurate', pressureRef: 'station', pressure: '26.82', altitude: '3000' });
+		const before = developResult(state, P223_G1);
+		const now = nowResult(state, P223_G1);
+		expect(before).not.toBeNull();
+		// Exactly the develop page with 26.82 inHg entered as station pressure at the saved altitude,
+		// up to the altitude, which station pressure does not use (at most 0.0008 cm, scopeAtmosphere).
+		const station = numbers(
+			calculateFullTrajectory(P223_G1, storedRange(state.range, { step: true }), { ...ISA_BOXES, altitude: '3000', pressure: '26.82', pressureRef: 'station' }, NO_WIND)
+		);
+		expect(now.trajectory.length).toBe(before.trajectory.length);
+		now.trajectory.forEach((r, i) => r.forEach((v, j) => expect(v).toBeCloseTo(station.trajectory[i][j], 4)));
+		// Against develop: the rounding of 0.0033 inHg (0.012 %) moves the 600 yd drop by about 0.05 in.
+		const last = before.trajectory.length - 1;
+		expect(Math.abs(now.trajectory[last][1] - before.trajectory[last][1])).toBeLessThan(0.1);
+		expect(Math.abs(now.trajectory[last][2] - before.trajectory[last][2])).toBeLessThan(0.02);
+	});
+
 	it('passes null, the sea-level standard atmosphere, for every saved ISA state', () => {
 		for (const [, state] of STATES.filter(([, s]) => s.atmosphere.useISA)) {
 			expect(nowParams(state)).toBeNull();
@@ -164,7 +179,7 @@ describe('a Ballistic state saved on develop gives the same result after #151', 
 });
 
 describe('storedBallisticAtmosphere', () => {
-	it('reads ISA saved before #151 as ISA at altitude 0, and custom as Accurate with QNH', () => {
+	it('reads ISA saved before #151 as ISA at altitude 0, and custom as Accurate with QNH, converted (#172)', () => {
 		expect(storedBallisticAtmosphere({ useISA: true, ...ISA_BOXES, altitude: '4000' })).toMatchObject({
 			mode: 'isa',
 			useISA: true,
@@ -172,21 +187,27 @@ describe('storedBallisticAtmosphere', () => {
 			weather: 'cloudy',
 			pressureRef: 'qnh'
 		});
+		// ATMO_HOT_ALTITUDE holds the QNH equivalent of 24.9 inHg measured at 5000 ft (#107).
 		expect(storedBallisticAtmosphere({ useISA: false, ...ATMO_HOT_ALTITUDE })).toEqual({
 			useISA: false,
 			mode: 'accurate',
 			weather: 'cloudy',
-			pressureRef: 'qnh',
-			...ATMO_HOT_ALTITUDE
+			pressureRef: 'station',
+			...ATMO_HOT_ALTITUDE,
+			pressure: '24.9'
 		});
 	});
 
-	it('reads the pressure reference of a state saved before #151 as QNH, and keeps it with a mode', () => {
-		expect(storedBallisticAtmosphere({ useISA: false, ...ATMO_HOT_ALTITUDE, pressureRef: 'station' }).pressureRef).toBe('qnh');
-		expect(storedBallisticAtmosphere({ useISA: false, mode: 'fog', ...ATMO_HOT_ALTITUDE, pressureRef: 'station' }).pressureRef).toBe('qnh');
+	it('reads the pressure reference of a state saved before #151 as QNH, converted, and keeps it with a mode', () => {
+		// Before #151 the page read every custom state as QNH: such a state is converted (#172).
+		expect(storedBallisticAtmosphere({ useISA: false, ...ATMO_HOT_ALTITUDE, pressureRef: 'station' })).toMatchObject({ pressureRef: 'station', pressure: '24.9' });
+		expect(storedBallisticAtmosphere({ useISA: false, mode: 'fog', ...ATMO_HOT_ALTITUDE, pressureRef: 'station' })).toMatchObject({ pressureRef: 'station', pressure: '24.9' });
+		// With a mode, a station reference is kept and the box used as it is.
 		expect(
-			storedBallisticAtmosphere({ useISA: false, mode: 'accurate', ...ATMO_HOT_ALTITUDE, pressureRef: 'station' }).pressureRef
-		).toBe('station');
+			storedBallisticAtmosphere({ useISA: false, mode: 'accurate', ...ATMO_HOT_ALTITUDE, pressureRef: 'station' })
+		).toMatchObject({ pressureRef: 'station', pressure: ATMO_HOT_ALTITUDE.pressure });
+		// An ISA state saved before #151 keeps its QNH reference: ISA does not use the box.
+		expect(storedBallisticAtmosphere({ useISA: true, ...ISA_BOXES }).pressureRef).toBe('qnh');
 	});
 
 	it('keeps the altitude of a state with a mode: ISA at an altitude is chosen by the user (#151)', () => {
@@ -279,11 +300,27 @@ describe('the Ballistic atmosphere guards apply in every mode, before the engine
 
 	const BAD_ALTITUDES = ['', 'x', '32809', '-3282', 'Infinity', '1e9', throwsAsText, null, ['100']];
 
-	it.each(['isa', 'estimate', 'accurate'])('stops an altitude out of its limits in %s', (mode) => {
+	it.each(['isa', 'estimate'])('stops an altitude out of its limits in %s', (mode) => {
 		for (const altitude of BAD_ALTITUDES) {
 			expect(run({ mode, altitude })).toBeNull();
 		}
 		expect(reached()).toBe(false);
+	});
+
+	it('stops a QNH Accurate state with an altitude out of its limits: its pressure reads empty (#172)', () => {
+		for (const altitude of BAD_ALTITUDES) {
+			expect(run({ mode: 'accurate', pressureRef: 'qnh', altitude })).toBeNull();
+		}
+		expect(reached()).toBe(false);
+	});
+
+	it('does not use the stored altitude in Accurate with station pressure (#172)', () => {
+		for (const altitude of BAD_ALTITUDES) {
+			solver.mockClear();
+			fire.mockClear();
+			run({ mode: 'accurate', altitude });
+			expect(reached()).toBe(true);
+		}
 	});
 
 	it.each(['estimate', 'accurate'])('stops a temperature out of its limits in %s', (mode) => {
@@ -300,9 +337,12 @@ describe('the Ballistic atmosphere guards apply in every mode, before the engine
 		expect(reached()).toBe(false);
 	});
 
-	it('stops air with no density at the site before the engine, and the card is told', () => {
+	it('stops a saved QNH state whose air had no density at the site before the engine (#172)', () => {
+		// 300 hPa as QNH at 10000 m is 78.3 hPa at the site, where the air at 70 °C and 100 % has no
+		// density. It now reads as that station pressure, out of the pressure limits: still no result.
 		const fields = {
 			mode: 'accurate',
+			pressureRef: 'qnh',
 			altitude: '10000',
 			altitudeUnit: 'm',
 			pressure: '300',
@@ -313,6 +353,10 @@ describe('the Ballistic atmosphere guards apply in every mode, before the engine
 		};
 		expect(run(fields)).toBeNull();
 		expect(reached()).toBe(false);
-		expect(hasNoAirDensity(scopeAtmosphereParams(storedBallisticAtmosphere({ ...ISA_ATMOSPHERE, ...fields })))).toBe(true);
+		expect(storedBallisticAtmosphere({ ...ISA_ATMOSPHERE, ...fields }).pressure).toBe('78.3');
+		expect(hasNoAirDensity(scopeAtmosphereParams(storedBallisticAtmosphere({ ...ISA_ATMOSPHERE, ...fields })))).toBe(false);
+		// The same box as station pressure has a density, so Accurate never shows the density message
+		// within the limits now; the check stays for the pages that still take QNH.
+		expect(hasNoAirDensity(scopeAtmosphereParams(storedBallisticAtmosphere({ ...ISA_ATMOSPHERE, ...fields, pressureRef: 'station' })))).toBe(false);
 	});
 });

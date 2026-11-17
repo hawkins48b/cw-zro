@@ -102,14 +102,33 @@ describe('zro-scope-view', () => {
 		expect(storage.values['zro-scope-view']).toMatchObject({ rotation: 5, atmosphere: { useISA: true } });
 	});
 
-	it('reads a state saved before #148 as before: ISA, or Accurate with QNH, and the dial', async () => {
+	it('reads a state saved before #148 as before: ISA, or Accurate with QNH converted to station pressure, and the dial', async () => {
 		let { scopeView } = await load_(scope);
 		expect(scopeView.atmosphere).toMatchObject({ useISA: true, mode: 'isa', weather: 'cloudy', pressureRef: 'qnh' });
 		expect(scopeView.resultMode).toBe('dial');
-		({ scopeView } = await load_({ ...scope, atmosphere: { ...scope.atmosphere, useISA: false } }));
-		expect(scopeView.atmosphere).toMatchObject({ useISA: false, mode: 'accurate', pressureRef: 'qnh' });
+		({ scopeView } = await load_({ ...scope, atmosphere: { ...scope.atmosphere, useISA: false, altitude: '4000' } }));
+		// 29.92 inHg as QNH at 4000 ft is 25.8408 inHg at the site (#172).
+		expect(scopeView.atmosphere).toMatchObject({ useISA: false, mode: 'accurate', pressureRef: 'station', pressure: '25.84', altitude: '4000' });
 		// Reading writes nothing.
 		expect(storage.values['zro-scope-view'].atmosphere.mode).toBeUndefined();
+		expect(storage.values['zro-scope-view'].atmosphere.pressure).toBe('29.92');
+	});
+
+	it('stores the converted Accurate state on the next change, and reads it back as it is (#172)', async () => {
+		const qnh = { ...scope.atmosphere, useISA: false, mode: 'accurate', pressureRef: 'qnh', altitude: '4000' };
+		let { scopeView } = await load_({ ...scope, atmosphere: qnh });
+		scopeView.setAtmosphere({ temperature: '20' });
+		expect(storage.values['zro-scope-view'].atmosphere).toMatchObject({ pressureRef: 'station', pressure: '25.84', temperature: '20', altitude: '4000' });
+		({ scopeView } = await load_(storage.values['zro-scope-view']));
+		expect(scopeView.atmosphere).toMatchObject({ pressureRef: 'station', pressure: '25.84' });
+	});
+
+	it('converts an ISA or Estimate state with QNH when the user switches it to Accurate, with the altitude then (#172)', async () => {
+		const { scopeView } = await load_({ ...scope, atmosphere: { ...scope.atmosphere, mode: 'estimate', useISA: false, pressureRef: 'qnh' } });
+		expect(scopeView.atmosphere).toMatchObject({ mode: 'estimate', pressureRef: 'qnh', pressure: '29.92' });
+		scopeView.setAtmosphere({ altitude: '4000' });
+		scopeView.setAtmosphere({ mode: 'accurate' });
+		expect(scopeView.atmosphere).toMatchObject({ mode: 'accurate', pressureRef: 'station', pressure: '25.84' });
 	});
 
 	it.each([[null], ['HOLD'], [1], [throwsAsText], [['hold']]])('reads a stored result mode of %j as dial', async (resultMode) => {
@@ -141,7 +160,7 @@ describe('zro-scope-view', () => {
 	it('keeps the old useISA switches: true resets to the standard atmosphere, false is Accurate', async () => {
 		const { scopeView } = await load_({ ...scope, atmosphere: { ...scope.atmosphere, useISA: false, altitude: '4000', pressureRef: 'station' } });
 		scopeView.setAtmosphere({ useISA: true });
-		expect(scopeView.atmosphere).toEqual({ ...scope.atmosphere, useISA: true, mode: 'isa', weather: 'cloudy', pressureRef: 'qnh' });
+		expect(scopeView.atmosphere).toEqual({ ...scope.atmosphere, useISA: true, mode: 'isa', weather: 'cloudy', pressureRef: 'station' });
 		scopeView.setAtmosphere({ useISA: false });
 		expect(scopeView.atmosphere).toMatchObject({ useISA: false, mode: 'accurate' });
 	});
@@ -236,16 +255,18 @@ describe('zro-ballistic', () => {
 		expect(ballistic.atmosphere.useISA).toBe(false);
 		expect(ballistic.atmosphere.altitude).toBe('');
 		ballistic.setAtmosphere({ useISA: true });
-		expect(ballistic.atmosphere).toEqual({ ...ISA, mode: 'isa', weather: 'cloudy', pressureRef: 'qnh' });
+		expect(ballistic.atmosphere).toEqual({ ...ISA, mode: 'isa', weather: 'cloudy', pressureRef: 'station' });
 	});
 
-	it('reads a state saved before #151 as before: ISA at altitude 0, or Accurate with QNH, without a write', async () => {
+	it('reads a state saved before #151 as before: ISA at altitude 0, or Accurate with QNH converted to station pressure, without a write', async () => {
 		let { ballistic } = await load_({ ...ball, atmosphere: { ...ISA, altitude: '4000' } });
 		expect(ballistic.atmosphere).toMatchObject({ useISA: true, mode: 'isa', altitude: '0', weather: 'cloudy', pressureRef: 'qnh' });
 		expect(storage.values['zro-ballistic'].atmosphere).toEqual({ ...ISA, altitude: '4000' });
 		({ ballistic } = await load_({ ...ball, atmosphere: { ...ISA, useISA: false, altitude: '4000' } }));
-		expect(ballistic.atmosphere).toMatchObject({ useISA: false, mode: 'accurate', pressureRef: 'qnh', altitude: '4000' });
+		// 29.92 inHg as QNH at 4000 ft is 25.8408 inHg at the site (#172).
+		expect(ballistic.atmosphere).toMatchObject({ useISA: false, mode: 'accurate', pressureRef: 'station', pressure: '25.84', altitude: '4000' });
 		expect(storage.values['zro-ballistic'].atmosphere.mode).toBeUndefined();
+		expect(storage.values['zro-ballistic'].atmosphere.pressure).toBe('29.92');
 	});
 
 	it('changes the mode without losing the boxes, and writes useISA with it for an older build', async () => {
@@ -259,7 +280,7 @@ describe('zro-ballistic', () => {
 		ballistic.setAtmosphere({ mode: 'fog' });
 		expect(ballistic.atmosphere.mode).toBe('accurate');
 		ballistic.setAtmosphere({ useISA: true });
-		expect(storage.values['zro-ballistic'].atmosphere).toEqual({ ...ISA, mode: 'isa', weather: 'cloudy', pressureRef: 'qnh' });
+		expect(storage.values['zro-ballistic'].atmosphere).toEqual({ ...ISA, mode: 'isa', weather: 'cloudy', pressureRef: 'station' });
 	});
 
 	describe('elevation angle (#173)', () => {
@@ -309,7 +330,7 @@ describe('zro-ballistic', () => {
 
 	it('starts on the standard atmosphere, in ISA mode', async () => {
 		const { ballistic } = await load('#lib/stores/ballistic.svelte.js', {});
-		expect(ballistic.atmosphere).toEqual({ ...ISA, mode: 'isa', weather: 'cloudy', pressureRef: 'qnh' });
+		expect(ballistic.atmosphere).toEqual({ ...ISA, mode: 'isa', weather: 'cloudy', pressureRef: 'station' });
 		expect(ballistic.options.chartMode).toBe('drop');
 	});
 
