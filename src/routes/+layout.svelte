@@ -8,6 +8,9 @@
 	import ReticleIcon from '#lib/components/ReticleIcon.svelte';
 	import DarkModeToggle from '#lib/components/DarkModeToggle.svelte';
 	import { settings, applyDarkMode } from '#lib/stores/settings.svelte.js';
+	import { profiles } from '#lib/stores/profiles.svelte.js';
+	import { shownProfile } from '#lib/utils/storedProfiles.js';
+	import { profileName } from '#lib/components/profile/profileLabels.js';
 
 	let { children } = $props();
 
@@ -35,6 +38,22 @@
 
 	// The path without its /fr or /de prefix, so a nav item is active in every language.
 	let currentPath = $derived(deLocalizeHref(page.url.pathname));
+
+	// The profile editor (#166) has its own header (back, title, Cancel / Save) on phone and tablet,
+	// and a pinned Cancel / Save bar instead of the tab bar on phones.
+	let editor = $derived(/^\/profiles\/(?!ammo-selector\/?$)[^/]+\/?$/.test(currentPath));
+
+	// Desktop sidebar (#166): under Profiles, on its sub-pages, every profile (rifle · ammunition)
+	// linking to its editor, then "+ New profile".
+	let profileSubItems = $derived.by(() => {
+		if (!currentPath.startsWith('/profiles/')) return null;
+		const items = profiles.list.map(shownProfile).map((p) => {
+			const ammo = p.bulletBrand?.trim();
+			return { href: `/profiles/${p.id}`, label: ammo ? `${profileName(p)} · ${ammo}` : profileName(p) };
+		});
+		items.push({ href: '/profiles/new', label: `+ ${m.profiles_new()}` });
+		return items;
+	});
 
 	// First-run screens (#150) are full screen: no header, rail, sidebar or tab bar.
 	const bareRoutes = ['/welcome', '/setup'];
@@ -141,6 +160,7 @@
 				{#each navItems as item (item.href)}
 					{@const Icon = item.icon}
 					{@const current = currentAttr(item.href)}
+					{@const subItems = item.href === '/profiles' ? profileSubItems : item.subItems}
 					<a
 						href={localizeHref(item.href)}
 						aria-current={current}
@@ -153,18 +173,18 @@
 						<Icon class="size-[18px] shrink-0" aria-hidden="true" />
 						{m[item.labelKey]()}
 					</a>
-					{#if item.subItems}
+					{#if subItems}
 						<div class="ml-[19px] pl-2.5 border-l border-surface-200-800 flex flex-col gap-0.5">
-							{#each item.subItems as sub (sub.href)}
+							{#each subItems as sub (sub.href)}
 								{@const subActive = isActive(sub.href)}
 								<a
 									href={localizeHref(sub.href)}
 									aria-current={currentAttr(sub.href)}
-									class="flex items-center h-[34px] px-2.5 rounded-base text-[13px] {focusRing} {subActive
+									class="flex items-center min-h-[34px] px-2.5 py-1 rounded-base text-[13px] leading-tight break-words {focusRing} {subActive
 										? 'preset-filled-primary-500 font-semibold'
 										: 'text-surface-600-400 hover:preset-tonal-surface hover:text-surface-950-50'}"
 								>
-									{m[sub.labelKey]()}
+									{sub.label ?? m[sub.labelKey]()}
 								</a>
 							{/each}
 						</div>
@@ -180,7 +200,7 @@
 
 		<!-- Page content with header inside scroll area -->
 		<main class="flex-1 min-w-0 overflow-y-auto">
-			<header class="flex items-center gap-1 pl-4 pr-2 py-2 sm:pl-6 sm:pr-4 lg:hidden">
+			<header class="{editor ? 'hidden' : 'flex'} items-center gap-1 pl-4 pr-2 py-2 sm:pl-6 sm:pr-4 lg:hidden">
 				{#if canGoBack}
 					<button
 						type="button"
@@ -205,7 +225,7 @@
 	<!-- Phone tab bar (below sm) -->
 	<nav
 		aria-label={m.nav_main()}
-		class="sm:hidden grid grid-cols-4 px-1.5 pt-1.5 pb-1 border-t border-surface-200-800 bg-surface-100-900"
+		class="{editor ? 'hidden' : 'grid'} sm:hidden grid-cols-4 px-1.5 pt-1.5 pb-1 border-t border-surface-200-800 bg-surface-100-900"
 	>
 		{#each navItems as item (item.href)}
 			{@const Icon = item.icon}

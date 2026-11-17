@@ -28,7 +28,7 @@ Versions are those locked in `package-lock.json` on `develop`.
 src/
 ├── routes/                  # Pages, see below
 ├── lib/
-│   ├── actions/             # Svelte actions (swipe)
+│   ├── actions/             # Svelte actions (focusTrap; swipe, unused since #166)
 │   ├── assets/              # Favicon
 │   ├── components/          # Reusable Svelte components
 │   ├── data/ammo.json       # Ammunition library, 41 loads
@@ -68,9 +68,9 @@ Configuration is in [`vite.config.js`](../vite.config.js). There is no `svelte.c
 | `/calculators/compare-trajectories/add` | Choose a profile to compare |
 | `/calculators/dope-cards` | PDF cards: the mid-range card (imperial, metric) and the precision dope card generator ([`PrecisionCardGenerator.svelte`](../src/lib/components/PrecisionCardGenerator.svelte), [#157](https://github.com/hawkins48b/cw-zro/issues/157)) |
 | `/calculators/dope-cards/precision-guide` | How to read the precision dope card (①–⑥, wind quarters, printing) |
-| `/profiles` | Profile list |
-| `/profiles/new`, `/profiles/[id]` | Profile form |
-| `/profiles/ammo-selector` | Ammunition library |
+| `/profiles` | Profiles: picker list (tap to use), summary of the profile in use, Import, Export all ([#166](2026-11-17-166-profiles-redesign.md)) |
+| `/profiles/new`, `/profiles/[id]` | Profile editor in five sections ([`ProfileForm`](../src/lib/components/ProfileForm.svelte)) |
+| `/profiles/ammo-selector` | Ammunition library: select, then "Use this ammunition" |
 | `/settings`, `/settings/about`, `/settings/privacy` | Settings pages |
 
 `/fr` and `/de` prefix any route. English has no prefix. A start without a prefix goes to the language the user picked last, stored in `localStorage` ([#96](https://github.com/hawkins48b/cw-zro/issues/96)). See [Translations](translations.md#locale-urls).
@@ -139,6 +139,20 @@ Since [#148](https://github.com/hawkins48b/cw-zro/issues/148) the Scope View pag
 
 On phones the page is one column: profile bar, distance, result, wind, angle, atmosphere. From 640 px the result is in a right column, sticky.
 
+### Profile components
+
+Since [#166](2026-11-17-166-profiles-redesign.md) (Profiles round) profile and ammunition selection share the picker pattern of the guided setup: search, one list card, the selected row tinted with a check badge, a tonal summary card. The components compute nothing; import, export and delete logic is in `utils/` and the stores.
+
+| Component | Role |
+|-----------|------|
+| [`ProfilePicker`](../src/lib/components/ProfilePicker.svelte) | Search, sort Recent (newest first) / Rifle / Ammo, single choice or checkboxes, New badges, groups. Used by Profiles and the import review; meant for the calculators and Compare in a later round |
+| [`picker/`](../src/lib/components/picker/) | `PickerSearch`, `PickerList`, `PickerGroup`, `PickerRow`, `AmmoSummaryCard`, shared with the Ammo Library and the setup ammunition step |
+| [`profile/ProfileSummaryCard`](../src/lib/components/profile/ProfileSummaryCard.svelte), [`ProfileDetailsCard`](../src/lib/components/profile/ProfileDetailsCard.svelte) | The profile in use: 8 key numbers and Edit (phone), right pane from 768 px |
+| [`profile/ProfileImportDialog`](../src/lib/components/profile/ProfileImportDialog.svelte) | File chooser and review; reads files with [`profileImport.js`](../src/lib/utils/profileImport.js), stores with `importProfiles` |
+| [`ResponsiveDialog`](../src/lib/components/ResponsiveDialog.svelte), [`ConfirmDialog`](../src/lib/components/ConfirmDialog.svelte), [`Toast`](../src/lib/components/Toast.svelte), [`SwitchRow`](../src/lib/components/SwitchRow.svelte) | Sheet on phones / dialog from 640 px; small confirmation; bottom message; on/off row. Dialogs use the [`focusTrap`](../src/lib/actions/focusTrap.js) action |
+
+Store functions added: `deleteProfile` in [`activeProfile.svelte.js`](../src/lib/stores/activeProfile.svelte.js) (refuses the last profile; the next, else the previous, becomes active), `importProfiles` in [`profiles.svelte.js`](../src/lib/stores/profiles.svelte.js) (appends, `null` when the save fails), `trySet` and `resetLocalStores` in [`localStore.svelte.js`](../src/lib/stores/localStore.svelte.js), and [`clearAllData.js`](../src/lib/stores/clearAllData.js) (not called by a page yet). `swipe.js` and the `svelte-gestures` dependency are no longer used.
+
 ### Ballistic page
 
 Since [#151](https://github.com/hawkins48b/cw-zro/issues/151) the Ballistic page ([`+page.svelte`](../src/routes/calculators/ballistic/+page.svelte)) has a header (title, the active profile with Change, Export CSV), then the conditions (Distances, `ScopeWindCard`, `ScopeAtmosphereCard`) and the results (four stats, the Bullet Path chart, the data table). Under 1024 px (`lg`) it is one column in that order; from 1024 px the conditions are a left column of 300 to 340 px and the results fill the right.
@@ -200,6 +214,8 @@ The input handling is written out six times: in `calculateShotPoint`, `calculate
 | 1024 px and over | Sidebar, 240 px: logo and tagline, the four items, the calculators listed under Calculators (Ballistic, Dope Cards, MPBR, Compare, Trajectory Validation, the hub's order), the version at the foot. No header | Light / Dark buttons at the foot |
 
 The width decides this, not the platform. Since [#149](2026-11-16-149-nav-hub-profiles.md) the three are plain `<nav>` elements in [`+layout.svelte`](../src/routes/+layout.svelte), built from one item list and shown by CSS breakpoints (`sm`, `lg`); Skeleton's `Navigation` component is no longer used. An item is active on its page and on the pages under it, compared on the path without `/fr` or `/de`, so it is marked in every language; `/` counts as Scope View. The link of the page itself has `aria-current="page"`, a section the page is in `aria-current="true"`.
+
+On the profile editor routes (`/profiles/new`, `/profiles/[id]`) the layout hides its header under 1024 px and the phone tab bar: the editor has its own header and a pinned Cancel / Save bar. On every `/profiles/...` sub-page the desktop sidebar lists the profiles (rifle · ammunition) and "+ New profile" under Profiles (#166).
 
 ## Desktop
 

@@ -1,6 +1,22 @@
 import { browser } from '$app/env';
 
 /**
+ * How to put each store made by localStore back to its default in memory, for clearAllData (#166).
+ * In the order the stores were made, so a default that reads another store (the active profile
+ * reads the profiles) sees it already reset.
+ * @type {Set<() => void>}
+ */
+const resets = new Set();
+
+/**
+ * Puts every store made by localStore back to its default in memory, without writing it: after
+ * the stored keys are removed, the app reads as on its first launch (#166).
+ */
+export function resetLocalStores() {
+	for (const reset of resets) reset();
+}
+
+/**
  * Creates a reactive localStorage-backed state.
  *
  * @param {string} key - localStorage key
@@ -36,8 +52,10 @@ export function localStore(key, init, { seed = true } = {}) {
 	function write(value) {
 		try {
 			localStorage.setItem(key, JSON.stringify(value));
+			return true;
 		} catch (e) {
 			console.warn(`Could not save ${key}:`, e);
+			return false;
 		}
 	}
 
@@ -47,6 +65,10 @@ export function localStore(key, init, { seed = true } = {}) {
 		if (browser) write(data);
 	}
 
+	resets.add(() => {
+		data = getDefault();
+	});
+
 	return {
 		get value() {
 			return data;
@@ -54,6 +76,17 @@ export function localStore(key, init, { seed = true } = {}) {
 		set value(v) {
 			data = v;
 			persist();
+		},
+		/**
+		 * Saves a value and keeps it only when the save worked (security review of #166): when storage
+		 * refuses it (full, or blocked), the value in memory stays the old one, so the page does not
+		 * show as saved what the next start would not have.
+		 * @returns {boolean} whether it was saved (always true outside the browser)
+		 */
+		trySet(v) {
+			if (browser && !write(v)) return false;
+			data = v;
+			return true;
 		},
 		/** Call after in-place mutations (push, splice, index assignment) */
 		persist

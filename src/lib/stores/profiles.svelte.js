@@ -1,4 +1,4 @@
-import { addProfile, removeProfile, updateProfile } from '#lib/utils/profileOps.js';
+import { addProfile, appendImportedProfiles, removeProfile, updateProfile } from '#lib/utils/profileOps.js';
 import {
 	findProfileIdRenames,
 	normalizeProfiles,
@@ -88,3 +88,19 @@ export const profiles = {
 		return profileForStoredId(store.value, id);
 	}
 };
+
+/**
+ * Appends imported profiles (#166): the profiles of planImport's candidates the user kept. No stored
+ * profile is replaced and the active profile is not changed. The profiles must come from planImport
+ * (profileImport.js), which checked them and gave them new ids.
+ *
+ * When storage refuses the list (full, or blocked), nothing is added, in storage or in memory, and
+ * the result is null, so the page can say so (security review of #166).
+ * @param {object[]} profileList
+ * @returns {string[] | null} the ids of the added profiles, in order; null when the save failed
+ */
+export function importProfiles(profileList) {
+	const { list, ids } = appendImportedProfiles(readList(), profileList);
+	if (ids.length > 0 && !store.trySet(list)) return null;
+	return ids;
+}

@@ -18,6 +18,8 @@ Data stays in the browser's `localStorage`, or the same store in the Electron an
 | `zro-dark-mode` | Dark mode choice, stored only after a change | [`settings`](../src/lib/stores/settings.svelte.js) |
 | `zro-locale` | Language picked in the language switcher, `en`, `fr` or `de` as plain text, stored only after a click ([#96](https://github.com/hawkins48b/cw-zro/issues/96)) | [`storedLocale.js`](../src/lib/utils/storedLocale.js), read by [`hooks.client.js`](../src/hooks.client.js) |
 
+Every key starts with `zro-`. [`appStorage.js`](../src/lib/utils/appStorage.js) lists them (`APP_STORAGE_KEYS`) for "Clear all data on this device" ([#166](https://github.com/hawkins48b/cw-zro/issues/166)): `clearAllData` in [`clearAllData.js`](../src/lib/stores/clearAllData.js) removes these keys and any other key starting with `zro-`, puts every store back to its default in memory, empties the ammo selection and form draft, and deletes the old locale cookie. Keys of other apps on the same origin are left alone. The function is tested, but no screen calls it yet: the button and its confirmation come with the Settings round of #166.
+
 These are the only uses of `localStorage` in `src/`, apart from the read in [`theme-init.js`](../static/theme-init.js), loaded by [`app.html`](../src/app.html), that sets dark mode before the first paint. Each stays until the user clears the site data or uninstalls the app. There is no `sessionStorage`, no IndexedDB and no service worker.
 
 **In memory only**, gone on reload: the ammo selection in progress and the profile form draft ([`ammoSelection`](../src/lib/stores/ammoSelection.svelte.js), [`formDraft`](../src/lib/stores/formDraft.svelte.js)).
@@ -26,7 +28,7 @@ These are the only uses of `localStorage` in `src/`, apart from the read in [`th
 
 ### Limits of this storage
 
-- Data lives on one device, in one browser. There is no sync, backup or import of profiles. One profile at a time can be exported as a JSON file ([#149](https://github.com/hawkins48b/cw-zro/issues/149), see below), but the app cannot read it back yet.
+- Data lives on one device, in one browser. There is no sync or automatic backup. Profiles can be exported as JSON files, one ([#149](https://github.com/hawkins48b/cw-zro/issues/149)) or all ([#166](https://github.com/hawkins48b/cw-zro/issues/166)), and imported again on any device (see below). Only profiles: calculator inputs and settings are not exported.
 - Clearing site data deletes everything. The web, desktop and mobile apps each have their own separate storage.
 - A value that is not valid JSON is replaced by the default, so a corrupted store loses its content.
 - Anyone with access to the device or browser profile can read it.
@@ -65,7 +67,7 @@ What Open-Meteo logs and keeps is in its own terms, not in this repository; it w
 
 **Generated files** are built on the device. CSV exports, PDF dope cards and profile exports are saved through the normal download. They contain profile names and data, so they go wherever the user sends them.
 
-**Profile export** ([#149](https://github.com/hawkins48b/cw-zro/issues/149)). Export in the profile's menu on the Profiles page saves `zro-profile-<name>.json`, built by [`profileExport.js`](../src/lib/utils/profileExport.js). Nothing is sent: the page makes a `blob:` URL and clicks a download link. The file holds the whole profile as stored (`profiles.get`), its id included, in an envelope:
+**Profile export** ([#149](https://github.com/hawkins48b/cw-zro/issues/149)). "Export this profile" on the card of the profile in use (Profiles page, since #166; the ⋮ menu before) saves `zro-profile-<name>.json`, built by [`profileExport.js`](../src/lib/utils/profileExport.js). Nothing is sent: the page makes a `blob:` URL and clicks a download link. The file holds the whole profile as stored (`profiles.get`), its id included, in an envelope:
 
 | Field | Value |
 |-------|-------|
@@ -74,7 +76,25 @@ What Open-Meteo logs and keeps is in its own terms, not in this repository; it w
 | `exportedAt` | The time of the export, ISO 8601 in UTC (`null` if the clock gives no valid date) |
 | `profile` | The stored profile, every field as stored, damaged values included |
 
-The file name keeps letters (accented ones too), digits, `_` and `-` from the profile name; every other run of characters (spaces, dots, path characters, control and format characters, emoji) becomes one `-`; `-` and `_` are trimmed from the ends, and the name part is cut to 60 characters. A name with nothing left gives `zro-profile.json`. A profile that is missing or not an object gives no file. Not checked on a device: whether the Android and iOS web views save a `blob:` download at all (the same open point as the CSV and the dope cards).
+The file name keeps letters (accented ones too), digits, `_` and `-` from the profile name; every other run of characters (spaces, dots, path characters, control and format characters, emoji) becomes one `-`; `-` and `_` are trimmed from the ends, and the name part is cut to 60 characters. A name with nothing left gives `zro-profile.json`. A profile that is missing or not an object gives no file. Not checked on a device: whether the Android and iOS web views save a `blob:` download at all (the same open point as the CSV and the dope cards). Since #166 the page revokes the `blob:` URL 1000 ms after the click, not at once (`downloadFile`).
+
+**Export all** ([#166](https://github.com/hawkins48b/cw-zro/issues/166)). "Export all" in the Profiles header saves every profile in one file, `zro-profiles-YYYY-MM-DD.json` (the date of the device's time zone; `zro-profiles.json` if the clock gives no valid date), the same way. No profile, no file.
+
+| Field | Value |
+|-------|-------|
+| `format` | `"zro-profiles"` |
+| `version` | `1` |
+| `exportedAt` | As in the single export |
+| `profiles` | Every stored profile as stored (`profiles.list`), ids included; entries that are not objects left out |
+
+**Profile import** ([#166](https://github.com/hawkins48b/cw-zro/issues/166)). "Import" on the Profiles page reads one or several files chosen by the user, of both formats, on the device, with [`profileImport.js`](../src/lib/utils/profileImport.js). Nothing is sent or fetched. Nothing in a file is trusted:
+
+- A file over 1 MiB is refused on its size, before it is read. A file that is empty, not JSON, of another `format`, or of a `version` other than 1 is refused. A `zro-profiles` file with more than 500 profiles is refused, and so is a file that would take one import over 500 profiles. The dialog names each refused file and its reason.
+- Each profile is rebuilt from the profile form's fields only. Every other key, `id` and `__proto__` included, is dropped. Texts are cut to 60 characters, a number text longer than 32 characters reads as an empty box. The profile must pass the profile form's validation, and is stored as the form stores it; one that fails is skipped and counted.
+- Every imported profile gets a new id (`crypto.randomUUID`). A name already used, compared without case, becomes a copy name ("K31 (2)").
+- Nothing is stored before the user confirms the review. Imported profiles are appended to `zro-profiles`; no stored profile is changed and the active profile stays. If storage refuses the save, nothing is added, in storage or in memory.
+
+The in-app privacy page does not mention import or Export all yet.
 
 ## What does not exist
 

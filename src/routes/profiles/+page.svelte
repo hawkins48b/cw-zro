@@ -1,478 +1,263 @@
 <script>
+	/**
+	 * Profiles (#166): the picker pattern. Tapping a row puts that profile in use; the summary card of
+	 * the profile in use holds Edit, Duplicate, Export this profile and Delete. Export all and Import
+	 * in the header. Phone: one column with a tonal summary; md and up: list left, details right.
+	 */
 	import { m } from '#lib/paraglide/messages.js';
 	import { localizeHref } from '#lib/paraglide/runtime.js';
-	import { profiles } from '#lib/stores/profiles.svelte.js';
-	import { activeProfile } from '#lib/stores/activeProfile.svelte.js';
-	import { Plus, Pencil, Trash2, Copy, ArrowUp, ArrowDown, Search, Download, EllipsisVertical } from '@lucide/svelte';
-	import { fly, fade } from 'svelte/transition';
-	import { usePress } from 'svelte-gestures';
-	import { swipe } from '#lib/actions/swipe.js';
+	import { profiles, importProfiles } from '#lib/stores/profiles.svelte.js';
+	import { activeProfile, deleteProfile } from '#lib/stores/activeProfile.svelte.js';
+	import { Plus, Upload, Download, Copy, Trash2 } from '@lucide/svelte';
 	import { shownProfile } from '#lib/utils/storedProfiles.js';
-	import { copyName } from '#lib/utils/profileOps.js';
-	import { profileExportFile } from '#lib/utils/profileExport.js';
-
-	let sortBy = $state('recent');
-	let sortDesc = $state(true);
-	let searchQuery = $state('');
+	import { copyName, canDeleteProfile, nextActiveAfterDelete } from '#lib/utils/profileOps.js';
+	import {
+		downloadProfile,
+		downloadAllProfiles,
+		allProfilesExportFileName,
+		profileExportFilename
+	} from '#lib/utils/profileExport.js';
+	import ProfilePicker from '#lib/components/ProfilePicker.svelte';
+	import ProfileSummaryCard from '#lib/components/profile/ProfileSummaryCard.svelte';
+	import ProfileDetailsCard from '#lib/components/profile/ProfileDetailsCard.svelte';
+	import ProfileImportDialog from '#lib/components/profile/ProfileImportDialog.svelte';
+	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
+	import Toast from '#lib/components/Toast.svelte';
+	import { profileName } from '#lib/components/profile/profileLabels.js';
 
 	// The profiles as the page shows them (#120): names are text, so they sort and search.
 	let shownProfiles = $derived(profiles.list.map(shownProfile));
+	let activeId = $derived(activeProfile.id);
+	let current = $derived(shownProfiles.find((p) => p.id === activeId) ?? null);
+	let canDelete = $derived(canDeleteProfile(profiles.list));
 
-	let sortedProfiles = $derived.by(() => {
-		const list = shownProfiles;
-		switch (sortBy) {
-			case 'name':
-				return [...list].sort((a, b) =>
-					sortDesc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)
-				);
-			case 'ammo':
-				return [...list].sort((a, b) =>
-					sortDesc ? a.ammo.localeCompare(b.ammo) : b.ammo.localeCompare(a.ammo)
-				);
-			default: // 'recent'
-				return sortDesc ? [...list] : [...list].reverse();
-		}
-	});
+	/** Ids imported in this visit, marked New in the list. */
+	let newIds = $state([]);
+	let toast = $state('');
+	let importDialog = $state(null);
 
-	let filteredProfiles = $derived.by(() => {
-		const q = searchQuery.trim().toLowerCase();
-		if (!q) return sortedProfiles;
-		return sortedProfiles.filter(
-			(p) => p.name.toLowerCase().includes(q) || p.ammo.toLowerCase().includes(q)
-		);
-	});
-
-	function handleSortClick(value) {
-		if (value === sortBy) {
-			sortDesc = !sortDesc;
-		} else {
-			sortBy = value;
-		}
-	}
-
-	// ── Long press (context menu) ──────────────────────────────────────────
-
-	function makePressHandler() {
-		return usePress(
-			(e) => {
-				const wrapper = e.detail.target?.closest('[data-card-id]');
-				if (!wrapper) return;
-				wrapper.addEventListener('click', stopClick, { capture: true, once: true });
-				openContextMenu(wrapper.dataset.cardId);
-			},
-			() => ({ timeframe: 500, spread: 10, triggerBeforeFinished: true, touchAction: 'auto' })
-		);
-	}
-
-	function stopClick(e) {
-		e.stopPropagation();
-	}
-
-	const listPress = makePressHandler();
-
-	// ── Delete confirmation ────────────────────────────────────────────────
-
-	let deleteConfirmId = $state(null);
-	let deleteSource = $state(null); // 'swipe' | 'menu'
-	let deleteConfirmProfile = $derived(shownProfiles.find((p) => p.id === deleteConfirmId) ?? null);
-
-	function requestDelete(id, source = 'menu') {
-		deleteConfirmId = id;
-		deleteSource = source;
-	}
-
-	function confirmDelete() {
-		const id = deleteConfirmId;
-		const source = deleteSource;
-		deleteConfirmId = null;
-		deleteSource = null;
-		if (source === 'swipe') {
-			swipeRefs[id]?.flyOut(() => collapseAndRemove(id));
-		} else {
-			setTimeout(() => collapseAndRemove(id), 50);
-		}
-	}
-
-	function cancelDelete() {
-		const id = deleteConfirmId;
-		const source = deleteSource;
-		deleteConfirmId = null;
-		deleteSource = null;
-		if (source === 'swipe') {
-			swipeRefs[id]?.snapBack();
-		}
-	}
-
-	// ── Context menu ───────────────────────────────────────────────────────
-
-	let contextMenuId = $state(null);
-	let contextMenuProfile = $derived(shownProfiles.find((p) => p.id === contextMenuId));
-	let sheetEl = $state(null);
-	// The ⋮ button that opened the sheet: focus goes back to it when the sheet closes (#149).
-	let sheetTrigger = null;
-
-	function openContextMenu(id, trigger = null) {
-		sheetTrigger = trigger;
-		contextMenuId = id;
-	}
-
-	function closeContextMenu() {
-		if (contextMenuId === null) return;
-		contextMenuId = null;
-		sheetTrigger?.focus();
-		sheetTrigger = null;
-	}
-
-	// Move focus into the sheet when it opens, so keyboard and screen reader users land on its actions.
-	$effect(() => {
-		if (contextMenuId !== null && sheetEl) sheetEl.querySelector('a, button')?.focus();
-	});
-
-	function duplicateProfile(id) {
-		const src = profiles.get(id);
-		if (!src) return;
-		const { id: _id, ...rest } = src;
-		profiles.add({ ...rest, name: copyName(src) });
-		closeContextMenu();
-	}
-
-	function deleteFromMenu(id) {
-		closeContextMenu();
-		setTimeout(() => requestDelete(id, 'menu'), 180);
-	}
-
-	/**
-	 * Export one profile as a JSON file (#149), through a normal download, as the CSV and dope card
-	 * downloads do. The file is built on the device from the stored profile; nothing is sent. A
-	 * profile that is missing or not an object gives no file (profileExportFile).
-	 * @param {string} id - the profile id, as in profiles.get(id)
-	 */
-	function exportProfile(id) {
-		closeContextMenu();
-		const file = profileExportFile(profiles.get(id), new Date());
-		if (!file) return;
-		const blob = new Blob([file.content], { type: file.type });
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = file.filename;
-		a.click();
-		URL.revokeObjectURL(url);
-	}
-
-	// ── Use: activate profile ──────────────────────────────────────────────
-	// Only the Use button activates a profile now (#149): tapping the card body does nothing.
-
-	function useProfile(id) {
+	function use(id) {
 		if (id !== activeProfile.id) activeProfile.setActive(id);
 	}
 
-	// ── Swipe refs & background state ─────────────────────────────────────
-
-	const swipeRefs = {};
-
-	function setSwipeRef(id, api) {
-		if (api) swipeRefs[id] = api;
-		else delete swipeRefs[id];
+	function duplicate() {
+		const src = profiles.get(activeId);
+		if (!src) return;
+		const { id: _id, ...rest } = src;
+		profiles.add({ ...rest, name: copyName(src) });
+		toast = m.profiles_duplicated({ name: copyName(src) });
 	}
 
-	let swipeActive = $state({});
-
-	// ── Collapse & remove ──────────────────────────────────────────────────
-
-	let itemRefs = $state({});
-
-	function collapseAndRemove(id) {
-		const el = itemRefs[id];
-		if (!el) { removeFromList(id); return; }
-		const h = el.getBoundingClientRect().height;
-		el.animate(
-			[{ height: `${h}px`, overflow: 'hidden' }, { height: '0px', overflow: 'hidden' }],
-			{ duration: 220, easing: 'ease', fill: 'forwards' }
-		).onfinish = () => removeFromList(id);
+	function exportOne() {
+		const src = profiles.get(activeId);
+		if (!src) return;
+		if (downloadProfile(src)) {
+			toast = m.profiles_exported_one({ name: profileName(current), file: profileExportFilename(current?.name) });
+		}
 	}
 
-	function removeFromList(id) {
-		if (activeProfile.id === id) activeProfile.setActive(profiles.list.find((p) => p.id !== id)?.id ?? null);
-		profiles.remove(id);
-		delete swipeActive[id];
-		delete swipeRefs[id];
-		delete itemRefs[id];
+	function exportAll() {
+		const now = new Date();
+		const count = profiles.list.length;
+		if (downloadAllProfiles(profiles.list, now)) {
+			toast =
+				count === 1
+					? m.profiles_exported_all_one({ file: allProfilesExportFileName(now) })
+					: m.profiles_exported_all({ count, file: allProfilesExportFileName(now) });
+		}
 	}
 
-	// ── Misc ───────────────────────────────────────────────────────────────
+	// ── Delete ────────────────────────────────────────────────────────────
+	let confirmDelete = $state(false);
+	let nextName = $derived.by(() => {
+		const id = nextActiveAfterDelete(profiles.list, activeId);
+		const next = shownProfiles.find((p) => p.id === id);
+		return next ? profileName(next) : '';
+	});
 
-	function zeroLabel(profile) {
-		return `${profile.zeroDist}\u202f${profile.zeroUnit === 'yd' ? m.unit_yd() : m.unit_m()}`;
+	function doDelete() {
+		const name = profileName(current);
+		confirmDelete = false;
+		if (deleteProfile(activeId)) toast = m.profiles_deleted({ name });
 	}
 
-	function velocityLabel(profile) {
-		return `${profile.velocity}\u202f${profile.velocityUnit === 'fps' ? m.unit_fps() : m.unit_mps()}`;
-	}
-
-	/** Meta line of a card: zero distance · muzzle velocity · elevation click, each left out when empty. */
-	function metaLine(profile) {
-		const parts = [];
-		if (profile.zeroDist !== '') parts.push(m.profiles_meta_zero({ distance: zeroLabel(profile) }));
-		if (profile.velocity !== '') parts.push(velocityLabel(profile));
-		parts.push(`${profile.elevationClickUnit}\u00a0${profile.elevationClickValue}`);
-		return parts.join(' · ');
+	function imported(ids) {
+		newIds = [...newIds, ...ids];
+		if (ids.length > 0) toast = ids.length === 1 ? m.profiles_imported_one() : m.profiles_imported({ count: ids.length });
 	}
 
 	const focusRing = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500';
-
-	const sortOptions = [
-		{ value: 'recent', labelKey: 'profiles_sort_recent' },
-		{ value: 'name', labelKey: 'profiles_sort_name' },
-		{ value: 'ammo', labelKey: 'profiles_sort_ammo' }
-	];
+	const outlineBtn = `btn preset-outlined-surface-300-700 hover:preset-tonal-surface h-11 px-3.5 gap-2 text-sm font-semibold ${focusRing}`;
+	let exportAllLabel = $derived(m.profiles_export_all({ count: profiles.list.length }));
 </script>
 
 <svelte:head>
 	<title>{m.profiles_title()} — {m.app_name()}</title>
 </svelte:head>
 
-<svelte:window onkeydown={(e) => {
-	if (e.key !== 'Escape') return;
-	if (deleteConfirmId !== null) cancelDelete();
-	else closeContextMenu();
-}} />
-
-
-{#snippet newProfileButton()}
+{#snippet newProfileButton(cls)}
 	<a
 		href={localizeHref('/profiles/new')}
-		class="btn preset-filled-primary-500 w-full h-[50px] gap-2 text-[15px] font-semibold {focusRing}"
+		class="btn preset-filled-primary-500 gap-2 font-semibold {focusRing} {cls}"
 	>
 		<Plus class="size-[18px]" strokeWidth={2.5} aria-hidden="true" />
 		{m.profiles_new()}
 	</a>
 {/snippet}
 
-<div class="max-w-2xl flex flex-col gap-2.5 px-2 sm:px-0">
-	{#if profiles.list.length === 0}
-		<!-- Empty state -->
-		<div class="card preset-filled-surface-100-900 border border-surface-200-800 p-5 flex flex-col gap-4">
-			<p class="text-sm leading-relaxed text-surface-600-400">{m.profiles_empty()}</p>
-			{@render newProfileButton()}
-		</div>
-	{:else}
-		<p class="mx-1 text-sm leading-relaxed text-surface-600-400">{m.profiles_intro()}</p>
-
-		<!-- Search: always visible, filters by rifle or ammo -->
-		<label
-			class="input !flex !items-center gap-2 h-[46px] px-3 text-surface-600-400 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primary-500"
+{#snippet phoneActions()}
+	<div class="flex gap-1.5">
+		<button type="button" class="btn flex-1 min-w-0 h-11 px-1 text-[13px] font-semibold bg-surface-50-950 {focusRing}" onclick={duplicate}>
+			{m.profiles_duplicate()}
+		</button>
+		<button type="button" class="btn flex-[1.6] min-w-0 h-11 px-1 text-[13px] font-semibold bg-surface-50-950 {focusRing}" onclick={exportOne}>
+			<span class="truncate">{m.profiles_export_this()}</span>
+		</button>
+		<button
+			type="button"
+			class="btn flex-1 min-w-0 h-11 px-1 text-[13px] font-semibold bg-surface-50-950 text-error-600-400 {focusRing}"
+			disabled={!canDelete}
+			title={canDelete ? undefined : m.profiles_delete_last()}
+			onclick={() => (confirmDelete = true)}
 		>
-			<Search class="size-[18px] shrink-0" aria-hidden="true" />
-			<input
-				type="search"
-				class="flex-1 min-w-0 bg-transparent border-none outline-none shadow-none p-0 text-[15px] text-surface-950-50"
-				placeholder={m.profiles_search_placeholder()}
-				aria-label={m.profiles_search()}
-				bind:value={searchQuery}
-			/>
-		</label>
+			{m.common_delete()}
+		</button>
+	</div>
+	{#if !canDelete}
+		<p class="-mt-1 text-xs">{m.profiles_delete_last()}</p>
+	{/if}
+{/snippet}
 
-		<!-- Sort chips: a second tap on the active one reverses the order -->
-		{#if profiles.list.length > 1}
-			<div role="group" aria-label={m.profiles_sort_label()} class="flex gap-1.5 overflow-x-auto py-1">
-				{#each sortOptions as opt (opt.value)}
-					{@const isActiveSort = sortBy === opt.value}
-					<button
-						type="button"
-						class="chip touch-hit min-w-11 h-8 px-3 shrink-0 {focusRing} {isActiveSort
-							? 'preset-filled-primary-500 font-semibold'
-							: 'preset-tonal-surface'}"
-						aria-pressed={isActiveSort}
-						onclick={() => handleSortClick(opt.value)}
-					>
-						{m[opt.labelKey]()}
-						{#if isActiveSort}
-							{#if sortDesc}
-								<ArrowDown class="size-3.5" aria-hidden="true" />
-							{:else}
-								<ArrowUp class="size-3.5" aria-hidden="true" />
-							{/if}
-						{/if}
-					</button>
-				{/each}
+{#snippet paneActions()}
+	<div class="flex flex-wrap items-center gap-2 pt-3 border-t border-surface-200-800">
+		<button type="button" class={outlineBtn} onclick={duplicate}>
+			<Copy class="size-4" aria-hidden="true" />
+			{m.profiles_duplicate()}
+		</button>
+		<button type="button" class={outlineBtn} onclick={exportOne}>
+			<Download class="size-4" aria-hidden="true" />
+			{m.profiles_export_this()}
+		</button>
+		<span class="flex-1"></span>
+		{#if !canDelete}
+			<span class="text-xs text-surface-600-400">{m.profiles_delete_last()}</span>
+		{/if}
+		<button
+			type="button"
+			class="{outlineBtn} text-error-600-400"
+			disabled={!canDelete}
+			onclick={() => (confirmDelete = true)}
+		>
+			<Trash2 class="size-4" aria-hidden="true" />
+			{m.common_delete()}
+		</button>
+	</div>
+{/snippet}
+
+<div class="max-w-[1240px] flex flex-col gap-2.5 px-2 sm:px-4 lg:px-0 md:gap-5">
+	<!-- Header: title on tablet/desktop (the phone header shows it), Import, Export all, New profile -->
+	<header class="flex flex-wrap items-center gap-x-4 gap-y-2">
+		<div class="hidden md:block flex-1 basis-80 min-w-0">
+			<h1 class="text-2xl lg:text-[28px] font-bold tracking-tight">{m.profiles_title()}</h1>
+			<p class="mt-1 text-sm text-surface-600-400">{m.profiles_tap_intro()}</p>
+		</div>
+		<h1 class="sr-only md:hidden">{m.profiles_title()}</h1>
+		{#if profiles.list.length > 0}
+			<div class="flex gap-0.5 md:gap-2 -mt-1 md:mt-0 ml-auto md:ml-0">
+				<button
+					type="button"
+					class="btn h-11 px-2.5 gap-1.5 text-sm font-semibold text-primary-700-300 md:text-surface-950-50 md:preset-outlined-surface-300-700 md:hover:preset-tonal-surface md:px-3.5 {focusRing}"
+					aria-haspopup="dialog"
+					onclick={() => importDialog?.chooseFiles()}
+				>
+					<Upload class="size-[17px]" aria-hidden="true" />
+					{m.profiles_import()}
+				</button>
+				<button
+					type="button"
+					class="btn h-11 px-2.5 gap-1.5 text-sm font-semibold text-primary-700-300 md:text-surface-950-50 md:preset-outlined-surface-300-700 md:hover:preset-tonal-surface md:px-3.5 {focusRing}"
+					onclick={exportAll}
+				>
+					<Download class="size-[17px]" aria-hidden="true" />
+					{exportAllLabel}
+				</button>
+			</div>
+			<div class="hidden md:block">
+				{@render newProfileButton('h-11 px-[18px] text-sm')}
 			</div>
 		{/if}
+	</header>
 
-		{#if filteredProfiles.length === 0 && searchQuery.trim()}
-			<p class="mx-1 text-sm text-surface-600-400" role="status">{m.profiles_no_results()}</p>
-		{:else}
-			<!-- listPress spread here so one pointer-controls instance covers all list cards -->
-			<ul class="flex flex-col gap-2.5" {...listPress}>
-				{#each filteredProfiles as profile (profile.id)}
-					{@const isActive = profile.id === activeProfile.id}
-					{@const name = profile.name || m.scope_view_profile_unnamed()}
-					<li bind:this={itemRefs[profile.id]} data-card-id={profile.id}>
-						<div
-							class="relative overflow-hidden rounded-container"
-							class:bg-error-500={swipeActive[profile.id]}
-						>
-							{#if !isActive}
-								<div class="absolute inset-y-0 right-0 flex items-center pr-5" aria-hidden="true">
-									<Trash2 class="size-5 text-white" />
-								</div>
-							{/if}
+	{#if profiles.list.length === 0}
+		<!-- Empty state: create one, or import a file -->
+		<div class="card preset-filled-surface-100-900 border border-surface-200-800 p-5 flex flex-col gap-4 max-w-lg">
+			<p class="text-sm leading-relaxed text-surface-600-400">{m.profiles_empty()}</p>
+			{@render newProfileButton('w-full h-[50px] text-[15px]')}
+			<button type="button" class="{outlineBtn} w-full" aria-haspopup="dialog" onclick={() => importDialog?.chooseFiles()}>
+				<Upload class="size-4" aria-hidden="true" />
+				{m.profiles_import()}
+			</button>
+		</div>
+	{:else}
+		<p class="md:hidden mx-1 text-sm leading-snug text-surface-600-400">{m.profiles_tap_intro()}</p>
 
-							<!-- Card: the swipe action handles horizontal drag (inactive cards only) -->
-							<div
-								class="relative select-none flex items-center gap-2 py-2 pl-3.5 pr-1.5 rounded-container border border-surface-200-800 preset-filled-surface-100-900"
-								use:swipe={{
-									canSwipe: !isActive,
-									ref: (api) => setSwipeRef(profile.id, api)
-								}}
-								onswipedelete={() => requestDelete(profile.id, 'swipe')}
-								onswipechange={(e) => { swipeActive[profile.id] = e.detail.active; }}
-							>
-								<div class="flex-1 min-w-0 py-1">
-									<p class="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[15px] font-semibold">
-										<span class="min-w-0 break-words">{name}</span>
-										{#if isActive}
-											<span
-												class="px-2 py-0.5 rounded-full preset-tonal-primary text-[10px] font-bold tracking-wide uppercase"
-											>
-												{m.profiles_in_use()}
-											</span>
-										{/if}
-									</p>
-									{#if profile.ammo}
-										<p class="mt-0.5 text-[13px] text-surface-600-400 break-words">{profile.ammo}</p>
-									{/if}
-									<p class="mt-1 text-xs text-surface-600-400">{metaLine(profile)}</p>
-								</div>
+		<div class="flex flex-col gap-2.5 md:flex-row md:items-start md:gap-5 lg:gap-6">
+			<!-- List -->
+			<div class="md:w-[320px] lg:w-[380px] md:shrink-0 min-w-0">
+				<ProfilePicker
+					profiles={shownProfiles}
+					selectedId={activeId}
+					onselect={use}
+					{newIds}
+					label={m.profiles_title()}
+					rowLabel={(p) => m.profiles_use_named({ name: profileName(p) })}
+					showCount
+				/>
+			</div>
 
-								{#if !isActive}
-									<button
-										type="button"
-										class="btn preset-outlined-surface-300-700 h-11 px-3.5 shrink-0 text-[13px] font-semibold {focusRing}"
-										aria-label={m.profiles_use_named({ name })}
-										onclick={() => useProfile(profile.id)}
-									>
-										{m.profiles_use()}
-									</button>
-								{/if}
-								<button
-									type="button"
-									class="btn-icon size-11 shrink-0 rounded-base text-surface-600-400 hover:preset-tonal-surface {focusRing}"
-									aria-label={m.profiles_more_actions({ name })}
-									aria-haspopup="dialog"
-									title={m.profiles_more_actions({ name })}
-									onclick={(e) => openContextMenu(profile.id, e.currentTarget)}
-								>
-									<EllipsisVertical class="size-[18px]" aria-hidden="true" />
-								</button>
-							</div>
-						</div>
-					</li>
-				{/each}
-			</ul>
-		{/if}
+			<!-- Profile in use -->
+			{#if current}
+				<div class="md:hidden">
+					<ProfileSummaryCard
+						profile={current}
+						editHref={localizeHref(`/profiles/${current.id}`)}
+						actions={phoneActions}
+					/>
+				</div>
+				<div class="hidden md:block flex-1 min-w-0">
+					<ProfileDetailsCard
+						profile={current}
+						editHref={localizeHref(`/profiles/${current.id}`)}
+						actions={paneActions}
+					/>
+				</div>
+			{/if}
+		</div>
 
-		<div class="pt-1">
-			{@render newProfileButton()}
+		<div class="md:hidden pt-1">
+			{@render newProfileButton('w-full h-[50px] text-[15px]')}
 		</div>
 	{/if}
 </div>
 
-<!-- Delete confirmation dialog -->
-{#if deleteConfirmId !== null}
-	<div
-		transition:fade={{ duration: 180 }}
-		class="fixed inset-0 z-50 bg-black/50"
-		role="presentation"
-		onclick={cancelDelete}
-	></div>
-	<div
-		transition:fly={{ y: 16, duration: 220, opacity: 0 }}
-		class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
-	>
-		<div
-			class="card preset-filled-surface-100-900 p-6 w-full max-w-sm shadow-2xl pointer-events-auto"
-			role="dialog"
-			aria-modal="true"
-			aria-labelledby="delete-dialog-title"
-			aria-describedby="delete-dialog-desc"
-		>
-			<h2 id="delete-dialog-title" class="h5 mb-2">{m.profiles_delete()}</h2>
-			<p id="delete-dialog-desc" class="text-surface-500 mb-6">
-				{m.profiles_delete_confirm({ name: deleteConfirmProfile?.name ?? '' })}
-			</p>
-			<footer class="flex gap-2 justify-end">
-				<button class="btn preset-tonal-surface" onclick={cancelDelete}>
-					{m.common_cancel()}
-				</button>
-				<button class="btn preset-filled-error-500" onclick={confirmDelete}>
-					{m.common_delete()}
-				</button>
-			</footer>
-		</div>
-	</div>
+<ProfileImportDialog
+	bind:this={importDialog}
+	existing={profiles.list}
+	inUseName={current ? profileName(current) : ''}
+	onimport={importProfiles}
+	ondone={imported}
+/>
+
+{#if confirmDelete && current}
+	<ConfirmDialog
+		title={m.profiles_delete()}
+		message={nextName
+			? m.profiles_delete_confirm_next({ name: profileName(current), next: nextName })
+			: m.profiles_delete_confirm({ name: profileName(current) })}
+		confirmLabel={m.common_delete()}
+		onconfirm={doDelete}
+		oncancel={() => (confirmDelete = false)}
+	/>
 {/if}
 
-<!-- Context menu bottom sheet -->
-{#if contextMenuId}
-	<div
-		transition:fade={{ duration: 180 }}
-		class="fixed inset-0 z-40 bg-black/50"
-		role="presentation"
-		onclick={closeContextMenu}
-	></div>
-
-	<div
-		transition:fly={{ y: 320, duration: 280, opacity: 1 }}
-		class="fixed bottom-0 inset-x-0 z-50 bg-surface-100-900 rounded-t-2xl shadow-2xl
-			max-w-lg mx-auto px-4 pt-3"
-		style="padding-bottom: calc(2rem + var(--safe-area-bottom));"
-		role="dialog"
-		aria-modal="true"
-		aria-labelledby="profile-sheet-title"
-		bind:this={sheetEl}
-	>
-		<div class="w-10 h-1 bg-surface-300-700 rounded-full mx-auto mb-4" aria-hidden="true"></div>
-		<p id="profile-sheet-title" class="font-semibold text-center mb-5 truncate px-4">
-			{contextMenuProfile?.name || m.scope_view_profile_unnamed()}
-		</p>
-
-		<div class="grid gap-2">
-			<a
-				href={localizeHref(`/profiles/${contextMenuId}`)}
-				class="btn preset-tonal-surface justify-start gap-3 h-12"
-			>
-				<Pencil class="size-5" aria-hidden="true" />
-				{m.common_edit()}
-			</a>
-			<button
-				class="btn preset-tonal-surface justify-start gap-3 h-12"
-				onclick={() => duplicateProfile(contextMenuId)}
-			>
-				<Copy class="size-5" aria-hidden="true" />
-				{m.profiles_duplicate()}
-			</button>
-			<button
-				type="button"
-				class="btn preset-tonal-surface justify-start gap-3 h-12"
-				onclick={() => exportProfile(contextMenuId)}
-			>
-				<Download class="size-5" aria-hidden="true" />
-				{m.profiles_export()}
-			</button>
-			{#if contextMenuId !== activeProfile.id}
-				<button
-					class="btn preset-tonal-error justify-start gap-3 h-12"
-					onclick={() => deleteFromMenu(contextMenuId)}
-				>
-					<Trash2 class="size-5" aria-hidden="true" />
-					{m.common_delete()}
-				</button>
-			{/if}
-		</div>
-
-		<button class="btn preset-outlined-surface-200-800 w-full mt-3 h-11" onclick={closeContextMenu}>
-			{m.common_cancel()}
-		</button>
-	</div>
-{/if}
+<Toast message={toast} ondismiss={() => (toast = '')} />

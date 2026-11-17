@@ -38,3 +38,30 @@ describe('localStore when storage refuses a write', () => {
 		expect(console.warn).toHaveBeenCalled();
 	});
 });
+
+describe('localStore.trySet (security review of #166)', () => {
+	afterEach(() => {
+		vi.unstubAllGlobals();
+		vi.restoreAllMocks();
+	});
+
+	it('keeps the old value and returns false when storage refuses the write', () => {
+		const saved = { 'zro-test': JSON.stringify([1]) };
+		let refuse = true;
+		vi.stubGlobal('localStorage', {
+			getItem: (k) => saved[k] ?? null,
+			setItem: (k, v) => {
+				if (refuse) throw new Error('QuotaExceededError');
+				saved[k] = v;
+			}
+		});
+		vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const store = localStore('zro-test', []);
+		expect(store.trySet([1, 2])).toBe(false);
+		expect(store.value).toEqual([1]);
+		refuse = false;
+		expect(store.trySet([1, 2])).toBe(true);
+		expect(store.value).toEqual([1, 2]);
+		expect(saved['zro-test']).toBe('[1,2]');
+	});
+});

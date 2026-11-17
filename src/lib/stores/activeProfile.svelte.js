@@ -1,3 +1,4 @@
+import { canDeleteProfile, nextActiveAfterDelete } from '#lib/utils/profileOps.js';
 import { storedProfileId } from '#lib/utils/storedProfiles.js';
 import { localStore } from './localStore.svelte.js';
 import { profiles } from './profiles.svelte.js';
@@ -20,3 +21,17 @@ export const activeProfile = {
 		return profiles.findStored(storedProfileId(store.value)) || profiles.list[0] || null;
 	}
 };
+
+/**
+ * Deletes a profile (#166). Refused when it is the last profile (canDeleteProfile) or not found.
+ * Deleting the profile in use first makes the next one in list order active, else the previous one
+ * (nextActiveAfterDelete). Here, not in the profiles store, which cannot import this one.
+ * @param {string} id
+ * @returns {boolean} whether the profile was deleted
+ */
+export function deleteProfile(id) {
+	const list = profiles.list;
+	if (!canDeleteProfile(list) || !list.some((p) => p.id === id)) return false;
+	if (activeProfile.id === id) activeProfile.setActive(nextActiveAfterDelete(list, id));
+	return profiles.remove(id);
+}
