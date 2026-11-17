@@ -9,7 +9,7 @@ ZRO is in English, French and German, through Paraglide 3. English is the base l
 | Plugin | [`vite.config.js`](../vite.config.js) |
 | Generated code | `src/lib/paraglide/`, git-ignored |
 
-Each language has 988 keys on 2026-11-17, after #182 added 88 for the 3D ballistic tutorial (`tutorial_` prefix). Check with `node -e "console.log(Object.keys(require('./messages/en.json')).length)"`.
+Each language has 990 keys on 2026-11-17, after #182 added 88 for the 3D ballistic tutorial (`tutorial_` prefix). Check with `node -e "console.log(Object.keys(require('./messages/en.json')).length)"`.
 
 ## Adding a message
 
