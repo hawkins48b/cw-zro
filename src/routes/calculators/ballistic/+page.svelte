@@ -515,13 +515,13 @@
 		from a 672 px page (Atmosphere under both) and one row of three cards from 768 px (#166 tablet).
 		lg and up (where the app sidebar appears): conditions on the left, results on the right (#151).
 	-->
-	<div class="@container max-w-[1180px] mx-auto flex flex-col gap-4 lg:gap-5">
+	<div class="@container flex flex-col gap-3 sm:gap-4 lg:gap-5">
 		<!-- ═══ Header ═══════════════════════════════════════════════════ -->
 		<!--
 			Phone: the profile card (Change opens the picker) and an Export CSV icon button.
 			sm and up: intro, compact profile chip, Export CSV button (#166 boards).
 		-->
-		<header class="flex flex-wrap items-center gap-x-4 gap-y-3 px-1 sm:px-0">
+		<header class="flex flex-wrap items-center gap-x-4 gap-y-3">
 			<div class="max-sm:contents flex-[1_1_320px] min-w-0">
 				<!-- Below lg the app header already shows the title -->
 				<h1 class="sr-only lg:not-sr-only lg:text-[28px] lg:font-bold lg:tracking-tight">{m.ballistic_title()}</h1>

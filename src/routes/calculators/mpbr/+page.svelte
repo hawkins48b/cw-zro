@@ -563,7 +563,7 @@
 		From lg (desktop sidebar): left inputs, save, about; right answer, chart, all results.
 		Save and All results are written in both columns and shown in one; the chart only once.
 	-->
-	<div class="max-w-[1180px] mx-auto flex flex-col gap-4 lg:gap-5">
+	<div class="flex flex-col gap-3 sm:gap-4 lg:gap-5">
 		<header class="flex flex-wrap items-center gap-x-4 gap-y-3 px-1 sm:px-0">
 			<div class="order-2 sm:order-none flex-[1_1_320px] min-w-0">
 				<!-- Below lg the app header already shows the title -->

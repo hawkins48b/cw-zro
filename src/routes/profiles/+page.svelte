@@ -154,7 +154,7 @@
 	</div>
 {/snippet}
 
-<div class="max-w-[1240px] flex flex-col gap-2.5 px-2 sm:px-4 lg:px-0 md:gap-5">
+<div class="flex flex-col gap-3 sm:gap-4 lg:gap-5">
 	<!-- Header: title on tablet/desktop (the phone header shows it), Import, Export all, New profile -->
 	<header class="flex flex-wrap items-center gap-x-4 gap-y-2">
 		<div class="hidden md:block flex-1 basis-80 min-w-0">

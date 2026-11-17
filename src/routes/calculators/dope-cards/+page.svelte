@@ -61,7 +61,7 @@
 		<a href={localizeHref('/profiles')} class="btn preset-tonal-primary">{m.nav_profiles()}</a>
 	</div>
 {:else}
-	<div class="max-w-[1180px] flex flex-col gap-2.5 sm:gap-4 lg:gap-5">
+	<div class="flex flex-col gap-3 sm:gap-4 lg:gap-5">
 		<!-- Header: title on desktop (the app header shows it below lg) and intro from sm -->
 		<header class="max-sm:sr-only">
 			<h1 class="sr-only lg:not-sr-only lg:text-[28px] lg:font-bold lg:tracking-tight">{m.dope_title()}</h1>

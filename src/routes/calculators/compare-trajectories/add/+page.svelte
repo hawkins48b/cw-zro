@@ -13,7 +13,7 @@
 	<title>{m.compare_pick_profile()} — {m.app_name()}</title>
 </svelte:head>
 
-<div class="max-w-2xl flex flex-col gap-2.5 px-2 sm:px-0">
+<div class="mx-auto w-full max-w-2xl flex flex-col gap-3 sm:gap-4 lg:gap-5">
 	<h1 class="sr-only lg:not-sr-only lg:text-[28px] lg:font-bold lg:tracking-tight">{m.compare_pick_profile()}</h1>
 	<CompareAddPicker pinned onadded={() => goto(localizeHref('/calculators/compare-trajectories'))} />
 </div>

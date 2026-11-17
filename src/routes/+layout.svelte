@@ -238,8 +238,13 @@
 				<!-- The rail has its own theme button on tablets -->
 				<DarkModeToggle class="sm:hidden" />
 			</header>
-			<div class="px-2 pb-2 sm:px-2 sm:pb-6 lg:px-8 lg:py-8">
-				{@render children()}
+			<!-- One page frame for every route (#169): side padding per device class (phone 16 px, tablet
+				24 px in line with the header, desktop 16 to 40 px as on the design boards), and on every
+				device the content centred within 1180 px. Pages set no width, centring or side padding. -->
+			<div class="px-4 pb-4 sm:px-6 sm:pb-6 lg:px-[clamp(16px,3vw,40px)] lg:pt-8 lg:pb-12">
+				<div class="mx-auto w-full max-w-[1180px]">
+					{@render children()}
+				</div>
 			</div>
 		</main>
 	</div>

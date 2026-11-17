@@ -141,7 +141,7 @@
 	once. Desktop (lg, ScopeDesktop board): title and intro, inputs a little wider than the result,
 	which keeps its Dial / Hold switch. The elevation angle is its own card at every width (#166).
 -->
-<div class="max-w-[1180px] mx-auto flex flex-col gap-3 sm:gap-5">
+<div class="flex flex-col gap-3 sm:gap-4 lg:gap-5">
 	<header class="flex flex-wrap items-center gap-x-4 gap-y-3">
 		<div class="max-sm:contents flex-[1_1_320px] min-w-0">
 			<!-- Below lg the app header already shows the title -->

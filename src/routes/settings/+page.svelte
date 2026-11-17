@@ -22,7 +22,7 @@
 	<title>{m.settings_title()} — {m.app_name()}</title>
 </svelte:head>
 
-<div class="max-w-[1180px] flex flex-col gap-2.5 px-2 sm:px-4 md:px-0 md:gap-5">
+<div class="flex flex-col gap-3 sm:gap-4 lg:gap-5">
 	<!-- Phone: the layout header shows "Settings". Tablet: "General" (the pane says Settings). Desktop: "Settings". -->
 	<header class="flex flex-wrap items-end gap-x-6 gap-y-1">
 		<div class="flex-1 min-w-0">

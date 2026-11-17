@@ -287,7 +287,7 @@
 	</button>
 {/snippet}
 
-<div class="max-w-[1180px] flex flex-col gap-3 px-2 sm:px-0 sm:gap-4 lg:gap-5">
+<div class="flex flex-col gap-3 sm:gap-4 lg:gap-5">
 	{#if profiles.list.length === 0}
 		<div class="py-12 text-center space-y-3">
 			<p class="text-surface-600-400">{m.compare_no_profiles()}</p>

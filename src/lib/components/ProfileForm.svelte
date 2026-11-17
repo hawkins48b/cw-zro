@@ -351,7 +351,7 @@
 
 <form
 	bind:this={formEl}
-	class="max-w-[1200px] flex flex-col gap-4 lg:gap-5 px-2 sm:px-4 lg:px-0"
+	class="flex flex-col gap-3 sm:gap-4 lg:gap-5"
 	aria-labelledby="{uid}-title"
 	onsubmit={(e) => {
 		e.preventDefault();

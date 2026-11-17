@@ -188,7 +188,7 @@
 	</div>
 {/snippet}
 
-<div class="max-w-[1240px] flex flex-col gap-2.5 px-2 sm:px-4 lg:px-0 lg:gap-5">
+<div class="flex flex-col gap-3 sm:gap-4 lg:gap-5">
 	<!-- Header: phone/tablet under the layout header; desktop breadcrumb + title -->
 	<nav aria-label={m.common_breadcrumb()} class="hidden lg:flex items-center gap-2 text-[13px] text-surface-600-400">
 		<a href={localizeHref('/profiles')} class="font-medium text-primary-700-300 underline-offset-2 hover:underline {focusRing}">{m.profiles_title()}</a>

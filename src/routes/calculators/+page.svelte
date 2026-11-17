@@ -99,7 +99,7 @@
 	</li>
 {/snippet}
 
-<div class="max-w-2xl sm:max-w-[1180px] flex flex-col gap-2.5 px-2 sm:px-0 sm:gap-4">
+<div class="flex flex-col gap-3 sm:gap-4 lg:gap-5">
 	<!-- Header: title on desktop (the app header shows it below lg), intro, profile chip from sm -->
 	<header class="flex flex-wrap items-center gap-x-4 gap-y-3">
 		<div class="flex-[1_1_320px] min-w-0">

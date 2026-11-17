@@ -24,7 +24,7 @@
 	let currentPath = $derived(deLocalizeHref(page.url.pathname).replace(/(.)\/$/, '$1'));
 </script>
 
-<div class="md:flex md:items-start md:gap-6 md:pt-6 md:px-4 lg:block lg:p-0">
+<div class="md:flex md:items-start md:gap-6 md:pt-6 lg:block lg:pt-0">
 	<nav
 		aria-labelledby="settings-pane-title"
 		class="hidden md:flex lg:hidden sticky top-6 w-64 shrink-0 flex-col gap-1 pr-4 border-r border-surface-200-800 min-h-[calc(100dvh-4rem)]"

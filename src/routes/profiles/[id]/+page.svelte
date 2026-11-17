@@ -28,7 +28,7 @@
 		/>
 	{/key}
 {:else}
-	<div class="px-2 sm:px-4 lg:px-0 py-4 flex flex-col items-start gap-3">
+	<div class="py-4 flex flex-col items-start gap-3">
 		<p class="text-surface-600-400">{m.common_error()}</p>
 		<a href={localizeHref('/profiles')} class="btn preset-tonal-surface h-11">{m.profiles_title()}</a>
 	</div>

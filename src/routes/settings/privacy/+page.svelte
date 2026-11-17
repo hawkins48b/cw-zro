@@ -34,7 +34,7 @@
 	<title>{m.privacy_title()} — {m.app_name()}</title>
 </svelte:head>
 
-<div class="max-w-[1180px] flex flex-col gap-2.5 px-2 sm:px-4 md:px-0 md:gap-5">
+<div class="flex flex-col gap-3 sm:gap-4 lg:gap-5">
 	<h1 class="sr-only md:not-sr-only text-xl lg:text-[28px] font-bold tracking-tight">{m.privacy_title()}</h1>
 
 	<!-- Summary -->
