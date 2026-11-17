@@ -8,9 +8,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Unit } from 'js-ballistics';
 import { Calculator } from '#lib/utils/ballisticEngine.js';
 import {
+	ISA_ATMOSPHERE,
 	MAX_ROTATION,
 	isRecord,
 	storedAtmosphere,
+	storedBallisticAtmosphere,
 	storedBallisticOptions,
 	storedElevation,
 	storedObject,
@@ -24,6 +26,7 @@ import {
 } from '#lib/utils/storedState.js';
 import { calculateFullTrajectory, calculateMPBR, calculateShotPoint, hasNoAirDensity } from '#lib/utils/ballisticCalculator.js';
 import { calculateTrajectoryValidation } from '#lib/utils/trajectoryValidation.js';
+import { scopeAtmosphereParams } from '#lib/utils/scopeAtmosphere.js';
 import { ballisticPageTrajectory, isUsableBallisticRange } from '#lib/utils/ballisticPage.js';
 import { isUsableScopeAngle, isUsableScopeRange, scopeEffectiveRange } from '#lib/utils/scopeRange.js';
 import { isUsableRange } from '#lib/utils/inputLimits.js';
@@ -464,9 +467,12 @@ const ISA_VALIDATION = { useISA: true, altitude: '0', altitudeUnit: 'ft', pressu
 const MEASURE = { type: 'angle', direction: 'below', distanceValue: '0', distanceUnit: 'in', angleValue: '2', angleUnit: 'moa' };
 const EMPTY_MEASURE = { type: 'angle', direction: 'below', distanceValue: '', distanceUnit: 'in', angleValue: '', angleUnit: 'moa' };
 
-/** The validation as the page runs it, from what the store reads. */
+/**
+ * The validation as the page runs it, from what the store reads. The atmosphere is read by the store
+ * (storedValidationAtmosphere) and handed to scopeAtmosphereParams since #194.
+ */
 function pageValidation(profile, range, measure, solveFor, atmosphere) {
-	const atmo = atmosphere.useISA ? null : atmosphere;
+	const atmo = scopeAtmosphereParams(atmosphere);
 	const value = measure.type === 'distance' ? measure.distanceValue : measure.angleValue;
 	const unit = measure.type === 'distance' ? measure.distanceUnit : measure.angleUnit;
 	return calculateTrajectoryValidation(profile, range, measure.type, value, unit, solveFor, atmo, measure.direction);
@@ -592,21 +598,24 @@ describe('storedSolveFor', () => {
 });
 
 describe('storedValidationAtmosphere', () => {
-	it('keeps a good atmosphere', () => {
-		expect(storedValidationAtmosphere(ISA_VALIDATION, ISA_VALIDATION)).toEqual(ISA_VALIDATION);
+	it('reads a saved atmosphere as the Ballistic store reads its own (#194)', () => {
 		const custom = { ...ISA_VALIDATION, useISA: false, altitude: '1000', altitudeUnit: 'm' };
-		expect(storedValidationAtmosphere(custom, ISA_VALIDATION)).toEqual(custom);
+		for (const value of [ISA_VALIDATION, custom, ISA_ATMOSPHERE, { ...ISA_ATMOSPHERE, mode: 'estimate', useISA: false }]) {
+			expect(storedValidationAtmosphere(value)).toEqual(storedBallisticAtmosphere(value));
+		}
+		expect(storedValidationAtmosphere(ISA_VALIDATION)).toEqual({ ...ISA_ATMOSPHERE, pressureRef: 'qnh' });
+		expect(storedValidationAtmosphere(custom)).toMatchObject({ mode: 'accurate', pressureRef: 'station', altitude: '1000' });
 	});
 
 	it.each([[undefined], [null]])('reads %j as the standard atmosphere, as the page did', (value) => {
-		const read = storedValidationAtmosphere(value, ISA_VALIDATION);
-		expect(read).toEqual(ISA_VALIDATION);
-		expect(read).not.toBe(ISA_VALIDATION);
+		const read = storedValidationAtmosphere(value);
+		expect(read).toEqual(ISA_ATMOSPHERE);
+		expect(read).not.toBe(ISA_ATMOSPHERE);
 	});
 
 	it.each(DAMAGED_SECTIONS.filter(([, v]) => v !== null && v !== undefined))('reads %s as a custom atmosphere with empty boxes', (_, value) => {
-		expect(storedValidationAtmosphere(value, ISA_VALIDATION)).toEqual(storedAtmosphere(value));
-		expect(storedValidationAtmosphere(value, ISA_VALIDATION).useISA).toBe(false);
+		const read = storedValidationAtmosphere(value);
+		expect(read).toMatchObject({ ...storedAtmosphere(value), mode: 'accurate', useISA: false });
 	});
 });
 
@@ -631,7 +640,7 @@ describe('a damaged validation value gives no result, before the engine', () => 
 	});
 
 	it('reaches the stub with good values, so the stub is live', () => {
-		pageValidation(P308_G1, storedRange(range), storedValidationMeasure(MEASURE), 'velocity', ISA_VALIDATION);
+		pageValidation(P308_G1, storedRange(range), storedValidationMeasure(MEASURE), 'velocity', ISA_ATMOSPHERE);
 		expect(reached()).toBe(true);
 	});
 
@@ -663,7 +672,7 @@ describe('a damaged validation value gives no result, before the engine', () => 
 			storedRange('range' in stored ? stored.range : range),
 			storedValidationMeasure('measure' in stored ? stored.measure : MEASURE),
 			storedSolveFor('velocity'),
-			storedValidationAtmosphere('atmosphere' in stored ? stored.atmosphere : ISA_VALIDATION, ISA_VALIDATION)
+			storedValidationAtmosphere('atmosphere' in stored ? stored.atmosphere : ISA_VALIDATION)
 		);
 		// A custom atmosphere out of its limits stops calculateShotPoint before the engine, so the
 		// search reports no solution under the box's message, as for a typed value out of its limits.
@@ -692,7 +701,7 @@ describe('a damaged validation choice changes no result', () => {
 		const raw = { ...MEASURE, ...damaged };
 		const read = storedValidationMeasure(raw);
 		expect(read).toEqual({ ...MEASURE, ...shown });
-		const fromRead = pageValidation(P308_G1, range, read, 'velocity', ISA_VALIDATION);
+		const fromRead = pageValidation(P308_G1, range, read, 'velocity', ISA_ATMOSPHERE);
 		const before = calculateTrajectoryValidation(
 			P308_G1,
 			range,
@@ -709,9 +718,9 @@ describe('a damaged validation choice changes no result', () => {
 	});
 
 	it('a missing or null atmosphere stays the standard atmosphere', () => {
-		const standard = pageValidation(P308_G1, range, MEASURE, 'velocity', ISA_VALIDATION);
-		const missing = pageValidation(P308_G1, range, MEASURE, 'velocity', storedValidationAtmosphere(undefined, ISA_VALIDATION));
-		const nulled = pageValidation(P308_G1, range, MEASURE, 'velocity', storedValidationAtmosphere(null, ISA_VALIDATION));
+		const standard = pageValidation(P308_G1, range, MEASURE, 'velocity', ISA_ATMOSPHERE);
+		const missing = pageValidation(P308_G1, range, MEASURE, 'velocity', storedValidationAtmosphere(undefined));
+		const nulled = pageValidation(P308_G1, range, MEASURE, 'velocity', storedValidationAtmosphere(null));
 		expect(standard.validatedVelocity).toBeGreaterThan(0);
 		expect(missing.validatedVelocity).toBe(standard.validatedVelocity);
 		expect(nulled.validatedVelocity).toBe(standard.validatedVelocity);

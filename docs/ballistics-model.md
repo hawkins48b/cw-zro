@@ -39,7 +39,7 @@ Everything comes from a profile or from the screen. Values are stored as entered
 | Temperature | °F, °C | Temperature the velocity was measured at, with powder sensitivity on |
 | Temperature modifier | fps per degree of the unit above | Powder sensitivity |
 | Altitude | ft, m | Custom atmosphere: corrects the pressure, and the end of the flight |
-| Pressure | inHg, hPa | Custom atmosphere: sea-level pressure (QNH), as in weather reports (Trajectory Validation, compare). The Accurate mode of the Scope View and the Ballistic page takes station pressure only since [#172](https://github.com/hawkins48b/cw-zro/issues/172) |
+| Pressure | inHg, hPa | Custom atmosphere: sea-level pressure (QNH), as in weather reports (compare). The Accurate mode of the Scope View, the Ballistic page and, since [#194](https://github.com/hawkins48b/cw-zro/issues/194), Trajectory Validation takes station pressure only since [#172](https://github.com/hawkins48b/cw-zro/issues/172) |
 | Air temperature | °F, °C | Custom atmosphere; Scope View Estimate mode |
 | Humidity | % | Custom atmosphere. Scope View Estimate mode takes it from the weather |
 | Wind speed | mph, m/s | Wind |
@@ -57,7 +57,7 @@ Weight and diameter do not change the drag. The BC alone carries that.
 |--------|----------|------------|------|--------------------|------------|
 | Scope view | `calculateShotPoint` | ISA (standard at the altitude), Estimate or Accurate, see [Scope View modes](#scope-view-modes) | Yes | Yes | Yes |
 | Ballistic calculator | `calculateFullTrajectory` | ISA, Estimate or Accurate, as the Scope View since [#151](https://github.com/hawkins48b/cw-zro/issues/151), see [Scope View modes](#scope-view-modes) | Yes | Yes | Yes |
-| Trajectory validation | `calculateTrajectoryValidation` | Standard or custom | No | Yes | Yes |
+| Trajectory validation | `calculateTrajectoryValidation` | ISA, Estimate or Accurate, as the Scope View since [#194](https://github.com/hawkins48b/cw-zro/issues/194), see [Scope View modes](#scope-view-modes) | No | Yes | Yes |
 | Compare trajectories | `calculateFullTrajectory` | Standard only | No | Yes | Yes |
 | MPBR | `calculateMPBR` | Standard only | No | No | Vertical only is used |
 | Dope cards | `computeTrajectory` in each card file | Standard only | Preset | No | No |
@@ -75,7 +75,7 @@ A single BC scales the standard G1 or G7 drag table from the library. Any `bcTyp
 
 ## Atmosphere
 
-**Standard.** With "use ISA" on (Trajectory Validation), the app calls `new Atmo()`: sea level, 15 °C (59 °F), 1013.25 hPa, 0 % humidity. The ISA mode of the Scope View and the Ballistic page does the same at altitude 0 only; see [Scope View modes](#scope-view-modes).
+**Standard.** The app calls `new Atmo()`: sea level, 15 °C (59 °F), 1013.25 hPa, 0 % humidity. The ISA mode of the Scope View, the Ballistic page and Trajectory Validation does that at altitude 0 only; see [Scope View modes](#scope-view-modes).
 
 **Custom.** Temperature and humidity are passed as entered, and the pressure after the altitude correction below. A temperature outside -90 to 70 °C (-130 to 158 °F), a pressure outside 300 to 1200 hPa (8.86 to 35.4 inHg), a humidity outside 0 to 100, or an altitude outside -1000 to 10000 m (-3281 to 32808 ft) gives no result, and the box shows the allowed range ([#92](https://github.com/hawkins48b/cw-zro/issues/92), [#125](https://github.com/hawkins48b/cw-zro/issues/125)). The limits are in the unit entered.
 
@@ -87,7 +87,7 @@ The altitude also sets where the engine ends a flight, at an altitude of -1410.7
 
 ### Scope View modes
 
-Since [#148](https://github.com/hawkins48b/cw-zro/issues/148) the Scope View has three atmosphere modes (owner decision of 2026-11-16), and since [#151](https://github.com/hawkins48b/cw-zro/issues/151) the Ballistic page has the same three (owner decision). [`scopeAtmosphereParams`](../src/lib/utils/scopeAtmosphere.js) turns each into what `calculateShotPoint` (Scope View) or `calculateFullTrajectory` (Ballistic, through `ballisticPageTrajectory`) gets:
+Since [#148](https://github.com/hawkins48b/cw-zro/issues/148) the Scope View has three atmosphere modes (owner decision of 2026-11-16), since [#151](https://github.com/hawkins48b/cw-zro/issues/151) the Ballistic page has the same three (owner decision), and since [#194](https://github.com/hawkins48b/cw-zro/issues/194) Trajectory Validation (owner request). [`scopeAtmosphereParams`](../src/lib/utils/scopeAtmosphere.js) turns each into what `calculateShotPoint` (Scope View, Trajectory Validation through `calculateTrajectoryValidation`) or `calculateFullTrajectory` (Ballistic, through `ballisticPageTrajectory`; the Validation chart) gets:
 
 | Mode | Boxes shown | Passed to the calculator |
 |------|-------------|-------------------------------|
@@ -99,11 +99,13 @@ ISA using the altitude is the developer's choice on #148, not yet confirmed by t
 
 The Ballistic page worked the same way before #151: "use ISA" gave `new Atmo()` whatever the boxes held, and choosing it reset them to altitude 0. Its store reads a state saved before #151 (no `mode`) with `useISA` on at altitude 0 ([`storedBallisticAtmosphere`](../src/lib/utils/storedState.js)), so even a hand-edited ISA state gives `null` as before, and a custom one is Accurate with QNH, the air it computed, even with a hand-edited `pressureRef: 'station'`. ISA at another altitude and Estimate only apply once the user picks them. Every custom atmosphere still goes through `calculateFullTrajectory`'s guards; `ballisticAtmosphere.test.js` checks both with the engine stubbed.
 
+Trajectory Validation had the same switch as the Ballistic page before #151. Since #194 its store reads its atmosphere with the same reader ([`storedValidationAtmosphere`](../src/lib/utils/storedState.js) calls `storedBallisticAtmosphere`), and a missing or `null` atmosphere is still the standard one (#127). So a saved state gives the result it gave before, up to the rounding of a QNH box converted to station pressure (#172). `validationAtmosphere.test.js` checks this for ISA, a hand-edited ISA altitude, imperial and metric custom atmospheres, velocity and BC, and the damaged sections.
+
 **Accurate is station pressure only** ([#172](https://github.com/hawkins48b/cw-zro/issues/172), owner decision of 2026-11-17). Accurate values come from a Kestrel-type meter or from the weather fill, which converts its sea-level pressure on the device ([Current weather](architecture.md#current-weather)). With station pressure the site altitude changes no result: measured on the eight test loads, 850 hPa, 10 °C, 50 %, 4 m/s crosswind, 100 to 3000 m, altitudes -1000 to 10000 m, the largest difference to altitude 0 was 0.0008 cm of drop (1364 shots with a result at both). The one exception is the engine's minimum altitude (-1410.748 ft, about -430 m, see [Input guards](#input-guards)): it ends a flight once the bullet is that far below sea level, so a low altitude gave no result. At altitude 0 that hit 14 of those shots (the .223 loads from 2700 to 3000 m, the 300 BLK from 2400 m), and at -430 or -1000 m more than 200. So the engine gets 5000 m, not the stored altitude: from about 4142 m up the floor lies further below the muzzle than the engine's maximum drop (15000 ft), so it never ends an Accurate flight, and every shot that had a result at a stored altitude has the same result now (`accurateStation.test.js`). Shots that a stored altitude stopped at the floor (the altitude message) now have a result. The card shows no altitude box and no altitude message in Accurate. The density check stays, but station air within the limits always has a density (checked at the corners of the limits), so the "air too thin" message cannot appear there now.
 
 **Saved QNH states** ([#172](https://github.com/hawkins48b/cw-zro/issues/172)). An Accurate state saved with QNH (`pressureRef: 'qnh'`, or none: every Scope View state before #148 and every Ballistic custom state before #151) is converted when it is read: the QNH box times the ratio of its saved altitude (`stationPressure`, the correction the calculators made before), rounded to 1 decimal in hPa or 2 in inHg ([`accurateStationAtmosphere`](../src/lib/utils/scopeAtmosphere.js)). The result changes only by that rounding, at most 0.05 hPa or 0.005 inHg. Measured on `P223_G1`, `P308_G1` and `P338_G7_METRIC` at 300 to 1500 m with a 4 m/s crosswind: 1019 hPa at 1234 m (878.5 hPa) moves the drop by at most 0.15 cm (0.001 mil), 30.12 inHg at 4321 ft (25.70 inHg) by at most 1.6 cm (0.011 mil), both on the .223 at 1500 m; 29.92 inHg at 3000 ft (26.82 inHg) by 1.4 cm there. The fixture states, recorded as station pressures, convert back to them (24.9 inHg, 845 hPa) and give the same results as before to the bit. Edge cases: a usable QNH with an altitude out of its limits reads as an empty box (no result, as before); a converted value can fall out of the 300 to 1200 hPa limits (QNH 1013 hPa above about 9100 m, or a QNH over about 1140 hPa far below sea level), and then that state has no result where it had one.
 
-The Scope View and the Ballistic page pass `pressureRef` (always `station` in Accurate, `qnh` with 1013.25 hPa in ISA and Estimate). The Trajectory Validation store reads its atmosphere with `storedAtmosphere`, which drops the field, so its pressure is always QNH. MPBR and the dope cards use the standard atmosphere.
+The Scope View, the Ballistic page and, since #194, Trajectory Validation pass `pressureRef` (always `station` in Accurate, `qnh` with 1013.25 hPa in ISA and Estimate). MPBR and the dope cards use the standard atmosphere.
 
 ISA and Estimate show a line with the pressure at the site, temperature and humidity used ([`usedScopeAtmosphere`](../src/lib/utils/scopeAtmosphere.js)). It shows dashes when the altitude, or the Estimate temperature, is out of its limits.
 
@@ -261,7 +263,7 @@ The limits were set by the owner on 2026-11-10 ([#89](https://github.com/hawkins
 | Range | Above 0, at most 3000 yd or m |
 | Zero distance | 1 to 3000 yd or m, after taking its absolute value |
 | Air temperature, custom | -90 to 70 °C, or -130 to 158 °F |
-| Air pressure, custom | 300 to 1200 hPa, or 8.86 to 35.4 inHg, as entered (sea level). About 78 to 1349 hPa after the altitude correction ([#107](https://github.com/hawkins48b/cw-zro/issues/107)). The Accurate pressure of the Scope View and the Ballistic page is station pressure, not corrected, so the engine gets 300 to 1200 hPa ([#148](https://github.com/hawkins48b/cw-zro/issues/148), [#172](https://github.com/hawkins48b/cw-zro/issues/172)) |
+| Air pressure, custom | 300 to 1200 hPa, or 8.86 to 35.4 inHg, as entered (sea level). About 78 to 1349 hPa after the altitude correction ([#107](https://github.com/hawkins48b/cw-zro/issues/107)). The Accurate pressure of the Scope View, the Ballistic page and Trajectory Validation (#194) is station pressure, not corrected, so the engine gets 300 to 1200 hPa ([#148](https://github.com/hawkins48b/cw-zro/issues/148), [#172](https://github.com/hawkins48b/cw-zro/issues/172)) |
 | Humidity, custom | 0 to 100 % |
 | Altitude, custom | -1000 to 10000 m, or -3281 to 32808 ft ([#125](https://github.com/hawkins48b/cw-zro/issues/125)) |
 | Bullet weight | 1 to 2000 gr, or 0.065 to 130 g ([#125](https://github.com/hawkins48b/cw-zro/issues/125)) |

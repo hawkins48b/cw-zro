@@ -830,9 +830,13 @@ describe('zro-mpbr (#127)', () => {
 });
 
 describe('zro-traj-validation (#127)', () => {
-	const ISA = { useISA: true, altitude: '0', altitudeUnit: 'ft', pressure: '29.92', pressureUnit: 'inhg', temperature: '59', temperatureUnit: 'f', humidity: '0' };
+	// As saved before #194: the switch and the boxes, no mode.
+	const SAVED_ISA = { useISA: true, altitude: '0', altitudeUnit: 'ft', pressure: '29.92', pressureUnit: 'inhg', temperature: '59', temperatureUnit: 'f', humidity: '0' };
+	// As read since #194: the Scope View atmosphere (storedValidationAtmosphere).
+	const ISA = { ...SAVED_ISA, mode: 'isa', weather: 'cloudy', pressureRef: 'station' };
+	const EMPTY_CUSTOM = { useISA: false, mode: 'accurate', weather: 'cloudy', pressureRef: 'station', altitude: '', altitudeUnit: 'ft', pressure: '', pressureUnit: 'inhg', temperature: '', temperatureUnit: 'f', humidity: '' };
 	const measure = { type: 'angle', direction: 'below', distanceValue: '0', distanceUnit: 'in', angleValue: '2', angleUnit: 'moa' };
-	const good = { range: { distance: '300', unit: 'yd' }, measure, solveFor: 'velocity', atmosphere: ISA };
+	const good = { range: { distance: '300', unit: 'yd' }, measure, solveFor: 'velocity', atmosphere: SAVED_ISA };
 	const EMPTY_MEASURE = { type: 'angle', direction: 'below', distanceValue: '', distanceUnit: 'in', angleValue: '', angleUnit: 'moa' };
 	const load_ = (value) => load('#lib/stores/trajectoryValidation.svelte.js', { 'zro-traj-validation': value });
 
@@ -842,7 +846,8 @@ describe('zro-traj-validation (#127)', () => {
 		expect(tv.measure).toEqual(measure);
 		expect(tv.direction).toBe('below');
 		expect(tv.solveFor).toBe('velocity');
-		expect(tv.atmosphere).toEqual(ISA);
+		// Saved before #194: QNH, as the Ballistic store reads it; Accurate converts the box.
+		expect(tv.atmosphere).toEqual({ ...ISA, pressureRef: 'qnh' });
 	});
 
 	it.each([
@@ -872,8 +877,8 @@ describe('zro-traj-validation (#127)', () => {
 		['measure.type unknown', { ...good, measure: { ...measure, type: 'foo' } }, 'measure', measure],
 		['measure.angleUnit an object', { ...good, measure: { ...measure, angleUnit: {} } }, 'measure', measure],
 		['measure.direction an object', { ...good, measure: { ...measure, direction: {} } }, 'measure', measure],
-		['atmosphere text', { ...good, atmosphere: 'x' }, 'atmosphere', { useISA: false, altitude: '', altitudeUnit: 'ft', pressure: '', pressureUnit: 'inhg', temperature: '', temperatureUnit: 'f', humidity: '' }],
-		['atmosphere.pressure an array', { ...good, atmosphere: { ...ISA, useISA: false, pressure: ['29.92'] } }, 'atmosphere', { ...ISA, useISA: false, pressure: '' }],
+		['atmosphere text', { ...good, atmosphere: 'x' }, 'atmosphere', EMPTY_CUSTOM],
+		['atmosphere.pressure an array', { ...good, atmosphere: { ...SAVED_ISA, useISA: false, pressure: ['29.92'] } }, 'atmosphere', { ...ISA, useISA: false, mode: 'accurate', pressure: '' }],
 		['atmosphere null, read as the standard one as before', { ...good, atmosphere: null }, 'atmosphere', ISA],
 		['solveFor an object', { ...good, solveFor: {} }, 'solveFor', 'velocity'],
 		['solveFor unknown', { ...good, solveFor: 'x' }, 'solveFor', 'velocity'],
@@ -904,7 +909,7 @@ describe('zro-traj-validation (#127)', () => {
 		tv.setMeasure({ type: 'distance', distanceValue: '4' });
 		expect(tv.measure).toEqual({ ...EMPTY_MEASURE, type: 'distance', distanceValue: '4' });
 		expect(tv.range).toEqual(good.range);
-		expect(storage.values['zro-traj-validation'].atmosphere).toEqual(ISA);
+		expect(storage.values['zro-traj-validation'].atmosphere).toEqual(SAVED_ISA);
 	});
 
 	it('restores the standard atmosphere over a damaged one, and turns it off with its values', async () => {
@@ -912,6 +917,19 @@ describe('zro-traj-validation (#127)', () => {
 		tv.setAtmosphere({ useISA: true });
 		expect(tv.atmosphere).toEqual(ISA);
 		tv.setAtmosphere({ useISA: false });
-		expect(tv.atmosphere).toEqual({ ...ISA, useISA: false });
+		expect(tv.atmosphere).toEqual({ ...ISA, useISA: false, mode: 'accurate' });
+	});
+
+	it('changes mode as the Scope View does, keeping the boxes (#194)', async () => {
+		const { trajectoryValidation: tv } = await load_(good);
+		tv.setAtmosphere({ mode: 'estimate', weather: 'rain', altitude: '4000', temperature: '20' });
+		expect(tv.atmosphere).toMatchObject({ mode: 'estimate', useISA: false, weather: 'rain', altitude: '4000', temperature: '20' });
+		expect(storage.values['zro-traj-validation'].atmosphere).toMatchObject({ mode: 'estimate', useISA: false });
+		tv.setAtmosphere({ mode: 'accurate' });
+		expect(tv.atmosphere).toMatchObject({ mode: 'accurate', useISA: false, altitude: '4000', temperature: '20' });
+		tv.setAtmosphere({ mode: 'isa' });
+		expect(tv.atmosphere).toMatchObject({ mode: 'isa', useISA: true, altitude: '4000' });
+		tv.setAtmosphere({ useISA: true });
+		expect(tv.atmosphere).toEqual(ISA);
 	});
 });

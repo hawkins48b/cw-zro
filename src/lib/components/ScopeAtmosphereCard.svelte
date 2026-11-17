@@ -16,7 +16,7 @@
 
 	/**
 	 * Atmosphere card of the Scope View (#148) and the Ballistic page (#151), with three modes (owner
-	 * decisions). The Trajectory Validation page keeps AtmosphereCard.
+	 * decisions), and the Trajectory Validation page (#194, step 3, with its own title).
 	 *
 	 * - isa: altitude only; a line shows the standard pressure and temperature used (`used`).
 	 * - estimate: altitude, weather, temperature (± 1 and quick picks); a line shows what is used.
@@ -29,6 +29,7 @@
  * 0.01 inHg, temperature 1°, humidity 5 %, within the limits the calculators check
  * (utils/fieldStep.js). A step sends the new text through onchange, as typing does.
 	 *
+	 * @prop {string} [title] - Card heading, already translated; the Scope View's "Atmosphere" by default.
 	 * @prop {object} atmosphere
 	 * @prop {'isa'|'estimate'|'accurate'} atmosphere.mode
 	 * @prop {string} atmosphere.altitude          @prop {'ft'|'m'} atmosphere.altitudeUnit
@@ -58,6 +59,7 @@
 	 *   its own setAtmosphere, the same way as onchange.
 	 */
 	let {
+		title = '',
 		atmosphere,
 		used = null,
 		altitudeTooLow = false,
@@ -178,7 +180,7 @@
 
 <section class="@container card preset-filled-surface-100-900 border border-surface-200-800 px-3.5 py-3 space-y-2.5">
 	<div class="flex items-center justify-between gap-2 flex-wrap">
-		<h2 class="text-sm font-semibold">{m.scope_view_atmosphere()}</h2>
+		<h2 class="text-sm font-semibold">{title || m.scope_view_atmosphere()}</h2>
 		<ChipGroup
 			variant="segmented"
 			label={m.scope_view_atmo_mode()}

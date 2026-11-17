@@ -1,4 +1,6 @@
 import {
+	ISA_ATMOSPHERE,
+	patchedAtmosphere,
 	storedObject,
 	storedRange,
 	storedSolveFor,
@@ -6,17 +8,6 @@ import {
 	storedValidationMeasure
 } from '#lib/utils/storedState.js';
 import { localStore } from './localStore.svelte.js';
-
-const ISA_DEFAULTS = {
-	useISA: true,
-	altitude: '0',
-	altitudeUnit: 'ft',
-	pressure: '29.92',
-	pressureUnit: 'inhg',
-	temperature: '59',
-	temperatureUnit: 'f',
-	humidity: '0'
-};
 
 const defaults = {
 	range: {
@@ -32,7 +23,7 @@ const defaults = {
 		angleUnit: 'moa'    // 'moa' | 'mrad'
 	},
 	solveFor: 'velocity',   // 'velocity' | 'bc'
-	atmosphere: { ...ISA_DEFAULTS }
+	atmosphere: { ...ISA_ATMOSPHERE }
 };
 
 const _store = localStore('zro-traj-validation', defaults);
@@ -47,7 +38,8 @@ export const trajectoryValidation = {
 	// State saved before this field existed has no direction: read it as below.
 	get direction() { return this.measure.direction; },
 	get solveFor() { return storedSolveFor(state().solveFor); },
-	get atmosphere() { return storedValidationAtmosphere(state().atmosphere, ISA_DEFAULTS); },
+	/** ISA / Estimate / Accurate as on the Scope View (#194): hand it to scopeAtmosphereParams. */
+	get atmosphere() { return storedValidationAtmosphere(state().atmosphere); },
 	setRange(patch) {
 		_store.value = { ...state(), range: { ...this.range, ...patch } };
 	},
@@ -57,9 +49,8 @@ export const trajectoryValidation = {
 	setSolveFor(val) {
 		_store.value = { ...state(), solveFor: val };
 	},
+	/** Change the atmosphere as the Scope View does: see patchedAtmosphere in storedState.js. */
 	setAtmosphere(patch) {
-		const updated = { ...this.atmosphere, ...patch };
-		if (updated.useISA) Object.assign(updated, ISA_DEFAULTS, { useISA: true });
-		_store.value = { ...state(), atmosphere: updated };
+		_store.value = { ...state(), atmosphere: patchedAtmosphere(this.atmosphere, patch) };
 	}
 };

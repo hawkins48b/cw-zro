@@ -6,7 +6,9 @@ import { describe, it, expect } from 'vitest';
 import {
 	validationChange,
 	validationObservationPoint,
-	validationPatch
+	validationPatch,
+	validationPicture,
+	PICTURE_REACH
 } from '#lib/utils/validationView.js';
 
 const velocityResult = {
@@ -95,5 +97,30 @@ describe('validationObservationPoint', () => {
 		expect(validationObservationPoint('', '4', 'below')).toBeNull();
 		expect(validationObservationPoint('abc', '4', 'below')).toBeNull();
 		expect(validationObservationPoint('-5', '4', 'below')).toBeNull();
+	});
+});
+
+describe('validationPicture (#194)', () => {
+	it('puts the larger value at the reach, the other to scale, below as down', () => {
+		expect(validationPicture(-10, '20', 'below')).toEqual({ predictedY: PICTURE_REACH / 2, observedY: PICTURE_REACH, example: false });
+		expect(validationPicture(-20, '10', 'below')).toEqual({ predictedY: PICTURE_REACH, observedY: PICTURE_REACH / 2, example: false });
+	});
+
+	it('draws above the aim point as up, and ignores the sign of the typed value', () => {
+		expect(validationPicture(4, '-8', 'above')).toEqual({ predictedY: -PICTURE_REACH / 2, observedY: -PICTURE_REACH, example: false });
+	});
+
+	it('reads a decimal comma', () => {
+		expect(validationPicture(-5, '2,5', 'below').observedY).toBe(PICTURE_REACH / 2);
+	});
+
+	it.each([
+		['no calculator value', null, '12'],
+		['an empty observation', -10, ''],
+		['an observation of 0', -10, '0'],
+		['text', -10, 'abc']
+	])('is an example for %s, on the side chosen', (_, predicted, observed) => {
+		expect(validationPicture(predicted, observed, 'below')).toEqual({ predictedY: PICTURE_REACH * 0.6, observedY: PICTURE_REACH, example: true });
+		expect(validationPicture(predicted, observed, 'above').observedY).toBe(-PICTURE_REACH);
 	});
 });

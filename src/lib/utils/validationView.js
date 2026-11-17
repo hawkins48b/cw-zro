@@ -71,3 +71,28 @@ export function validationObservationPoint(rangeDistance, measureValue, directio
 	const magnitude = Math.round(Math.abs(value) * 10) / 10;
 	return { x, y: direction === 'above' ? magnitude : -magnitude };
 }
+
+/** Half the height the picture of #194 gives an impact, in its own units (viewBox 240 × 240). */
+export const PICTURE_REACH = 84;
+
+/**
+ * Where the picture of #194 (the view through the scope) draws the two impacts: y offsets from the
+ * aim point in picture units, positive downwards as in SVG. The larger of the two values reaches
+ * PICTURE_REACH, the other is to scale. Values that are missing or 0 are drawn as an example (the
+ * calculator at 60 % of the observed impact, on the side of `direction`), flagged `example`.
+ *
+ * @param {number|null|undefined} predicted - calculator value, signed: below the line of sight is negative
+ * @param {number|string|null|undefined} observed - observed value as typed, its sign is ignored
+ * @param {'below'|'above'} direction - side of the observed impact
+ * @returns {{ predictedY: number, observedY: number, example: boolean }}
+ */
+export function validationPicture(predicted, observed, direction) {
+	const side = direction === 'above' ? -1 : 1;
+	const seen = Math.abs(readDecimal(observed));
+	const calc = Number.isFinite(predicted) ? -predicted : NaN;
+	if (!Number.isFinite(seen) || seen === 0 || !Number.isFinite(calc)) {
+		return { predictedY: side * PICTURE_REACH * 0.6, observedY: side * PICTURE_REACH, example: true };
+	}
+	const scale = PICTURE_REACH / Math.max(seen, Math.abs(calc));
+	return { predictedY: calc * scale, observedY: side * seen * scale, example: false };
+}

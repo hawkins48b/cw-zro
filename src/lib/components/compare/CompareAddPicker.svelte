@@ -4,13 +4,10 @@
 	 * a tap selects (rows already on the chart carry an "On chart" badge), the tonal summary of the
 	 * selection, then the confirm button adds it. Nothing is added before the button.
 	 *
-	 * Used by the /calculators/compare-trajectories/add page (phone, tablet) and by the inline panel
-	 * of the Compare page on desktop.
+	 * Used by the /calculators/compare-trajectories/add page on every device (#193); the confirm
+	 * button sits in a bar pinned to the bottom.
 	 *
-	 * @prop {(entryProfileId: string) => void} [onadded] - After the entry was added (page: go back;
-	 *                                    panel: close).
-	 * @prop {boolean} [pinned]         - Page: the confirm button sits in a bar pinned to the bottom.
-	 * @prop {string}  [listClass]      - Classes for the list card (e.g. "max-h-72" in the panel).
+	 * @prop {(entryProfileId: string) => void} [onadded] - After the entry was added (the page goes back).
 	 */
 	import { m } from '#lib/paraglide/messages.js';
 	import { localizeHref } from '#lib/paraglide/runtime.js';
@@ -23,7 +20,7 @@
 	import ProfileSummaryCard from '#lib/components/profile/ProfileSummaryCard.svelte';
 	import { profileName, profileTitle } from '#lib/components/profile/profileLabels.js';
 
-	let { onadded, pinned = false, listClass = '' } = $props();
+	let { onadded } = $props();
 
 	let shownProfiles = $derived(profiles.list.map(shownProfile));
 	let onChartIds = $derived(new Set(compareTrajectories.entries.map((e) => profiles.findStored(e.profileId)?.id).filter(Boolean)));
@@ -63,7 +60,6 @@
 		{badges}
 		label={m.compare_pick_profile()}
 		rowLabel={(p) => (onChartIds.has(p.id) ? m.compare_row_on_chart({ name: profileTitle(p) }) : profileTitle(p))}
-		{listClass}
 	/>
 
 	{#if picked}
@@ -79,14 +75,10 @@
 		</ProfileSummaryCard>
 	{/if}
 
-	<div
-		class={pinned
-			? 'sticky bottom-0 -mx-2 sm:-mx-0 px-2 sm:px-0 pt-2.5 pb-3 bg-surface-50-950 border-t border-surface-200-800 sm:border-0'
-			: ''}
-	>
+	<div class="sticky bottom-0 -mx-2 sm:-mx-0 px-2 sm:px-0 pt-2.5 pb-3 bg-surface-50-950 border-t border-surface-200-800 sm:border-0">
 		<button
 			type="button"
-			class="btn w-full {pinned ? 'h-12 text-[15px]' : 'h-11 text-sm'} preset-filled-primary-500 gap-2 font-semibold {focusRing}"
+			class="btn w-full h-12 text-[15px] preset-filled-primary-500 gap-2 font-semibold {focusRing}"
 			disabled={!picked}
 			onclick={add}
 		>
