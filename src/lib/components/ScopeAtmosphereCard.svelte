@@ -1,8 +1,9 @@
 <script>
-	import { Sun, Cloud, CloudRain, CloudSnow, Plus, Minus, MapPin, Loader, ExternalLink } from '@lucide/svelte';
+	import { Sun, Cloud, CloudRain, CloudSnow, MapPin, Loader, ExternalLink } from '@lucide/svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { readDecimal } from '#lib/utils/decimal.js';
-	import { formatLimit } from '#lib/utils/format.js';
+	import { formatLimit, formatNumber } from '#lib/utils/format.js';
+	import { fieldStepSpec } from '#lib/utils/fieldStep.js';
 	import {
 		HUMIDITY_LIMITS,
 		altitudeLimits,
@@ -11,6 +12,7 @@
 	} from '#lib/utils/inputLimits.js';
 	import { altitudeTooLowMessage } from '#lib/components/altitudeMessage.js';
 	import ChipGroup from '#lib/components/ChipGroup.svelte';
+	import StepperField from '#lib/components/StepperField.svelte';
 
 	/**
 	 * Atmosphere card of the Scope View (#148) and the Ballistic page (#151), with three modes (owner
@@ -21,6 +23,10 @@
 	 * - accurate: pressure with QNH / Station, altitude, temperature, humidity.
 	 *
 	 * The card computes nothing: the page gives what is used, already formatted with units.
+ *
+ * Every number box has − and + (#166, StepperField): altitude 10 m or ft, pressure 1 hPa or
+ * 0.01 inHg, temperature 1°, humidity 5 %, within the limits the calculators check
+ * (utils/fieldStep.js). A step sends the new text through onchange, as typing does.
 	 *
 	 * @prop {object} atmosphere
 	 * @prop {'isa'|'estimate'|'accurate'} atmosphere.mode
@@ -91,6 +97,7 @@
 
 	let altitudeUnitLabel = $derived(atmosphere.altitudeUnit === 'm' ? m.unit_m() : m.unit_ft());
 	let temperatureUnitLabel = $derived(atmosphere.temperatureUnit === 'c' ? m.unit_c() : m.unit_f());
+	let pressureUnitLabel = $derived(atmosphere.pressureUnit === 'hpa' ? m.unit_hpa() : m.unit_inhg());
 
 	let altitudeError = $derived(
 		rangeError(atmosphere.altitude, altitudeLimits(atmosphere.altitudeUnit), altitudeUnitLabel)
@@ -99,7 +106,7 @@
 		rangeError(
 			atmosphere.pressure,
 			pressureLimits(atmosphere.pressureUnit),
-			atmosphere.pressureUnit === 'hpa' ? m.unit_hpa() : m.unit_inhg()
+			pressureUnitLabel
 		)
 	);
 	let temperatureError = $derived(
@@ -123,12 +130,16 @@
 	// Quick picks: round values in the unit shown (−10 to 30 °C, and the same temperatures in °F).
 	let quickTemps = $derived(atmosphere.temperatureUnit === 'c' ? [-10, 0, 10, 20, 30] : [14, 32, 50, 68, 86]);
 
-	/** ±1 degree. A box that is not a number starts from 0 °C (32 °F). Rounded to 0.1 against float noise. */
-	function stepTemperature(delta) {
-		const current = readDecimal(atmosphere.temperature);
-		const start = Number.isFinite(current) ? current : atmosphere.temperatureUnit === 'c' ? 0 : 32;
-		onchange({ temperature: String(Math.round((start + delta) * 10) / 10) });
-	}
+	// − / + steps (#166), in the unit shown: utils/fieldStep.js.
+	let altitudeSpec = $derived(fieldStepSpec('altitude', atmosphere.altitudeUnit));
+	let pressureSpec = $derived(fieldStepSpec('pressure', atmosphere.pressureUnit));
+	let temperatureSpec = $derived(fieldStepSpec('temperature', atmosphere.temperatureUnit));
+	const HUMIDITY_SPEC = fieldStepSpec('humidity');
+
+	const stepText = (spec, unit) => `${formatNumber(spec.step)} ${unit}`;
+	let altitudeStep = $derived(stepText(altitudeSpec, altitudeUnitLabel));
+	let pressureStep = $derived(stepText(pressureSpec, pressureUnitLabel));
+	const humidityStep = stepText(HUMIDITY_SPEC, '%');
 
 	const signed = (n) => (n < 0 ? `−${Math.abs(n)}` : String(n));
 
@@ -143,59 +154,46 @@
 </script>
 
 <!--
-	One labelled box with optional unit chips or a suffix, and its message line.
-	key: the atmosphere field; unitKey: its unit field.
+	Altitude with − / +. Full width (ISA, Estimate): unit chips inside the box. In the Accurate grid
+	(compact): the chips in the label row and the unit after the value, so the box fits 140 px.
 -->
-{#snippet field(id, label, key, units, unitKey, unitLabel, suffix, message, messageClass)}
-	<div class="space-y-0.5 min-w-0">
-		<label for={id} class="text-xs text-surface-600-400">{label}</label>
-		<div class="input !flex !items-center gap-1 h-11">
-			<input
-				{id}
-				class="flex-1 w-8 min-w-0 bg-transparent border-none outline-none shadow-none p-0 font-semibold"
-				type="text"
-				inputmode="decimal"
-				autocomplete="off"
-				value={atmosphere[key]}
-				aria-invalid={!!message && messageClass === 'error'}
-				aria-describedby={message ? `${id}-msg` : undefined}
-				oninput={(e) => onchange({ [key]: e.target.value })}
-			/>
-			{#if units}
-				<ChipGroup
-					label={unitLabel}
-					options={units}
-					value={atmosphere[unitKey]}
-					onselect={(value) => onchange({ [unitKey]: value })}
-				/>
-			{:else if suffix}
-				<span class="text-sm text-surface-600-400 shrink-0">{suffix}</span>
-			{/if}
-		</div>
-		{#if message}
-			<p
-				id="{id}-msg"
-				class="text-xs {messageClass === 'error' ? 'text-error-500' : messageClass === 'warning' ? 'text-warning-800-200' : 'text-surface-600-400'}"
-				role={messageClass === 'hint' ? undefined : 'alert'}
-			>
-				{message}
-			</p>
-		{/if}
-	</div>
+{#snippet altitudeField(compact)}
+	{@const message = altitudeError || (altitudeTooLow ? altitudeTooLowMessage(atmosphere.altitudeUnit) : '')}
+	{#snippet altitudeUnits()}
+		<ChipGroup
+			label={m.scope_view_altitude_unit()}
+			options={ALTITUDE_UNITS}
+			value={atmosphere.altitudeUnit}
+			onselect={(value) => onchange({ altitudeUnit: value })}
+		/>
+	{/snippet}
+	<StepperField
+		id="{uid}-alt"
+		label={m.scope_view_altitude()}
+		labelEnd={compact ? altitudeUnits : undefined}
+		value={atmosphere.altitude}
+		onchange={(text) => onchange({ altitude: text })}
+		spec={altitudeSpec}
+		decreaseLabel={m.scope_view_step_altitude_down({ step: altitudeStep })}
+		increaseLabel={m.scope_view_step_altitude_up({ step: altitudeStep })}
+		suffix={compact ? altitudeUnitLabel : ''}
+		units={compact ? null : ALTITUDE_UNITS}
+		unit={atmosphere.altitudeUnit}
+		unitsLabel={m.scope_view_altitude_unit()}
+		onunitchange={(value) => onchange({ altitudeUnit: value })}
+		{message}
+		messageType={altitudeError ? 'error' : 'warning'}
+		placeholder=""
+	/>
 {/snippet}
 
-{#snippet altitudeField()}
-	{@render field(
-		`${uid}-alt`,
-		m.scope_view_altitude(),
-		'altitude',
-		ALTITUDE_UNITS,
-		'altitudeUnit',
-		m.scope_view_altitude_unit(),
-		null,
-		altitudeError || (altitudeTooLow ? altitudeTooLowMessage(atmosphere.altitudeUnit) : ''),
-		altitudeError ? 'error' : 'warning'
-	)}
+{#snippet temperatureUnits()}
+	<ChipGroup
+		label={m.scope_view_temperature_unit()}
+		options={TEMPERATURE_UNITS}
+		value={atmosphere.temperatureUnit}
+		onselect={(value) => onchange({ temperatureUnit: value })}
+	/>
 {/snippet}
 
 <section class="@container card preset-filled-surface-100-900 border border-surface-200-800 px-3.5 py-3 space-y-2.5">
@@ -211,14 +209,14 @@
 	</div>
 
 	{#if atmosphere.mode === 'isa'}
-		{@render altitudeField()}
+		{@render altitudeField(false)}
 		<p class="rounded-base preset-tonal-primary px-2.5 py-2 text-xs leading-relaxed" aria-live="polite">
 			{m.scope_view_atmo_isa_used()}
 			<strong>{used?.pressure ?? '—'}</strong> · <strong>{used?.temperature ?? '—'}</strong>.
 			{m.scope_view_atmo_isa_note()}
 		</p>
 	{:else if atmosphere.mode === 'estimate'}
-		{@render altitudeField()}
+		{@render altitudeField(false)}
 
 		<!-- Weather -->
 		<div class="space-y-1">
@@ -242,47 +240,27 @@
 			</div>
 		</div>
 
-		<!-- Temperature: ± 1 and quick picks -->
+		<!-- Temperature: − / + 1° and quick picks -->
 		<div class="space-y-1">
 			<div class="flex items-center justify-between gap-2">
 				<label for="{uid}-temp" class="text-xs text-surface-600-400">{m.scope_view_atmo_temp()}</label>
-				<ChipGroup
-					label={m.scope_view_temperature_unit()}
-					options={TEMPERATURE_UNITS}
-					value={atmosphere.temperatureUnit}
-					onselect={(value) => onchange({ temperatureUnit: value })}
-				/>
+				{@render temperatureUnits()}
 			</div>
 			<div class="flex flex-wrap items-center gap-1.5">
-				<div class="input !flex !items-center !p-0 h-11 w-full @md:w-48 shrink-0 overflow-hidden">
-					<button
-						type="button"
-						class="h-full w-11 shrink-0 flex items-center justify-center preset-tonal-surface focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500"
-						aria-label={m.scope_view_temperature_colder()}
-						onclick={() => stepTemperature(-1)}
-					>
-						<Minus class="size-4" />
-					</button>
-					<input
+				<div class="w-full @md:w-48 shrink-0">
+					<StepperField
 						id="{uid}-temp"
-						class="flex-1 w-8 min-w-0 bg-transparent border-none outline-none shadow-none px-1 py-0 text-center font-semibold"
-						type="text"
-						inputmode="decimal"
-						autocomplete="off"
 						value={atmosphere.temperature}
-						aria-invalid={!!temperatureError}
-						aria-describedby={temperatureError ? `${uid}-temp-msg` : undefined}
-						oninput={(e) => onchange({ temperature: e.target.value })}
+						onchange={(text) => onchange({ temperature: text })}
+						spec={temperatureSpec}
+						decreaseLabel={m.scope_view_temperature_colder()}
+						increaseLabel={m.scope_view_temperature_warmer()}
+						suffix={temperatureUnitLabel}
+						align="center"
+						placeholder=""
+						invalid={!!temperatureError}
+						describedby={temperatureError ? `${uid}-temp-msg` : ''}
 					/>
-					<span class="text-sm text-surface-600-400 shrink-0" aria-hidden="true">{temperatureUnitLabel}</span>
-					<button
-						type="button"
-						class="h-full w-11 shrink-0 flex items-center justify-center preset-tonal-surface focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500"
-						aria-label={m.scope_view_temperature_warmer()}
-						onclick={() => stepTemperature(1)}
-					>
-						<Plus class="size-4" />
-					</button>
 				</div>
 				<div class="flex w-full @md:w-auto @md:flex-1 gap-1" role="group" aria-label={m.scope_view_temperature_quick()}>
 					{#each quickTemps as t (t)}
@@ -312,78 +290,75 @@
 			<strong>{used?.temperature ?? '—'}</strong>
 		</p>
 	{:else}
-		<!-- Accurate -->
-		<div class="space-y-0.5">
-			<div class="flex items-center justify-between gap-2">
-				<label for="{uid}-press" class="text-xs text-surface-600-400">{m.scope_view_pressure_label()}</label>
-				<ChipGroup
-					label={m.scope_view_pressure_ref()}
-					options={[
-						{ value: 'qnh', label: m.scope_view_pressure_qnh() },
-						{ value: 'station', label: m.scope_view_pressure_station() }
-					]}
-					value={atmosphere.pressureRef}
-					onselect={(pressureRef) => onchange({ pressureRef })}
-				/>
-			</div>
-			<div class="input !flex !items-center gap-1 h-11">
-				<input
-					id="{uid}-press"
-					class="flex-1 w-8 min-w-0 bg-transparent border-none outline-none shadow-none p-0 font-semibold"
-					type="text"
-					inputmode="decimal"
-					autocomplete="off"
-					value={atmosphere.pressure}
-					aria-invalid={!!pressureError || noAirDensity}
-					aria-describedby="{uid}-press-msg"
-					oninput={(e) => onchange({ pressure: e.target.value })}
-				/>
-				<ChipGroup
-					label={m.scope_view_pressure_unit()}
-					options={[
-						{ value: 'inhg', label: m.unit_inhg() },
-						{ value: 'hpa', label: m.unit_hpa() }
-					]}
-					value={atmosphere.pressureUnit}
-					onselect={(value) => onchange({ pressureUnit: value })}
-				/>
-			</div>
-			{#if pressureError}
-				<p id="{uid}-press-msg" class="text-xs text-error-500" role="alert">{pressureError}</p>
-			{:else if noAirDensity}
-				<p id="{uid}-press-msg" class="text-xs text-error-500" role="alert">{m.ballistic_air_too_thin()}</p>
-			{:else}
-				<p id="{uid}-press-msg" class="text-xs text-surface-600-400">
-					{atmosphere.pressureRef === 'station' ? m.scope_view_pressure_station_hint() : m.scope_view_pressure_qnh_hint()}
-				</p>
-			{/if}
-		</div>
+		<!-- Accurate: pressure (QNH / Station), then altitude, temperature and humidity in a grid of
+			columns of at least 140 px: two on phones, three on a wide card (#166). -->
+		{#snippet pressureRefChips()}
+			<ChipGroup
+				label={m.scope_view_pressure_ref()}
+				options={[
+					{ value: 'qnh', label: m.scope_view_pressure_qnh() },
+					{ value: 'station', label: m.scope_view_pressure_station() }
+				]}
+				value={atmosphere.pressureRef}
+				onselect={(pressureRef) => onchange({ pressureRef })}
+			/>
+		{/snippet}
+		<StepperField
+			id="{uid}-press"
+			label={m.scope_view_pressure_label()}
+			labelEnd={pressureRefChips}
+			value={atmosphere.pressure}
+			onchange={(text) => onchange({ pressure: text })}
+			spec={pressureSpec}
+			decreaseLabel={m.scope_view_step_pressure_down({ step: pressureStep })}
+			increaseLabel={m.scope_view_step_pressure_up({ step: pressureStep })}
+			units={[
+				{ value: 'inhg', label: m.unit_inhg() },
+				{ value: 'hpa', label: m.unit_hpa() }
+			]}
+			unit={atmosphere.pressureUnit}
+			unitsLabel={m.scope_view_pressure_unit()}
+			onunitchange={(value) => onchange({ pressureUnit: value })}
+			placeholder=""
+			invalid={!!pressureError || noAirDensity}
+			message={pressureError ||
+				(noAirDensity
+					? m.ballistic_air_too_thin()
+					: atmosphere.pressureRef === 'station'
+						? m.scope_view_pressure_station_hint()
+						: m.scope_view_pressure_qnh_hint())}
+			messageType={pressureError || noAirDensity ? 'error' : 'hint'}
+		/>
 
-		{@render altitudeField()}
-
-		<div class="grid grid-cols-1 @xs:grid-cols-2 gap-2">
-			{@render field(
-				`${uid}-temp`,
-				m.scope_view_atmo_temp(),
-				'temperature',
-				TEMPERATURE_UNITS,
-				'temperatureUnit',
-				m.scope_view_temperature_unit(),
-				null,
-				temperatureError,
-				'error'
-			)}
-			{@render field(
-				`${uid}-hum`,
-				m.scope_view_humidity(),
-				'humidity',
-				null,
-				null,
-				'',
-				'%',
-				humidityError,
-				'error'
-			)}
+		<div class="grid gap-2 grid-cols-[repeat(auto-fit,minmax(140px,1fr))]">
+			{@render altitudeField(true)}
+			<StepperField
+				id="{uid}-temp"
+				label={m.scope_view_atmo_temp()}
+				labelEnd={temperatureUnits}
+				value={atmosphere.temperature}
+				onchange={(text) => onchange({ temperature: text })}
+				spec={temperatureSpec}
+				decreaseLabel={m.scope_view_temperature_colder()}
+				increaseLabel={m.scope_view_temperature_warmer()}
+				suffix={temperatureUnitLabel}
+				placeholder=""
+				message={temperatureError}
+				messageType="error"
+			/>
+			<StepperField
+				id="{uid}-hum"
+				label={m.scope_view_humidity()}
+				value={atmosphere.humidity}
+				onchange={(text) => onchange({ humidity: text })}
+				spec={HUMIDITY_SPEC}
+				decreaseLabel={m.scope_view_step_humidity_down({ step: humidityStep })}
+				increaseLabel={m.scope_view_step_humidity_up({ step: humidityStep })}
+				suffix="%"
+				placeholder=""
+				message={humidityError}
+				messageType="error"
+			/>
 		</div>
 
 		{#if weatherAvailable && onweather}

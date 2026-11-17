@@ -916,5 +916,19 @@
 	"compare_zero_unit_named": "Zero distance unit for {name}",
 	"compare_zero_note": "Change a zero to see the same load zeroed elsewhere. It does not change the saved profile.",
 	"compare_chart_settings": "Chart",
-	"compare_height_in": "Height in"
+	"compare_height_in": "Height in",
+
+	"scope_view_intro": "What to dial for one shot. Set the distance first, then the wind; the answer on the right follows.",
+	"scope_view_step_speed_down": "Decrease wind speed by {step}",
+	"scope_view_step_speed_up": "Increase wind speed by {step}",
+	"scope_view_step_angle_down": "Decrease elevation angle by {step}",
+	"scope_view_step_angle_up": "Increase elevation angle by {step}",
+	"scope_view_step_altitude_down": "Decrease altitude by {step}",
+	"scope_view_step_altitude_up": "Increase altitude by {step}",
+	"scope_view_step_pressure_down": "Decrease pressure by {step}",
+	"scope_view_step_pressure_up": "Increase pressure by {step}",
+	"scope_view_step_humidity_down": "Decrease humidity by {step}",
+	"scope_view_step_humidity_up": "Increase humidity by {step}",
+	"scope_view_step_cant_down": "Decrease cant by {step}",
+	"scope_view_step_cant_up": "Increase cant by {step}"
 }

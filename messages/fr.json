@@ -916,5 +916,19 @@
 	"compare_zero_unit_named": "Unité de la distance de zéro pour {name}",
 	"compare_zero_note": "Modifiez un zéro pour voir la même munition réglée ailleurs. Le profil enregistré ne change pas.",
 	"compare_chart_settings": "Graphique",
-	"compare_height_in": "Hauteur en"
+	"compare_height_in": "Hauteur en",
+
+	"scope_view_intro": "Ce qu'il faut régler pour un tir. Saisissez d'abord la distance, puis le vent ; la réponse s'affiche à droite.",
+	"scope_view_step_speed_down": "Diminuer la vitesse du vent de {step}",
+	"scope_view_step_speed_up": "Augmenter la vitesse du vent de {step}",
+	"scope_view_step_angle_down": "Diminuer l'angle d'élévation de {step}",
+	"scope_view_step_angle_up": "Augmenter l'angle d'élévation de {step}",
+	"scope_view_step_altitude_down": "Diminuer l'altitude de {step}",
+	"scope_view_step_altitude_up": "Augmenter l'altitude de {step}",
+	"scope_view_step_pressure_down": "Diminuer la pression de {step}",
+	"scope_view_step_pressure_up": "Augmenter la pression de {step}",
+	"scope_view_step_humidity_down": "Diminuer l'humidité de {step}",
+	"scope_view_step_humidity_up": "Augmenter l'humidité de {step}",
+	"scope_view_step_cant_down": "Diminuer l'inclinaison de {step}",
+	"scope_view_step_cant_up": "Augmenter l'inclinaison de {step}"
 }

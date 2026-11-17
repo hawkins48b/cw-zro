@@ -12,7 +12,7 @@ import { MAX_WIND_DIRECTION_DEGREES, halfTurn } from './windDirection.js';
  * from 60 to 4000 fps and BC 0.02 to 2. That is all this limit shows: a wind under it can still hang
  * on an absurd atmosphere or BC, as Remaining gaps in docs/ballistics-model.md lists.
  */
-const MAX_WIND_SPEED_MPS = 100;
+export const MAX_WIND_SPEED_MPS = 100;
 
 /**
  * The winds array of a Shot, from the wind of a screen or of storage. Call this before the engine.

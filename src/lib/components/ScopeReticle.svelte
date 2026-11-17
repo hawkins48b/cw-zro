@@ -5,9 +5,18 @@
 	import { activeProfile } from '#lib/stores/activeProfile.svelte.js';
 	import { shownProfile } from '#lib/utils/storedProfiles.js';
 	import { settings } from '#lib/stores/settings.svelte.js';
+	import { fieldStepSpec, stepValue } from '#lib/utils/fieldStep.js';
+	import StepButton from '#lib/components/StepButton.svelte';
 	import { RotateCcw, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from '@lucide/svelte';
 
 	let { point = null } = $props();
+
+	// Cant − / + (#166): one degree within the slider's range (utils/fieldStep.js), stored as the
+	// slider stores it, a number.
+	const CANT_SPEC = fieldStepSpec('cant');
+	function stepCant(sign) {
+		scopeView.setRotation(Number(stepValue(scopeView.rotation, sign * CANT_SPEC.step, CANT_SPEC)));
+	}
 
 	// ── Constants ────────────────────────────────────────────────────
 	const CX = 200;
@@ -426,10 +435,16 @@
 		</span>
 	</div>
 
-	<!-- Rotation (cant) dial -->
+	<!-- Rotation (cant): slider with − / + 1° (#166), within the slider's range -->
 	<div class="space-y-2">
-		<div class="flex items-center gap-3">
+		<div class="flex items-center gap-2">
 			<label for="scope-cant" class="text-xs text-surface-600-400 shrink-0">{m.scope_view_rotation()}</label>
+			<StepButton
+				dir="down"
+				variant="standalone"
+				label={m.scope_view_step_cant_down({ step: '1°' })}
+				onclick={() => stepCant(-1)}
+			/>
 			<input
 				id="scope-cant"
 				type="range"
@@ -440,6 +455,12 @@
 				oninput={(e) => scopeView.setRotation(Number(e.target.value))}
 				aria-valuetext="{scopeView.rotation}°"
 				class="flex-1 min-w-0 h-11 accent-primary-500"
+			/>
+			<StepButton
+				dir="up"
+				variant="standalone"
+				label={m.scope_view_step_cant_up({ step: '1°' })}
+				onclick={() => stepCant(1)}
 			/>
 			<span class="text-xs font-mono w-10 text-right tabular-nums">{scopeView.rotation}°</span>
 		</div>
