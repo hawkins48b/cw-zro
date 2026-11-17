@@ -4,7 +4,6 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
 import { readFileSync } from 'fs';
 import { defineConfig } from 'vite';
-import { modelViewer } from './tools/model-viewer/plugin.js';
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
 const isCapacitor = process.env.BUILD_TARGET === 'capacitor';
@@ -45,10 +44,7 @@ const csp = {
 
 export default defineConfig({
 	define: {
-		__APP_VERSION__: JSON.stringify(pkg.version),
-		// The mobile build leaves the 3D tutorial out (#182, owner decision of 2026-11-17): the page
-		// imports its three.js scene only when this is false, so the single mobile bundle has none.
-		__MOBILE_BUILD__: JSON.stringify(isCapacitor)
+		__APP_VERSION__: JSON.stringify(pkg.version)
 	},
 	plugins: [
 		tailwindcss(),
@@ -71,10 +67,7 @@ export default defineConfig({
 						}
 					}
 				: {})
-		}),
-		// Dev-only viewer of the tutorial models at /dev/models (#181): `apply: 'serve'`, so no build
-		// has it. See tools/model-viewer/plugin.js.
-		modelViewer()
+		})
 	],
 	test: {
 		environment: 'jsdom',

@@ -17,7 +17,6 @@ export const APP_STORAGE_KEYS = Object.freeze([
 	'zro-active-profile', // activeProfile
 	'zro-ballistic', // ballistic
 	'zro-scope-view', // scopeView
-	'zro-ballistic-tutorial', // ballisticTutorial (#182)
 	'zro-traj-validation', // trajectoryValidation
 	'zro-compare-traj', // compareTrajectories
 	'zro-mpbr', // mpbr

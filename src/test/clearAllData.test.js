@@ -30,7 +30,6 @@ describe('APP_STORAGE_KEYS', () => {
 			[
 				'zro-active-profile',
 				'zro-ballistic',
-				'zro-ballistic-tutorial',
 				'zro-compare-traj',
 				'zro-dark-mode',
 				'zro-locale',

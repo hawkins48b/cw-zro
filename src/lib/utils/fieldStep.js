@@ -1,13 +1,6 @@
 import { UNew, Unit } from 'js-ballistics';
 import { readDecimal } from './decimal.js';
-import {
-	HUMIDITY_LIMITS,
-	MAX_DISTANCE,
-	altitudeLimits,
-	pressureLimits,
-	targetElevationLimits,
-	temperatureLimits
-} from './inputLimits.js';
+import { HUMIDITY_LIMITS, altitudeLimits, pressureLimits, temperatureLimits } from './inputLimits.js';
 import { MAX_SCOPE_ANGLE_DEG } from './scopeRange.js';
 import { MAX_WIND_SPEED_MPS } from './shotWind.js';
 import { MAX_ROTATION, ISA_ATMOSPHERE } from './storedState.js';
@@ -118,13 +111,11 @@ export function maxWindSpeed(speedUnit) {
  * | temperature   | 1 °C, 1 °F           | temperatureLimits                        | 0 °C, 32 °F (as before) |
  * | humidity      | 5 %                  | 0 to 100 %                               | 65 % (cloudy, default)  |
  * | cant          | 1°                   | -90° to 90° (the slider)                 | 0                       |
- * | targetDistance| 25 m, 25 yd          | 1 to MAX_DISTANCE                        | 300 (3D tutorial, #182) |
- * | targetElevation| 1 m, 5 ft           | targetElevationLimits (±500 m)           | 0 (3D tutorial, #182)   |
  *
  * Units are read as the calculators read them: `mps` or else mph, `m` or else ft, `hpa` or else
  * inHg, `c` or else °F, `deg` or else a cosine.
  *
- * @param {'windSpeed'|'windDirection'|'angle'|'altitude'|'pressure'|'temperature'|'humidity'|'cant'|'targetDistance'|'targetElevation'} field
+ * @param {'windSpeed'|'windDirection'|'angle'|'altitude'|'pressure'|'temperature'|'humidity'|'cant'} field
  * @param {string} [unit]
  * @returns {StepSpec}
  */
@@ -157,10 +148,6 @@ export function fieldStepSpec(field, unit) {
 			return { step: 5, ...HUMIDITY_LIMITS, start: WEATHER_HUMIDITY[DEFAULT_WEATHER] };
 		case 'cant':
 			return { step: 1, min: -MAX_ROTATION, max: MAX_ROTATION, start: 0 };
-		case 'targetDistance':
-			return { step: 25, min: 1, max: MAX_DISTANCE, start: 300 };
-		case 'targetElevation':
-			return { step: unit === 'm' ? 1 : 5, ...targetElevationLimits(unit), start: 0 };
 		default:
 			throw new Error(`No step for ${field}`);
 	}

@@ -299,22 +299,6 @@ export function altitudeLimits(unit) {
 }
 
 /**
- * Target elevation of the 3D tutorial (#182), the height of the target above (or, negative, below)
- * the shooter: ±500 m, or ±1640 ft (499.9 m). It never reaches the engine as a height: it gives the
- * uphill or downhill angle of the shot (tutorialPath.js), so the limit keeps the terrain readable,
- * not the engine safe.
- */
-export const TARGET_ELEVATION_LIMITS = { m: { min: -500, max: 500 }, ft: { min: -1640, max: 1640 } };
-
-/**
- * Target elevation limits in a unit: 'm', or feet for anything else.
- * @param {string} unit
- */
-export function targetElevationLimits(unit) {
-	return unit === 'm' ? TARGET_ELEVATION_LIMITS.m : TARGET_ELEVATION_LIMITS.ft;
-}
-
-/**
  * Whether the bullet and barrel of a profile can be given to the engine (#125): weight and
  * diameter always, since they always go into the drag model, and twist and length when spin drift
  * is on and they are set, the only case in which the calculators pass them on (otherwise they use
