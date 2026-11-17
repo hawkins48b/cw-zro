@@ -380,6 +380,8 @@
 	"ballistic_col_elev_clicks": "Élév (clics)",
 	"ballistic_col_wind_clicks": "Vent (clics)",
 	"ballistic_table_highlight": "La ligne en surbrillance correspond à la distance cible de la vue lunette.",
+	"ballistic_angle_note": "Les distances sont mesurées le long de la ligne de visée. Chaque ligne utilise la distance multipliée par le cosinus de l'angle, comme la vue lunette.",
+	"ballistic_angle_too_steep": "Trop raide pour le tableau : saisissez un angle entre -89,9999° et 89,9999°, ou un cosinus d'au moins 0,000001",
 
 	"mpbr_target_size": "Taille de la cible",
 	"mpbr_target_size_hint": "La zone vitale de votre cible, par exemple une plaque de 20 cm (8 in). La balle doit y rester, jamais au-dessus ni en dessous, jusqu'au MPBR.",

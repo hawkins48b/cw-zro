@@ -380,6 +380,8 @@
 	"ballistic_col_elev_clicks": "Elev (clicks)",
 	"ballistic_col_wind_clicks": "Wind (clicks)",
 	"ballistic_table_highlight": "The highlighted row is the Scope View target distance.",
+	"ballistic_angle_note": "Distances are along the line of sight. Each row uses the distance times the cosine of the angle, as the Scope View does.",
+	"ballistic_angle_too_steep": "Too steep for the table: enter an angle between -89.9999° and 89.9999°, or a cosine of at least 0.000001",
 
 	"mpbr_target_size": "Target size",
 	"mpbr_target_size_hint": "The vital zone of your target, for example a 20 cm (8 in) plate. The bullet must stay inside it, never above or below, out to the MPBR.",

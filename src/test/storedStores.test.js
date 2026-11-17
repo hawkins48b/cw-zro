@@ -201,6 +201,8 @@ describe('zro-ballistic', () => {
 		['range null', { ...ball, range: null }],
 		['atmosphere null', { ...ball, atmosphere: null }],
 		['options null', { ...ball, options: null }],
+		['elevation null', { ...ball, elevation: null }],
+		['elevation text', { ...ball, elevation: 'x' }],
 		['range.distance an object', { ...ball, range: { ...ball.range, distance: throwsAsText } }],
 		['range.step an object', { ...ball, range: { ...ball.range, step: throwsAsText } }],
 		['atmosphere.altitude an object', { ...ball, atmosphere: { ...ISA, useISA: false, altitude: throwsAsText } }],
@@ -213,6 +215,8 @@ describe('zro-ballistic', () => {
 		expect(typeof ballistic.atmosphere.useISA).toBe('boolean');
 		expect(typeof ballistic.options.showAnnotations).toBe('boolean');
 		expect(['drop', 'velocity']).toContain(ballistic.options.chartMode);
+		expect(() => readLikeThePage(ballistic.elevation.angle)).not.toThrow();
+		expect(['deg', 'cos']).toContain(ballistic.elevation.unit);
 		expect(['isa', 'estimate', 'accurate']).toContain(ballistic.atmosphere.mode);
 		expect(['qnh', 'station']).toContain(ballistic.atmosphere.pressureRef);
 		expect(() => ['time'].filter((id) => ballistic.options.visibleColumns.includes(id))).not.toThrow();
@@ -256,6 +260,51 @@ describe('zro-ballistic', () => {
 		expect(ballistic.atmosphere.mode).toBe('accurate');
 		ballistic.setAtmosphere({ useISA: true });
 		expect(storage.values['zro-ballistic'].atmosphere).toEqual({ ...ISA, mode: 'isa', weather: 'cloudy', pressureRef: 'qnh' });
+	});
+
+	describe('elevation angle (#173)', () => {
+		// A wind already in the convention of #106, so that loading writes nothing.
+		const saved = { ...ball, wind: { speed: '0', speedUnit: 'mph', direction: '90', directionConvention: 'from-target' } };
+		it('starts at 0° and stores it', async () => {
+			const { ballistic } = await load('#lib/stores/ballistic.svelte.js', {});
+			expect(ballistic.elevation).toEqual({ angle: '0', unit: 'deg' });
+			expect(storage.values['zro-ballistic'].elevation).toEqual({ angle: '0', unit: 'deg' });
+		});
+
+		it.each([
+			['saved before #173 (no angle)', saved],
+			['an angle of null', { ...saved, elevation: null }]
+		])('reads state %s as 0° and writes nothing', async (_, value) => {
+			const { ballistic } = await load_(value);
+			expect(ballistic.elevation).toEqual({ angle: '0', unit: 'deg' });
+			expect(storage.values['zro-ballistic']).toEqual(value);
+		});
+
+		it.each([
+			['text', 'x', { angle: '', unit: 'cos' }],
+			['an array', [{ angle: '30', unit: 'deg' }], { angle: '', unit: 'cos' }],
+			['an object as the angle', { angle: throwsAsText, unit: 'deg' }, { angle: '', unit: 'deg' }],
+			['a damaged unit', { angle: '0.9', unit: throwsAsText }, { angle: '0.9', unit: 'cos' }]
+		])('reads a damaged angle (%s) as the Scope View does', async (_, elevation, read) => {
+			const { ballistic } = await load_({ ...ball, elevation });
+			expect(ballistic.elevation).toEqual(read);
+			expect(() => readLikeThePage(ballistic.elevation.angle)).not.toThrow();
+		});
+
+		it('saves the angle and the unit with the Ballistic state, and keeps the rest', async () => {
+			const { ballistic } = await load_(saved);
+			ballistic.setElevation({ angle: '15' });
+			ballistic.setElevation({ unit: 'cos' });
+			expect(storage.values['zro-ballistic']).toEqual({ ...saved, elevation: { angle: '15', unit: 'cos' } });
+			expect(ballistic.elevation).toEqual({ angle: '15', unit: 'cos' });
+		});
+
+		it('recovers from a damaged angle on the next change', async () => {
+			const { ballistic } = await load_({ ...ball, elevation: 'x' });
+			ballistic.setElevation({ unit: 'deg' });
+			ballistic.setElevation({ angle: '-10' });
+			expect(storage.values['zro-ballistic'].elevation).toEqual({ angle: '-10', unit: 'deg' });
+		});
 	});
 
 	it('starts on the standard atmosphere, in ISA mode', async () => {

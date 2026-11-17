@@ -380,6 +380,8 @@
 	"ballistic_col_elev_clicks": "Elev (Klicks)",
 	"ballistic_col_wind_clicks": "Wind (Klicks)",
 	"ballistic_table_highlight": "Die hervorgehobene Zeile ist die Zielentfernung aus der Zieloptik.",
+	"ballistic_angle_note": "Die Entfernungen gelten entlang der Visierlinie. Jede Zeile verwendet die Entfernung mal den Kosinus des Winkels, wie die Zieloptik.",
+	"ballistic_angle_too_steep": "Zu steil für die Tabelle: Geben Sie einen Winkel zwischen -89,9999° und 89,9999° ein oder einen Kosinus von mindestens 0,000001",
 
 	"mpbr_target_size": "Zielgröße",
 	"mpbr_target_size_hint": "Die Trefferzone Ihres Ziels, zum Beispiel eine Platte von 20 cm (8 in). Das Geschoss muss bis zur MPBR darin bleiben, nie darüber oder darunter.",

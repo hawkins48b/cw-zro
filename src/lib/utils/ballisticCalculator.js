@@ -8,6 +8,7 @@ import {
 	DragTables,
 	Unit,
 	TrajFlag,
+	TrajectoryData,
 	RangeError as TrajectoryRangeError
 } from 'js-ballistics';
 import { Calculator, ENGINE_CONFIG, EVENT_ROWS } from './ballisticEngine.js';
@@ -21,6 +22,7 @@ import {
 import { readDecimal } from './decimal.js';
 import { createFlightCalculator, endedAtMinimumAltitude } from './flightStop.js';
 import { stationPressure } from './stationPressure.js';
+import { isUsableTableAngle, scopeAngleCosine } from './scopeRange.js';
 import {
 	hasFlyableVelocity,
 	hasUsableBullet,
@@ -338,6 +340,13 @@ const RANGE_EPSILON = 1e-6;
  * @param {object} [options]
  * @param {{ minimumAltitude?: boolean }} [options.report] - when given, minimumAltitude is set to
  *   whether a null result came from the engine's minimum altitude (flightStop.js, #125)
+ * @param {{ angle: unknown, unit: 'deg'|'cos' } | null} [options.elevation] - uphill or downhill
+ *   angle of the Ballistic page (#173), read as the Scope View reads it (scopeAngleCosine). The
+ *   range, the step and every distance returned are then along the line of sight, and each row is
+ *   the flat shot at that distance times the cosine, as calculateShotPoint gives it for the Scope
+ *   View's effective range (rifleman's rule). None, an empty box or 0° is the flat table. An angle
+ *   out of its limits (isUsableTableAngle: the Scope View's, and a cosine of at least
+ *   MIN_TABLE_COSINE) gives null.
  * @returns {{ trajectory, chartPoints, nearZero, farZero, maxApex, maxDrop, soundSpeedFPS, subsonicDist } | null}
  *   maxApex, maxDrop and subsonicDist do not depend on range.step and stay within the range.
  */
@@ -345,9 +354,17 @@ export function calculateFullTrajectory(profile, range, atmosphere, wind, option
 	const { calc, stops } = createFlightCalculator();
 	if (options.report) options.report.minimumAltitude = false;
 	try {
-		const maxDist = Math.abs(readDecimal(range.distance));
-		const stepVal = tableStep(range.step, maxDist);
-		if (!isUsableRange(maxDist)) return null;
+		const slantDist = Math.abs(readDecimal(range.distance));
+		const slantStep = tableStep(range.step, slantDist);
+		if (!isUsableRange(slantDist)) return null;
+		// --- Uphill or downhill angle (#173) ---
+		// The engine fires a flat shot over the horizontal distances (the line-of-sight distances
+		// times the cosine), as the Scope View does with calculateShotPoint. A cosine of exactly 1
+		// (no angle, an empty box, 0°) leaves every value as it was before #173.
+		if (!isUsableTableAngle(options.elevation)) return null;
+		const cosAngle = scopeAngleCosine(options.elevation);
+		const maxDist = slantDist * cosAngle;
+		const stepVal = slantStep * cosAngle;
 		if (!isUsableZeroDistance(profile.zeroDist)) return null;
 
 		// --- Optic height ---
@@ -425,12 +442,19 @@ export function calculateFullTrajectory(profile, range, atmosphere, wind, option
 
 		if (!hitResult || hitResult.length === 0) return null;
 
-		const allPoints = hitResult.records;
-		const tablePoints = allPoints.filter((p) => p.flag & TrajFlag.RANGE);
-
 		// --- Key trajectory points via flags ---
 		const distUnit = isMetric ? Unit.Meter : Unit.Yard;
 		const elevUnit = isMetric ? Unit.Centimeter : Unit.Inch;
+		const toDistance = isMetric ? UNew.Meter : UNew.Yard;
+
+		// With an angle (#173), a horizontal distance of the engine is shown as the distance along the
+		// line of sight that gives it (divided by the cosine). Without one, nothing is touched.
+		const shownDistance = (p) => p.distance.In(distUnit) / cosAngle;
+		const alongSight =
+			cosAngle === 1 ? (rows) => rows : (rows) => rows.map((p) => withDistance(p, toDistance(shownDistance(p))));
+
+		const allPoints = alongSight(hitResult.records);
+		const tablePoints = allPoints.filter((p) => p.flag & TrajFlag.RANGE);
 
 		const nearZeroPoint = allPoints.find((p) => p.flag & TrajFlag.ZERO_UP);
 		const farZeroPoint = allPoints.find((p) => p.flag & TrajFlag.ZERO_DOWN);
@@ -449,8 +473,9 @@ export function calculateFullTrajectory(profile, range, atmosphere, wind, option
 		// The grid is the whole range: a fractional range gives a step just under 1, so that the
 		// grid ends on the range and this fire never goes further than the main one, which could
 		// otherwise fail on a bullet that stops just past it. EVENT_ROWS keeps the zero crossing rows
-		// (an arc under a unit wide can fall between grid rows) and the Mach crossing row.
-		const toDistance = isMetric ? UNew.Meter : UNew.Yard;
+		// (an arc under a unit wide can fall between grid rows) and the Mach crossing row. With an
+		// angle (#173), the grid is on the horizontal distance, and the distances below are shown
+		// along the line of sight.
 		const gridRows = calc.fire({
 			shot,
 			trajectoryRange,
@@ -476,7 +501,7 @@ export function calculateFullTrajectory(profile, range, atmosphere, wind, option
 		}
 		const maxApex = maxOrdPoint
 			? {
-					distance: round1(maxOrdPoint.distance.In(distUnit)),
+					distance: round1(shownDistance(maxOrdPoint)),
 					elevation: round1(maxOrdPoint.slantHeight.In(elevUnit))
 				}
 			: null;
@@ -490,7 +515,7 @@ export function calculateFullTrajectory(profile, range, atmosphere, wind, option
 		}
 		const maxDrop = maxDropPoint
 			? {
-					distance: round1(maxDropPoint.distance.In(distUnit)),
+					distance: round1(shownDistance(maxDropPoint)),
 					drop: round1(maxDropPoint.slantHeight.In(elevUnit))
 				}
 			: null;
@@ -502,7 +527,7 @@ export function calculateFullTrajectory(profile, range, atmosphere, wind, option
 		// The Mach crossing row is kept by EVENT_ROWS, so this is within one grid unit of the
 		// crossing, and usually on it.
 		const subsonicPoint = inRange.find((p) => p.velocity.In(Unit.FPS) < soundSpeedFPS);
-		const subsonicDist = subsonicPoint ? round1(subsonicPoint.distance.In(distUnit)) : null;
+		const subsonicDist = subsonicPoint ? round1(shownDistance(subsonicPoint)) : null;
 
 		return { trajectory: tablePoints, chartPoints: allPoints, nearZero, farZero, maxApex, maxDrop, soundSpeedFPS, subsonicDist };
 	} catch (e) {
@@ -510,6 +535,35 @@ export function calculateFullTrajectory(profile, range, atmosphere, wind, option
 		console.error('Ballistic trajectory error:', e);
 		return null;
 	}
+}
+
+/**
+ * A copy of a trajectory row with another distance (#173): the distance along the line of sight on
+ * the Ballistic page with an angle. Every other value is the row's, as the engine gave it.
+ *
+ * @param {TrajectoryData} p
+ * @param {import('js-ballistics').Distance} distance
+ * @returns {TrajectoryData}
+ */
+function withDistance(p, distance) {
+	return new TrajectoryData(
+		p.time,
+		distance,
+		p.velocity,
+		p.mach,
+		p.height,
+		p.slantHeight,
+		p.dropAngle,
+		p.windage,
+		p.windageAngle,
+		p.slantDistance,
+		p.angle,
+		p.densityRatio,
+		p.drag,
+		p.energy,
+		p.ogw,
+		p.flag
+	);
 }
 
 /**

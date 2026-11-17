@@ -24,8 +24,10 @@
 		tableStepLimit
 	} from '#lib/utils/inputLimits.js';
 	import { shownProfile } from '#lib/utils/storedProfiles.js';
+	import { isUsableScopeAngle, isUsableTableAngle, scopeAngleCosine } from '#lib/utils/scopeRange.js';
 	import ChipGroup from '#lib/components/ChipGroup.svelte';
 	import ScopeWindCard from '#lib/components/ScopeWindCard.svelte';
+	import ElevationAngleCard from '#lib/components/ElevationAngleCard.svelte';
 	import ScopeAtmosphereCard from '#lib/components/ScopeAtmosphereCard.svelte';
 	import ProfileInUseChip from '#lib/components/ProfileInUseChip.svelte';
 	import { useCurrentWeather } from '#lib/components/currentWeather.svelte.js';
@@ -69,8 +71,15 @@
 	// the atmosphere actually used.
 	let noAirDensity = $derived(hasNoAirDensity(atmoParams));
 
+	// ── Elevation angle (#173): the Scope View card; the table is along the line of sight ──
+	let elevation = $derived(ballistic.elevation);
+	// Whether a usable angle other than 0 applies, for the note under the table.
+	let angled = $derived(isUsableTableAngle(elevation) && scopeAngleCosine(elevation) !== 1);
+	// An angle the Scope View takes but the table cannot (MIN_TABLE_COSINE, about ±89.99994°).
+	let angleTooSteep = $derived(isUsableScopeAngle(elevation) && !isUsableTableAngle(elevation));
+
 	let trajectory = $derived(
-		ballisticPageTrajectory(activeProfile.profile, ballistic.range, atmoParams, ballistic.storedWind)
+		ballisticPageTrajectory(activeProfile.profile, ballistic.range, atmoParams, ballistic.storedWind, elevation)
 	);
 	let trajectoryResult = $derived(trajectory.result);
 
@@ -511,9 +520,11 @@
 	</div>
 {:else}
 	<!--
-		Below lg: the conditions, then stats, chart, table. The conditions are one column on phones, two
-		from a 672 px page (Atmosphere under both) and one row of three cards from 768 px (#166 tablet).
-		lg and up (where the app sidebar appears): conditions on the left, results on the right (#151).
+		Below lg: the conditions, then stats, chart, table. The conditions are one column on phones
+		(Distances, Wind, Angle, Atmosphere, the Scope View order), two from a 672 px page (Distances
+		and Angle beside Wind, Atmosphere under both) and three columns from 768 px (#166 tablet:
+		Distances over Angle, Wind, Atmosphere; #173). lg and up (where the app sidebar appears):
+		conditions on the left, in the phone order, results on the right (#151).
 	-->
 	<div class="@container flex flex-col gap-3 sm:gap-4 lg:gap-5">
 		<!-- ═══ Header ═══════════════════════════════════════════════════ -->
@@ -556,7 +567,13 @@
 
 		<div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(300px,340px)_minmax(0,1fr)] lg:gap-5 lg:items-start">
 			<!-- ═══ Conditions (one row on tablets, left column on lg) ═══════ -->
-			<div class="grid grid-cols-1 gap-3.5 @2xl:grid-cols-2 @3xl:grid-cols-3 items-start lg:flex lg:flex-col lg:items-stretch min-w-0">
+			<!--
+				The second row is 1fr (#173): the cards that span it (Wind, and Atmosphere on three columns)
+				only grow that row, so Angle sits right under Distances, without a gap.
+			-->
+			<div
+				class="grid grid-cols-1 gap-3.5 @2xl:grid-cols-2 @2xl:grid-rows-[auto_1fr_auto] @3xl:grid-cols-3 @3xl:grid-rows-[auto_1fr] items-start lg:flex lg:flex-col lg:items-stretch min-w-0"
+			>
 				<!-- Distances: unit chips in the header, max distance and step side by side -->
 				<section
 					class="card preset-filled-surface-100-900 border border-surface-200-800 px-3.5 py-3 space-y-2.5 min-w-0"
@@ -635,8 +652,8 @@
 					{/if}
 				</section>
 
-				<!-- Wind -->
-				<div class="min-w-0">
+				<!-- Wind: beside Distances and Angle on two or three columns -->
+				<div class="min-w-0 @2xl:row-span-2">
 					<ScopeWindCard
 						speed={ballistic.wind.speed}
 						speedUnit={ballistic.wind.speedUnit}
@@ -647,8 +664,20 @@
 					/>
 				</div>
 
-				<!-- Atmosphere: under Distances and Wind on a two-column page -->
-				<div class="min-w-0 @2xl:col-span-2 @3xl:col-span-1">
+				<!-- Elevation angle (#173): the Scope View card, under Distances on two or three columns -->
+				<div class="min-w-0 @2xl:col-start-1">
+					<ElevationAngleCard
+						angle={elevation.angle}
+						unit={elevation.unit}
+						onchange={(patch) => ballistic.setElevation(patch)}
+						limitMessage={angleTooSteep ? m.ballistic_angle_too_steep() : ''}
+					/>
+				</div>
+
+				<!-- Atmosphere: under the others on a two-column page, the third column on three -->
+				<div
+					class="min-w-0 @2xl:col-span-2 @3xl:col-span-1 @3xl:col-start-3 @3xl:row-start-1 @3xl:row-span-2"
+				>
 					<ScopeAtmosphereCard
 						{atmosphere}
 						used={atmosphereUsed}
@@ -834,6 +863,11 @@
 						{#if highlightIndex >= 0}
 							<p class="px-4 py-2 text-xs text-surface-600-400 border-t border-surface-200-800">
 								{m.ballistic_table_highlight()}
+							</p>
+						{/if}
+						{#if angled}
+							<p class="px-4 py-2 text-xs text-surface-600-400 border-t border-surface-200-800">
+								{m.ballistic_angle_note()}
 							</p>
 						{/if}
 					{/if}

@@ -7,10 +7,9 @@
 	import { useCurrentWeather } from '#lib/components/currentWeather.svelte.js';
 	import ScopeResult from '#lib/components/ScopeResult.svelte';
 	import ScopeReticle from '#lib/components/ScopeReticle.svelte';
-	import StepperField from '#lib/components/StepperField.svelte';
+	import ElevationAngleCard from '#lib/components/ElevationAngleCard.svelte';
 	import ProfileInUseChip from '#lib/components/ProfileInUseChip.svelte';
 	import { MediaQuery } from 'svelte/reactivity';
-	import { fieldStepSpec } from '#lib/utils/fieldStep.js';
 	import { activeProfile } from '#lib/stores/activeProfile.svelte.js';
 	import { scopeView } from '#lib/stores/scopeView.svelte.js';
 	import {
@@ -22,7 +21,7 @@
 	import { Unit } from 'js-ballistics';
 	import { clickCount, clickValue } from '#lib/utils/clicks.js';
 	import { MAX_DISTANCE } from '#lib/utils/inputLimits.js';
-	import { isUsableScopeAngle, isUsableScopeRange, scopeEffectiveRange } from '#lib/utils/scopeRange.js';
+	import { isUsableScopeRange, scopeEffectiveRange } from '#lib/utils/scopeRange.js';
 	import { formatLimit, formatNumber } from '#lib/utils/format.js';
 	import {
 		formatUsedAtmosphere,
@@ -30,8 +29,6 @@
 		usedScopeAtmosphere
 	} from '#lib/utils/scopeAtmosphere.js';
 	import { shownProfile } from '#lib/utils/storedProfiles.js';
-
-	const uid = $props.id();
 
 	// Tablet, between the phone tab bar and the desktop sidebar (sm to lg in +layout.svelte): the
 	// result shows the dial and the hold together (TabletScope board, #166).
@@ -58,12 +55,6 @@
 	// closed on every visit. An angle of 0 or an empty box gives the same result as before.
 	let effectiveRange = $derived(scopeEffectiveRange(scopeView.range, scopeView.elevation));
 	let rangeUsable = $derived(isUsableScopeRange(scopeView.range.distance));
-	let angleUsable = $derived(isUsableScopeAngle(scopeView.elevation));
-	// Angle − / + (#166): 1° in degrees, 0.01 as a cosine (utils/fieldStep.js).
-	let angleSpec = $derived(fieldStepSpec('angle', scopeView.elevation.unit));
-	let angleStepText = $derived(
-		scopeView.elevation.unit === 'deg' ? `${formatNumber(angleSpec.step)}°` : formatNumber(angleSpec.step)
-	);
 	let distLabel = $derived(scopeView.range.unit === 'm' ? m.unit_m() : m.unit_yd());
 
 	// Whether the custom altitude is too low for this shot (#125), from the engine's stop reason.
@@ -208,35 +199,14 @@
 			/>
 		</div>
 
-		<!-- 5 · Elevation angle, always shown, its own card; deg / cos inside the box (#166) -->
-		<section
-			class="sm:col-start-1 min-w-0 card preset-filled-surface-100-900 border border-surface-200-800 px-3.5 py-3 space-y-2"
-		>
-			<h2 class="text-sm font-semibold">
-				<label for="{uid}-angle">{m.scope_view_angle()}</label>
-			</h2>
-			<StepperField
-				id="{uid}-angle"
-				value={scopeView.elevation.angle}
-				onchange={(angle) => scopeView.setElevation({ angle })}
-				spec={angleSpec}
-				decreaseLabel={m.scope_view_step_angle_down({ step: angleStepText })}
-				increaseLabel={m.scope_view_step_angle_up({ step: angleStepText })}
-				units={[
-					{ value: 'deg', label: m.unit_deg() },
-					{ value: 'cos', label: m.unit_cos() }
-				]}
+		<!-- 5 · Elevation angle, always shown, its own card; deg / cos inside the box (#166, shared with Ballistic #173) -->
+		<div class="sm:col-start-1 min-w-0">
+			<ElevationAngleCard
+				angle={scopeView.elevation.angle}
 				unit={scopeView.elevation.unit}
-				unitsLabel={m.scope_view_angle_unit()}
-				onunitchange={(unit) => scopeView.setElevation({ unit })}
-				message={angleUsable
-					? m.scope_view_angle_hint()
-					: scopeView.elevation.unit === 'deg'
-						? m.scope_view_deg_invalid()
-						: m.scope_view_cos_invalid()}
-				messageType={angleUsable ? 'hint' : 'error'}
+				onchange={(patch) => scopeView.setElevation(patch)}
 			/>
-		</section>
+		</div>
 
 		<!-- 6 · Atmosphere -->
 		<div class="sm:col-start-1 min-w-0">

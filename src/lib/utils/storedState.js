@@ -9,7 +9,7 @@
  *   damaged value did (or the page threw), so no result appears for a value the user did not enter,
  *   and the page shows its message under the box.
  * - A damaged section (`range`, `atmosphere`, `elevation`) is read as a section of empty boxes, for
- *   the same reason. The atmosphere is then a custom one, not the standard one.
+ *   the same reason. A missing Ballistic `elevation` (saved before #173) is 0°. The atmosphere is then a custom one, not the standard one.
  * - Units are read as the calculators read them: `m`, `hpa`, `c` and `deg`, anything else is the
  *   other unit.
  * - Display settings (the Ballistic `options`) fall back to their defaults: they change no result.
@@ -96,6 +96,22 @@ export function storedAtmosphere(stored) {
 export function storedElevation(stored) {
 	const elevation = storedObject(stored);
 	return { angle: storedText(elevation.angle), unit: elevation.unit === 'deg' ? 'deg' : 'cos' };
+}
+
+/** The angle of a page that has never stored one: 0°, a flat shot (#173). */
+export const DEFAULT_ELEVATION = Object.freeze({ angle: '0', unit: 'deg' });
+
+/**
+ * The stored uphill or downhill angle of the Ballistic page (#173). State saved before #173 has no
+ * angle (missing or null): it reads as 0°, the flat table it always gave, with the degree chip.
+ * Anything else is read as the Scope View reads its angle (storedElevation): a damaged section is an
+ * empty box, which is a flat shot too, and a damaged angle an empty box.
+ *
+ * @param {unknown} stored
+ * @returns {{ angle: string|number, unit: 'deg'|'cos' }}
+ */
+export function storedBallisticElevation(stored) {
+	return stored === undefined || stored === null ? { ...DEFAULT_ELEVATION } : storedElevation(stored);
 }
 
 /** The cant the Scope View slider can set, in degrees either way. */
