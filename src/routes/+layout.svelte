@@ -33,7 +33,19 @@
 			]
 		},
 		{ href: '/profiles', labelKey: 'nav_profiles', shortKey: 'nav_profiles', icon: ListIcon },
-		{ href: '/settings', labelKey: 'nav_settings', shortKey: 'nav_settings', icon: SlidersHorizontalIcon }
+		{
+			href: '/settings',
+			labelKey: 'nav_settings',
+			shortKey: 'nav_settings',
+			icon: SlidersHorizontalIcon,
+			// #166: Settings pages; exact, since About contains Licences and Settings contains them all.
+			subItems: [
+				{ href: '/settings', labelKey: 'settings_general', exact: true },
+				{ href: '/settings/about', labelKey: 'settings_about', exact: true },
+				{ href: '/settings/privacy', labelKey: 'settings_privacy', exact: true },
+				{ href: '/settings/about/licenses', labelKey: 'settings_licenses_short', exact: true }
+			]
+		}
 	];
 
 	// The path without its /fr or /de prefix, so a nav item is active in every language.
@@ -54,6 +66,9 @@
 		items.push({ href: '/profiles/new', label: `+ ${m.profiles_new()}` });
 		return items;
 	});
+
+	// Settings (#166): from 768 px the Settings pane (settings/+layout.svelte) holds the title.
+	let settingsSection = $derived(currentPath === '/settings' || currentPath.startsWith('/settings/'));
 
 	// First-run screens (#150) are full screen: no header, rail, sidebar or tab bar.
 	const bareRoutes = ['/welcome', '/setup'];
@@ -85,6 +100,7 @@
 		if (path.startsWith('/calculators/dope-cards/precision-guide')) return m.dope_guide_title();
 		if (path.startsWith('/calculators/dope-cards')) return m.dope_title();
 		if (path.startsWith('/calculators')) return m.calculators_title();
+		if (path.startsWith('/settings/about/licenses')) return m.licenses_title();
 		if (path.startsWith('/settings/about')) return m.about_title();
 		if (path.startsWith('/settings/privacy')) return m.privacy_title();
 		if (path.startsWith('/settings')) return m.settings_title();
@@ -159,8 +175,12 @@
 			<nav aria-label={m.nav_main()} class="flex flex-col gap-0.5 px-2.5 py-3">
 				{#each navItems as item (item.href)}
 					{@const Icon = item.icon}
-					{@const current = currentAttr(item.href)}
 					{@const subItems = item.href === '/profiles' ? profileSubItems : item.subItems}
+					<!-- A section whose own page is also a sub-item (Settings > General) fills the sub-item only. -->
+					{@const current =
+						currentAttr(item.href) === 'page' && subItems?.some((s) => s.href === item.href)
+							? 'true'
+							: currentAttr(item.href)}
 					<a
 						href={localizeHref(item.href)}
 						aria-current={current}
@@ -176,10 +196,10 @@
 					{#if subItems}
 						<div class="ml-[19px] pl-2.5 border-l border-surface-200-800 flex flex-col gap-0.5">
 							{#each subItems as sub (sub.href)}
-								{@const subActive = isActive(sub.href)}
+								{@const subActive = sub.exact ? currentPath.replace(/(.)\/$/, '$1') === sub.href : isActive(sub.href)}
 								<a
 									href={localizeHref(sub.href)}
-									aria-current={currentAttr(sub.href)}
+									aria-current={sub.exact ? (subActive ? 'page' : undefined) : currentAttr(sub.href)}
 									class="flex items-center min-h-[34px] px-2.5 py-1 rounded-base text-[13px] leading-tight break-words {focusRing} {subActive
 										? 'preset-filled-primary-500 font-semibold'
 										: 'text-surface-600-400 hover:preset-tonal-surface hover:text-surface-950-50'}"
@@ -200,7 +220,7 @@
 
 		<!-- Page content with header inside scroll area -->
 		<main class="flex-1 min-w-0 overflow-y-auto">
-			<header class="{editor ? 'hidden' : 'flex'} items-center gap-1 pl-4 pr-2 py-2 sm:pl-6 sm:pr-4 lg:hidden">
+			<header class="{editor ? 'hidden' : 'flex'} {settingsSection ? 'md:hidden' : ''} items-center gap-1 pl-4 pr-2 py-2 sm:pl-6 sm:pr-4 lg:hidden">
 				{#if canGoBack}
 					<button
 						type="button"

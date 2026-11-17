@@ -72,6 +72,19 @@ npm run templates:precision
 
 and commit the three PDFs. The output has no date or id, so an unchanged layout writes the same bytes. `precisionCardPdf.test.js` fails when a committed template differs from what the script writes. The fill code reads the same layout and words, so the numbers stay in their cells.
 
+### Included software list
+
+Settings > About and the Licences page list every package the app ships, from [`src/lib/data/licenses.json`](../src/lib/data/licenses.json) (#166). The file is generated and committed:
+
+```bash
+npm run licenses:generate        # writes src/lib/data/licenses.json
+node scripts/licenses.js --check # writes nothing, exits 1 when the file is out of date
+```
+
+- [`scripts/licenses.js`](../scripts/licenses.js) reads `package.json`, `package-lock.json` and, for each package's web address, its installed `package.json`. Run `npm ci` first: without `node_modules` the homepages are missing and the file differs. No network.
+- What counts as shipped, the platform tags and the exclusions (`@capacitor/cli`, `svelte-gestures`) are in [`scripts/license-rules.js`](../scripts/license-rules.js). bclibc is an embedded entry checked for `js-ballistics` 3.1.0: when the lockfile has another version, the generator stops until the entry is checked and updated.
+- `src/test/licenses.test.js` fails when the file no longer matches the lockfile. So every dependency update, Dependabot's included, needs `npm ci`, `npm run licenses:generate` and a commit of the file on its branch.
+
 ### Skeleton upgrades
 
 Its tools do not flag every changed default. Diff the old and new CSS, as [the Skeleton delivery](2026-11-05-74-skeleton-lucide.md) explains.

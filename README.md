@@ -40,6 +40,7 @@ The [development guide](docs/development.md) covers the production, mobile and d
 | `npm run test:run` | Runs the tests once, as CI does |
 | `npm run audit:check` | Fails on high or critical audit findings, as CI does |
 | `npm run templates:precision` | Redraws the precision dope card templates in `static/pdf/` (#157). See [Precision card templates](docs/development.md#precision-card-templates) |
+| `npm run licenses:generate` | Rewrites `src/lib/data/licenses.json`, the included software list of the Licences page, from the lockfile (#166). Needs `npm ci` first; `node scripts/licenses.js --check` only checks. See [Included software list](docs/development.md#included-software-list) |
 | `npm run cap:sync` | Runs `build:mobile`, then `npx cap sync` |
 | `npm run cap:android` | Runs `cap:sync`, then opens the Android project |
 | `npm run cap:ios` | Runs `cap:sync`, then opens the iOS project |
@@ -79,6 +80,7 @@ Dependabot (`.github/dependabot.yml`) checks npm and GitHub Actions every week a
 
 - **`js-ballistics`** always gets its own pull request. Merge it only with owner approval of the results (#77), and check the bclibc version and licence it embeds.
 - **`apexcharts`** (and its dependency `apex-commons`) always gets its own pull request, minor and patch updates included. Its licence changed within majors, so CI compares each package's `LICENSE.md` with the text the owner accepted (#75), by sha256 in `src/test/apexcharts.test.js` (#164). A green pull request has the same licence: read the release notes and check the charts in a browser before merging. A red licence test means the text changed: stop for the owner, and update the hash only once they accept it. The exact pin (no `^`) is checked too, and must match the installed version.
+- **Every npm update** changes the included software list: run `npm ci` and `npm run licenses:generate` on the pull request branch and commit `src/lib/data/licenses.json`, or `src/test/licenses.test.js` fails (#166). A `js-ballistics` update also needs the bclibc entry in `scripts/license-rules.js` checked.
 - **`SamKirkland/FTP-Deploy-Action`** always gets its own pull request, because it runs with the FTP password. Review each update on its own.
 
 Dependabot *security updates*, a repository setting, must stay off: they always target `main` and skip the rules above. Dependabot alerts are fine. No file in this repository can enforce this, so the owner has to confirm it in the repository settings.

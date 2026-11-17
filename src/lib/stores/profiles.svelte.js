@@ -62,6 +62,10 @@ export const profiles = {
 	get list() {
 		return readList();
 	},
+	/** How many usable profiles are stored: Settings > Data (#166). */
+	get count() {
+		return readList().length;
+	},
 	add(profile) {
 		const { list, id } = addProfile(readList(), profile);
 		store.value = list;

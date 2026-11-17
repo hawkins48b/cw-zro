@@ -1,0 +1,304 @@
+[
+	{
+		"name": "@capacitor/android",
+		"version": "8.6.2",
+		"license": "MIT",
+		"platforms": [
+			"android"
+		],
+		"homepage": "https://capacitorjs.com/"
+	},
+	{
+		"name": "@capacitor/app",
+		"version": "8.1.2",
+		"license": "MIT",
+		"platforms": [
+			"android",
+			"ios"
+		],
+		"homepage": "https://github.com/ionic-team/capacitor-plugins"
+	},
+	{
+		"name": "@capacitor/core",
+		"version": "8.6.2",
+		"license": "MIT",
+		"platforms": [
+			"android",
+			"ios"
+		],
+		"homepage": "https://capacitorjs.com/"
+	},
+	{
+		"name": "@capacitor/ios",
+		"version": "8.6.2",
+		"license": "MIT",
+		"platforms": [
+			"ios"
+		],
+		"homepage": "https://capacitorjs.com/"
+	},
+	{
+		"name": "@capacitor/splash-screen",
+		"version": "8.0.2",
+		"license": "MIT",
+		"platforms": [
+			"android",
+			"ios"
+		],
+		"homepage": "https://github.com/ionic-team/capacitor-plugins"
+	},
+	{
+		"name": "@capacitor/status-bar",
+		"version": "8.0.4",
+		"license": "MIT",
+		"platforms": [
+			"android",
+			"ios"
+		],
+		"homepage": "https://github.com/ionic-team/capacitor-plugins"
+	},
+	{
+		"name": "@inlang/paraglide-js",
+		"version": "3.2.2",
+		"license": "MIT",
+		"platforms": [
+			"web",
+			"android",
+			"ios",
+			"desktop"
+		],
+		"homepage": "https://paraglidejs.com/"
+	},
+	{
+		"name": "@lucide/svelte",
+		"version": "1.72.0",
+		"license": "ISC",
+		"platforms": [
+			"web",
+			"android",
+			"ios",
+			"desktop"
+		],
+		"homepage": "https://lucide.dev/"
+	},
+	{
+		"name": "@pdf-lib/standard-fonts",
+		"version": "1.0.0",
+		"license": "MIT",
+		"platforms": [
+			"web",
+			"android",
+			"ios",
+			"desktop"
+		],
+		"homepage": "https://github.com/Hopding/standard-fonts"
+	},
+	{
+		"name": "@pdf-lib/upng",
+		"version": "1.0.1",
+		"license": "MIT",
+		"platforms": [
+			"web",
+			"android",
+			"ios",
+			"desktop"
+		],
+		"homepage": "https://github.com/Hopding/upng"
+	},
+	{
+		"name": "@skeletonlabs/skeleton",
+		"version": "5.0.4",
+		"license": "MIT",
+		"platforms": [
+			"web",
+			"android",
+			"ios",
+			"desktop"
+		],
+		"homepage": "https://github.com/skeletonlabs/skeleton"
+	},
+	{
+		"name": "@skeletonlabs/skeleton-svelte",
+		"version": "5.0.4",
+		"license": "MIT",
+		"platforms": [
+			"web",
+			"android",
+			"ios",
+			"desktop"
+		],
+		"homepage": "https://github.com/skeletonlabs/skeleton"
+	},
+	{
+		"name": "@sveltejs/kit",
+		"version": "3.2.0",
+		"license": "MIT",
+		"platforms": [
+			"web",
+			"android",
+			"ios",
+			"desktop"
+		],
+		"homepage": "https://svelte.dev/"
+	},
+	{
+		"name": "apex-commons",
+		"version": "0.10.0",
+		"license": "SEE LICENSE IN LICENSE.md",
+		"platforms": [
+			"web",
+			"android",
+			"ios",
+			"desktop"
+		],
+		"homepage": "https://github.com/apexcharts/projects"
+	},
+	{
+		"name": "apexcharts",
+		"version": "8.8.1",
+		"license": "SEE LICENSE IN LICENSE.md",
+		"platforms": [
+			"web",
+			"android",
+			"ios",
+			"desktop"
+		],
+		"homepage": "https://apexcharts.com/"
+	},
+	{
+		"name": "bclibc",
+		"version": "2.0.0",
+		"license": "LGPL-3.0-only",
+		"homepage": "https://github.com/ballistics-lab/bclibc",
+		"platforms": [
+			"web",
+			"android",
+			"ios",
+			"desktop"
+		]
+	},
+	{
+		"name": "clsx",
+		"version": "2.1.1",
+		"license": "MIT",
+		"platforms": [
+			"web",
+			"android",
+			"ios",
+			"desktop"
+		],
+		"homepage": "https://github.com/lukeed/clsx"
+	},
+	{
+		"name": "devalue",
+		"version": "5.9.4",
+		"license": "MIT",
+		"platforms": [
+			"web",
+			"android",
+			"ios",
+			"desktop"
+		],
+		"homepage": "https://github.com/sveltejs/devalue"
+	},
+	{
+		"name": "electron",
+		"version": "45.3.2",
+		"license": "MIT",
+		"platforms": [
+			"desktop"
+		],
+		"homepage": "https://github.com/electron/electron"
+	},
+	{
+		"name": "electron-serve",
+		"version": "3.0.1",
+		"license": "MIT",
+		"platforms": [
+			"desktop"
+		],
+		"homepage": "https://github.com/sindresorhus/electron-serve"
+	},
+	{
+		"name": "js-ballistics",
+		"version": "3.1.0",
+		"license": "ISC",
+		"platforms": [
+			"web",
+			"android",
+			"ios",
+			"desktop"
+		],
+		"homepage": "https://github.com/o-murphy/js-ballistics"
+	},
+	{
+		"name": "pako",
+		"version": "1.0.11",
+		"license": "(MIT AND Zlib)",
+		"platforms": [
+			"web",
+			"android",
+			"ios",
+			"desktop"
+		],
+		"homepage": "https://github.com/nodeca/pako"
+	},
+	{
+		"name": "pdf-lib",
+		"version": "1.17.1",
+		"license": "MIT",
+		"platforms": [
+			"web",
+			"android",
+			"ios",
+			"desktop"
+		],
+		"homepage": "https://pdf-lib.js.org/"
+	},
+	{
+		"name": "svelte",
+		"version": "5.57.3",
+		"license": "MIT",
+		"platforms": [
+			"web",
+			"android",
+			"ios",
+			"desktop"
+		],
+		"homepage": "https://svelte.dev/"
+	},
+	{
+		"name": "tailwindcss",
+		"version": "4.3.5",
+		"license": "MIT",
+		"platforms": [
+			"web",
+			"android",
+			"ios",
+			"desktop"
+		],
+		"homepage": "https://tailwindcss.com/"
+	},
+	{
+		"name": "tslib",
+		"version": "1.14.1",
+		"license": "0BSD",
+		"platforms": [
+			"web",
+			"android",
+			"ios",
+			"desktop"
+		],
+		"homepage": "https://www.typescriptlang.org/"
+	},
+	{
+		"name": "tslib",
+		"version": "2.9.1",
+		"license": "0BSD",
+		"platforms": [
+			"android",
+			"ios"
+		],
+		"homepage": "https://www.typescriptlang.org/"
+	}
+]

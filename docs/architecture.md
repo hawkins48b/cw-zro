@@ -32,6 +32,7 @@ src/
 │   ├── assets/              # Favicon
 │   ├── components/          # Reusable Svelte components
 │   ├── data/ammo.json       # Ammunition library, 41 loads
+│   ├── data/licenses.json   # Shipped packages and licences, generated (#166)
 │   ├── paraglide/           # Generated, git-ignored
 │   ├── stores/              # Reactive state (.svelte.js)
 │   ├── themes/zro.css       # Skeleton theme
@@ -46,7 +47,7 @@ electron/                    # Desktop main process, navigation rules, menu, per
 messages/                    # en.json, fr.json, de.json
 project.inlang/              # Paraglide settings
 resources/                   # Desktop icons
-scripts/                     # Audit check, precision card templates
+scripts/                     # Audit check, precision card templates, licence list
 static/                      # Copied to build/: logo, PDF templates, robots.txt
 ```
 
@@ -71,7 +72,10 @@ Configuration is in [`vite.config.js`](../vite.config.js). There is no `svelte.c
 | `/profiles` | Profiles: picker list (tap to use), summary of the profile in use, Import, Export all ([#166](2026-11-17-166-profiles-redesign.md)) |
 | `/profiles/new`, `/profiles/[id]` | Profile editor in five sections ([`ProfileForm`](../src/lib/components/ProfileForm.svelte)) |
 | `/profiles/ammo-selector` | Ammunition library: select, then "Use this ammunition" |
-| `/settings`, `/settings/about`, `/settings/privacy` | Settings pages |
+| `/settings` | Settings, General: Display (theme, language), Data, About links, Danger zone with Clear all data ([#166](2026-11-17-166-settings-redesign.md)) |
+| `/settings/about` | About: identity, Provided by Chocolate Warfare, This copy, Open source, Calculation engine |
+| `/settings/about/licenses` | Licences and notices: licence texts and Included software |
+| `/settings/privacy` | Privacy |
 
 `/fr` and `/de` prefix any route. English has no prefix. A start without a prefix goes to the language the user picked last, stored in `localStorage` ([#96](https://github.com/hawkins48b/cw-zro/issues/96)). See [Translations](translations.md#locale-urls).
 
@@ -151,7 +155,28 @@ Since [#166](2026-11-17-166-profiles-redesign.md) (Profiles round) profile and a
 | [`profile/ProfileImportDialog`](../src/lib/components/profile/ProfileImportDialog.svelte) | File chooser and review; reads files with [`profileImport.js`](../src/lib/utils/profileImport.js), stores with `importProfiles` |
 | [`ResponsiveDialog`](../src/lib/components/ResponsiveDialog.svelte), [`ConfirmDialog`](../src/lib/components/ConfirmDialog.svelte), [`Toast`](../src/lib/components/Toast.svelte), [`SwitchRow`](../src/lib/components/SwitchRow.svelte) | Sheet on phones / dialog from 640 px; small confirmation; bottom message; on/off row. Dialogs use the [`focusTrap`](../src/lib/actions/focusTrap.js) action |
 
-Store functions added: `deleteProfile` in [`activeProfile.svelte.js`](../src/lib/stores/activeProfile.svelte.js) (refuses the last profile; the next, else the previous, becomes active), `importProfiles` in [`profiles.svelte.js`](../src/lib/stores/profiles.svelte.js) (appends, `null` when the save fails), `trySet` and `resetLocalStores` in [`localStore.svelte.js`](../src/lib/stores/localStore.svelte.js), and [`clearAllData.js`](../src/lib/stores/clearAllData.js) (not called by a page yet). `swipe.js` and the `svelte-gestures` dependency are no longer used.
+Store functions added: `deleteProfile` in [`activeProfile.svelte.js`](../src/lib/stores/activeProfile.svelte.js) (refuses the last profile; the next, else the previous, becomes active), `importProfiles` in [`profiles.svelte.js`](../src/lib/stores/profiles.svelte.js) (appends, `null` when the save fails), `trySet` and `resetLocalStores` in [`localStore.svelte.js`](../src/lib/stores/localStore.svelte.js), and [`clearAllData.js`](../src/lib/stores/clearAllData.js) (called from Settings > Danger zone since the Settings round). `swipe.js` and the `svelte-gestures` dependency are no longer used.
+
+### Settings components
+
+Since the Settings round of [#166](2026-11-17-166-settings-redesign.md) the Settings pages are built from [`components/settings/`](../src/lib/components/settings/). [`settings/+layout.svelte`](../src/routes/settings/+layout.svelte) adds a 256 px left pane from 768 to 1023 px (General, About, Privacy, Licences, and the build line); on phones one page at a time, on desktop the sidebar lists the same pages.
+
+| Component | Role |
+|-----------|------|
+| `DisplaySettingsCard` | Theme and Language rows: the `settings` variants of [`DarkModeToggle`](../src/lib/components/DarkModeToggle.svelte) and [`LanguageSwitcher`](../src/lib/components/LanguageSwitcher.svelte) |
+| `ProfilesDataCard` | `profiles.count`, link to Profiles |
+| `SettingsLinksCard` | About ZRO, Privacy, Licences (phone and desktop) |
+| `ClearDataCard` | Danger zone: inline confirmation, `clearAllData()`, then `goto('/welcome', { replace: true })` |
+| `AboutIdentityCard`, `ProvidedByCard`, `ThisCopyCard`, `OpenSourceCard`, `EngineCreditsCard` | The About cards |
+| `LicenceTexts` | Accordion of the three files of `static/licenses/`, imported as text, one open at a time |
+| `IncludedSoftware` | The packages of [`licenses.json`](../src/lib/data/licenses.json), as a list or a table; [`hasExtraTerms`](../src/lib/utils/licenseKind.js) picks the highlight |
+| `ExternalLink` | `target="_blank"`, `rel="noopener noreferrer"`, icon and hidden "(opens in a new tab)" |
+| `platformText.js`, `settingsStyles.js` | Translated platform names; shared class strings |
+
+- **Platform and version.** [`platform.js`](../src/lib/utils/platform.js): `platformLabel()` gives `android` or `ios` from `window.Capacitor.getPlatform()` (the native bridge; the app does not import `@capacitor/core`), `desktop` from `isDesktopApp()` (`app:` scheme or `Electron/` user agent, moved here from `currentWeather.js`), else `web`. Web and mobile share one bundle, so this is read at run time. `APP_VERSION` is `__APP_VERSION__`, the package.json version set in `vite.config.js`.
+- **Theme.** [`settings.svelte.js`](../src/lib/stores/settings.svelte.js) has `theme` (`'light'` or `'dark'`) and `setTheme(theme)`, beside `darkMode`, `toggleDarkMode` and `setDarkMode`; all write `zro-dark-mode`. `darkMode` is true only for a stored `true`, as [`theme-init.js`](../static/theme-init.js) reads it before the first paint.
+- **Licence list.** [`scripts/licenses.js`](../scripts/licenses.js) writes `src/lib/data/licenses.json` with the rules of [`scripts/license-rules.js`](../scripts/license-rules.js), at development time, not during the build. See [Included software list](development.md#included-software-list).
+- **Ids.** `DarkModeToggle`, `LanguageSwitcher` and the settings components take their element ids from `$props.id()`, so two copies on one page (sidebar and Settings) do not clash.
 
 ### Ballistic page
 
@@ -187,7 +212,7 @@ Since [#152](https://github.com/hawkins48b/cw-zro/issues/152) (owner decisions o
 - **Rounding.** Altitude whole (ft or m), pressure 1 decimal in hPa or 2 in inHg, temperature 1 decimal (°C or °F), humidity whole. Conversions are js-ballistics'. A value outside the limits of its box after conversion is `invalid`.
 - **Altitude.** The device's GPS altitude when it is a finite number within the altitude limits, else Open-Meteo's `elevation` (its model ground height at the point). Browser and Android GPS altitude is usually height above the WGS84 ellipsoid, not above sea level; the two differ by the geoid height, tens of metres in many places and up to about 100 m. It is not corrected (owner decision: GPS first). The user can edit the box.
 - **Stale answers.** Leaving the page, or leaving the Accurate mode, aborts the request and drops a late answer. A change to a box while the request runs does not stop it: the answer then replaces the four boxes.
-- **Where it shows.** [`isCurrentWeatherAvailable`](../src/lib/utils/currentWeather.js): web and mobile, with `navigator.geolocation`, `fetch` and `AbortController`. Not on the desktop build, detected by its `app:` scheme or an `Electron/` user agent; the desktop app also refuses the location permission ([`permissions.js`](../electron/permissions.js), unchanged).
+- **Where it shows.** [`isCurrentWeatherAvailable`](../src/lib/utils/currentWeather.js): web and mobile, with `navigator.geolocation`, `fetch` and `AbortController`. Not on the desktop build, detected by its `app:` scheme or an `Electron/` user agent ([`isDesktopApp`](../src/lib/utils/platform.js) since #166); the desktop app also refuses the location permission ([`permissions.js`](../electron/permissions.js), unchanged).
 
 ### Where shots are built
 
@@ -216,6 +241,8 @@ The input handling is written out six times: in `calculateShotPoint`, `calculate
 The width decides this, not the platform. Since [#149](2026-11-16-149-nav-hub-profiles.md) the three are plain `<nav>` elements in [`+layout.svelte`](../src/routes/+layout.svelte), built from one item list and shown by CSS breakpoints (`sm`, `lg`); Skeleton's `Navigation` component is no longer used. An item is active on its page and on the pages under it, compared on the path without `/fr` or `/de`, so it is marked in every language; `/` counts as Scope View. The link of the page itself has `aria-current="page"`, a section the page is in `aria-current="true"`.
 
 On the profile editor routes (`/profiles/new`, `/profiles/[id]`) the layout hides its header under 1024 px and the phone tab bar: the editor has its own header and a pinned Cancel / Save bar. On every `/profiles/...` sub-page the desktop sidebar lists the profiles (rifle · ammunition) and "+ New profile" under Profiles (#166).
+
+Settings (#166, Settings round): the desktop sidebar always lists General, About, Privacy and Licences under Settings, each matched on its exact path; on General the Settings item gets `aria-current="true"` and the sub-item `"page"`. On `/settings/...` the layout header is hidden from 768 px, where the Settings pane holds the title (see [Settings components](#settings-components)).
 
 ## Desktop
 

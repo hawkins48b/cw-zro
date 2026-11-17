@@ -90,6 +90,7 @@ describe('clearAllData', () => {
 		document.documentElement.classList.add('dark');
 		formDraft.save({ form: {} });
 		expect(activeProfile.id).toBe('a');
+		expect(profiles.count).toBe(1);
 		expect(settings.darkMode).toBe(true);
 		expect(localStorage.getItem('zro-scope-view')).not.toBeNull();
 
@@ -98,6 +99,7 @@ describe('clearAllData', () => {
 		expect(removed).toEqual(expect.arrayContaining(['zro-profiles', 'zro-active-profile', 'zro-dark-mode', 'zro-locale', 'zro-mpbr', 'zro-scope-view']));
 		expect(Object.keys(localStorage)).toEqual(['unrelated']);
 		expect(profiles.list).toEqual([]);
+		expect(profiles.count).toBe(0);
 		expect(isFirstRun(profiles.list)).toBe(true);
 		expect(activeProfile.id).toBeNull();
 		expect(activeProfile.profile).toBeNull();

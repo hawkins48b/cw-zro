@@ -8,6 +8,7 @@ import {
 	pressureLimits,
 	temperatureLimits
 } from './inputLimits.js';
+import { isDesktopApp } from './platform.js';
 
 /**
  * Current weather at the user's location (#152; owner decisions of 2026-11-16).
@@ -390,9 +391,6 @@ export async function readCurrentWeather({ geolocation, fetch: fetchFn, signal, 
 	return { weather, altitude, altitudeSource: source, model: weatherModel(json) };
 }
 
-/** Electron's app scheme (electron/navigation.js, APP_SCHEME), as location.protocol gives it. */
-const ELECTRON_PROTOCOL = 'app:';
-
 /**
  * Whether to show "Use current weather here": web and mobile (Capacitor) with geolocation and
  * fetch. Not on the desktop build, which refuses every permission (electron/permissions.js): it
@@ -404,8 +402,7 @@ const ELECTRON_PROTOCOL = 'app:';
 export function isCurrentWeatherAvailable(env) {
 	const nav = env?.navigator;
 	if (!nav?.geolocation || typeof nav.geolocation.getCurrentPosition !== 'function') return false;
-	if (env.location?.protocol === ELECTRON_PROTOCOL) return false;
-	if (/\bElectron\//.test(String(nav.userAgent ?? ''))) return false;
+	if (isDesktopApp(env)) return false;
 	return typeof env.fetch === 'function' && typeof env.AbortController === 'function';
 }
 

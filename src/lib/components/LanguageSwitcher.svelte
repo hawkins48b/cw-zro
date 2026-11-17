@@ -5,6 +5,8 @@
 	 * @prop {'group'|'chips'} variant
 	 *   group: joined buttons (Settings).
 	 *   chips: separate pills with a 44 px touch area (Welcome screen, #150).
+	 *   settings: the Language row of the Settings Display card (#166): label, a three-way track
+	 *     with each language's own name and code, and a hint that the app reloads.
 	 * @prop {string} class - Extra classes on the wrapper.
 	 */
 	import { page } from '$app/state';
@@ -15,10 +17,43 @@
 	let { variant = 'group', class: cls = '' } = $props();
 
 	const localeLabels = { en: 'EN', fr: 'FR', de: 'DE' };
+	// Each language in its own language, the same on every page (marked with lang=).
+	const localeNames = { en: 'English', fr: 'Français', de: 'Deutsch' };
+	const uid = $props.id();
 	const focusRing = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500';
 </script>
 
-{#if variant === 'chips'}
+{#if variant === 'settings'}
+	<div class="flex flex-col gap-2 {cls}">
+		<span id="{uid}-label" class="text-[15px] font-medium">{m.settings_language()}</span>
+		<div
+			role="group"
+			aria-labelledby="{uid}-label"
+			aria-describedby="{uid}-hint"
+			class="grid grid-cols-3 gap-0.5 p-[3px] rounded-container bg-surface-200-800"
+		>
+			{#each locales as locale (locale)}
+				{@const active = getLocale() === locale}
+				<a
+					href={localizeHref(page.url.pathname, { locale })}
+					class="h-12 min-w-0 px-1 rounded-base flex flex-col items-center justify-center leading-tight text-sm {focusRing} {active
+						? 'bg-surface-50-950 shadow-sm font-bold'
+						: 'font-medium hover:text-surface-950-50 hover:bg-surface-50-950/50'}"
+					aria-current={active ? 'true' : undefined}
+					data-sveltekit-reload
+					rel="alternate"
+					hreflang={locale}
+					lang={locale}
+					onclick={() => storeLocale(locale)}
+				>
+					<span class="max-w-full truncate">{localeNames[locale] ?? locale}</span>
+					<span class="text-[11px] font-medium text-surface-600-400">{localeLabels[locale] ?? locale.toUpperCase()}</span>
+				</a>
+			{/each}
+		</div>
+		<span id="{uid}-hint" class="text-xs text-surface-600-400">{m.settings_language_hint()}</span>
+	</div>
+{:else if variant === 'chips'}
 	<div role="group" aria-label={m.settings_language()} class="flex items-center gap-1.5 {cls}">
 		{#each locales as locale (locale)}
 			{@const active = getLocale() === locale}

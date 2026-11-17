@@ -15,10 +15,10 @@ Data stays in the browser's `localStorage`, or the same store in the Electron an
 | `zro-traj-validation` | Trajectory validation inputs | [`trajectoryValidation`](../src/lib/stores/trajectoryValidation.svelte.js) |
 | `zro-compare-traj` | Compared profiles, range, chart unit | [`compareTrajectories`](../src/lib/stores/compareTrajectories.svelte.js) |
 | `zro-mpbr` | MPBR target size | [`mpbr`](../src/lib/stores/mpbr.svelte.js) |
-| `zro-dark-mode` | Dark mode choice, stored only after a change | [`settings`](../src/lib/stores/settings.svelte.js) |
+| `zro-dark-mode` | Dark mode choice (`true` or `false`), stored only after a change: Settings > Display or the sidebar theme buttons. Any stored value other than `true` reads as light, in the store and in `theme-init.js` (#166) | [`settings`](../src/lib/stores/settings.svelte.js) |
 | `zro-locale` | Language picked in the language switcher, `en`, `fr` or `de` as plain text, stored only after a click ([#96](https://github.com/hawkins48b/cw-zro/issues/96)) | [`storedLocale.js`](../src/lib/utils/storedLocale.js), read by [`hooks.client.js`](../src/hooks.client.js) |
 
-Every key starts with `zro-`. [`appStorage.js`](../src/lib/utils/appStorage.js) lists them (`APP_STORAGE_KEYS`) for "Clear all data on this device" ([#166](https://github.com/hawkins48b/cw-zro/issues/166)): `clearAllData` in [`clearAllData.js`](../src/lib/stores/clearAllData.js) removes these keys and any other key starting with `zro-`, puts every store back to its default in memory, empties the ammo selection and form draft, and deletes the old locale cookie. Keys of other apps on the same origin are left alone. The function is tested, but no screen calls it yet: the button and its confirmation come with the Settings round of #166.
+Every key starts with `zro-`. [`appStorage.js`](../src/lib/utils/appStorage.js) lists them (`APP_STORAGE_KEYS`) for "Clear all data on this device" ([#166](https://github.com/hawkins48b/cw-zro/issues/166)): `clearAllData` in [`clearAllData.js`](../src/lib/stores/clearAllData.js) removes these keys and any other key starting with `zro-`, puts every store back to its default in memory, empties the ammo selection and form draft, and deletes the old locale cookie. Keys of other apps on the same origin are left alone. Since the Settings round of #166 it is called from Settings > Danger zone ([`ClearDataCard.svelte`](../src/lib/components/settings/ClearDataCard.svelte)): "Clear all data…" opens a confirmation inside the card (focus on Cancel), and "Delete everything" calls `clearAllData()`, then opens `/welcome` with `replace`, so Back does not return to an emptied Settings page. The theme then follows the device setting again. Nothing is backed up first; the card says how many profiles will be deleted and points to Export all.
 
 These are the only uses of `localStorage` in `src/`, apart from the read in [`theme-init.js`](../static/theme-init.js), loaded by [`app.html`](../src/app.html), that sets dark mode before the first paint. Each stays until the user clears the site data or uninstalls the app. There is no `sessionStorage`, no IndexedDB and no service worker.
 
@@ -40,7 +40,9 @@ These are the only uses of `localStorage` in `src/`, apart from the read in [`th
 | Page and code files | Web: opening the app, moving to a page that needs a new chunk | Standard browser request. No cookie, apart from the old locale cookie until it is deleted (see above) | The site's host |
 | `/pdf/rifle-dataset-*.pdf`, `/pdf/precision-*.pdf` | Creating a dope card | Fetches the blank template. No profile data is sent | The same origin: the site's host on the web, local files on desktop and mobile |
 | `_app/version.json` | When the tab regains focus, and once an hour | Standard browser request. The app does not use the result | The same origin |
-| GitHub | Only when the user opens one of the three links on the About page (ZRO, js-ballistics, bclibc) | Opens in a browser | github.com |
+| GitHub | Only when the user opens a link on the About page: the ZRO repository, js-ballistics, bclibc (tag `v2.0.0`) | Opens in a new tab; in the desktop app, the system browser | github.com |
+| chocolate-warfare.com | Only when the user opens the link of the "Provided by Chocolate Warfare" card on the About page (#166) | Opens in a new tab | chocolate-warfare.com |
+| Package web pages | Only when the user opens a package name in Included software (Licences page, desktop About; #166). The addresses come from `src/lib/data/licenses.json`, https only | Opens in a new tab | The package's homepage or repository (github.com, capacitorjs.com, svelte.dev and others) |
 | Current weather ([#152](https://github.com/hawkins48b/cw-zro/issues/152)) | Web and mobile only: each tap of "Use current weather here" in the Accurate atmosphere of the Scope View or the Ballistic page, after the user allowed the location. Never on load, never in the background, never on desktop | One `GET https://api.open-meteo.com/v1/forecast?latitude=<lat>&longitude=<lon>&current=temperature_2m,relative_humidity_2m,pressure_msl&hourly=temperature_2m,relative_humidity_2m,pressure_msl&models=meteoswiss_icon_ch1,best_match&forecast_hours=1`, latitude and longitude rounded to 2 decimals; every other parameter is fixed ([#154](https://github.com/hawkins48b/cw-zro/issues/154)). No cookie (`credentials: 'omit'`), no referrer (`referrerPolicy: 'no-referrer'`), no HTTP cache (`cache: 'no-store'`). No profile, no other value, no device altitude. The browser adds its usual headers (user agent, language) and, because the request goes to another site, `Origin`: the app's address (the web site, or `https://localhost` / `capacitor://localhost` on mobile). Open-Meteo sees the IP address | api.open-meteo.com |
 | open-meteo.com | Only when the user opens the attribution link shown after a fill | Opens in a browser | open-meteo.com |
 | meteoswiss.admin.ch | Only when the user opens the MeteoSwiss link, shown after a fill with ICON-CH1 values ([#154](https://github.com/hawkins48b/cw-zro/issues/154)) | Opens in a browser | www.meteoswiss.admin.ch |
@@ -94,7 +96,7 @@ The file name keeps letters (accented ones too), digits, `_` and `-` from the pr
 - Every imported profile gets a new id (`crypto.randomUUID`). A name already used, compared without case, becomes a copy name ("K31 (2)").
 - Nothing is stored before the user confirms the review. Imported profiles are appended to `zro-profiles`; no stored profile is changed and the active profile stays. If storage refuses the save, nothing is added, in storage or in memory.
 
-The in-app privacy page does not mention import or Export all yet.
+The in-app privacy page covers export and import since the Settings round of #166 ("Profile files": both stay on the device, nothing is sent).
 
 ## What does not exist
 
@@ -134,7 +136,7 @@ Calculations run on the device. The current weather needs a connection on every 
 - The desktop app refuses every permission request (camera, location, notifications, devices).
 - The desktop window cannot leave the app, and opens `https:` links only in the system browser. See [Architecture](architecture.md#desktop).
 - Saved values are not validated when read, apart from the chart unit of compare trajectories. See [Input guards](ballistics-model.md#input-guards).
-- The app's [privacy page](../src/routes/settings/privacy/+page.svelte) lists what is stored, that it stays until the site data is cleared or the app is uninstalled, the web host's view of requests, and the offline limits of the web version ([#102](https://github.com/hawkins48b/cw-zro/issues/102)), and since [#152](https://github.com/hawkins48b/cw-zro/issues/152) what the current weather sends and when. It follows this guide: change both together.
+- The app's [privacy page](../src/routes/settings/privacy/+page.svelte) lists what is stored, that it stays until the site data is cleared, the app is uninstalled or Clear all data is used, the web host's view of requests, and the offline limits of the web version ([#102](https://github.com/hawkins48b/cw-zro/issues/102)), and since [#152](https://github.com/hawkins48b/cw-zro/issues/152) what the current weather sends and when. Since the Settings round of #166 it has a summary card, a "Profile files" card (export and import stay on the device), the weather facts as a When / Sent / To / Back / Kept table, and "No cookies."; the line about the old language cookie was dropped. It follows this guide: change both together.
 
 ## Licences
 
@@ -144,8 +146,9 @@ Since [#77](https://github.com/hawkins48b/cw-zro/issues/77) every build (web, de
 
 | Where | What |
 |-------|------|
-| About page | A card "Includes bclibc (LGPL-3.0)", in English, French and German, with a link to the bclibc source and to the licences page |
-| `/settings/about/licenses` | The third-party notice and the full LGPL-3.0 and GPL-3.0 texts, shown in the app, so the desktop window never has to leave it |
+| About page | Since #166, a "Calculation engine" card: js-ballistics and the bclibc solver it embeds, with versions and licences read from `licenses.json`, links to both sources and to the licences page. On desktop, the Included software table; on tablet, the licence texts |
+| `/settings/about/licenses` | The third-party notice and the full LGPL-3.0 and GPL-3.0 texts, shown in the app (one open at a time), so the desktop window never has to leave it. Since #166 also **Included software**: every shipped package with version and licence, highlighted when the licence has terms beyond a permissive one (`hasExtraTerms`), tagged when it is only in some builds |
+| [`src/lib/data/licenses.json`](../src/lib/data/licenses.json) | The shipped packages (#166), written by `npm run licenses:generate` from the lockfile, see [Included software list](development.md#included-software-list). 27 entries on 2026-11-17, bclibc among them as an embedded entry. `src/test/licenses.test.js` fails when it no longer matches the lockfile |
 | `static/licenses/` | `THIRD-PARTY-NOTICES.txt` (bclibc, the link to the ZRO source and how to replace bclibc, since #143), `LGPL-3.0.txt`, `GPL-3.0.txt`, copied into every build under `/licenses/`. The LGPL-3.0 text is identical to the `LICENSE` of bclibc; the LGPL-3.0 incorporates the GPL-3.0, so both are shipped |
 
 `js-ballistics` does not ship a licence notice for bclibc itself; its package declares ISC only.
