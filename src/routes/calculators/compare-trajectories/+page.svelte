@@ -11,7 +11,7 @@
 	import { isUsableZeroDistance, MIN_ZERO_DISTANCE, MAX_ZERO_DISTANCE } from '#lib/utils/zeroDistance.js';
 	import { readDecimal } from '#lib/utils/decimal.js';
 	import { formatLimit } from '#lib/utils/format.js';
-	import { isUsableRange, MAX_DISTANCE } from '#lib/utils/inputLimits.js';
+	import { isUsableHundredsRange, MAX_DISTANCE, MAX_DISTANCE_STEP } from '#lib/utils/inputLimits.js';
 	import { Unit } from 'js-ballistics';
 	import { Plus, X } from '@lucide/svelte';
 	import ChipGroup from '#lib/components/ChipGroup.svelte';
@@ -69,7 +69,7 @@
 
 	// ── Compute trajectories for all entries ─────────────────────────
 	let rangeDist = $derived(readDecimal(compareTrajectories.range.distance));
-	let rangeUsable = $derived(isUsableRange(rangeDist));
+	let rangeUsable = $derived(isUsableHundredsRange(rangeDist));
 
 	/** The trajectory of each entry, in the order of resolvedEntries: null when it has none. */
 	let entryResults = $derived.by(() => {
@@ -404,7 +404,7 @@
 							</div>
 							{#if !rangeUsable}
 								<p id="{uid}-max-msg" class="text-xs text-error-500" role="alert">
-									{m.validation_range_above_zero({ max: formatLimit(MAX_DISTANCE), unit: distLabel })}
+									{m.validation_max_distance_hundreds({ min: formatLimit(MAX_DISTANCE_STEP), max: formatLimit(MAX_DISTANCE), unit: distLabel })}
 								</p>
 							{/if}
 						</div>

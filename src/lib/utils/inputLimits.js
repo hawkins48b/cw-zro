@@ -153,6 +153,20 @@ export function isUsableRange(distance) {
 	return distance > 0 && distance <= MAX_DISTANCE;
 }
 
+/** Ballistic and Compare maximum distances are whole hundreds (#199, owner decision of 2026-11-18). */
+export const MAX_DISTANCE_STEP = 100;
+
+/**
+ * Whether a maximum distance is one Ballistic and Compare Trajectories take (#199): a multiple of
+ * MAX_DISTANCE_STEP, from MAX_DISTANCE_STEP to MAX_DISTANCE. Other values show a message and give
+ * no result.
+ * @param {number} distance - in the unit entered
+ * @returns {boolean}
+ */
+export function isUsableHundredsRange(distance) {
+	return isUsableRange(distance) && distance % MAX_DISTANCE_STEP === 0;
+}
+
 /** Smallest Ballistic table step, in the range unit (yd or m) (#130, owner decision of 2026-11-10). */
 export const MIN_TABLE_STEP = 1;
 

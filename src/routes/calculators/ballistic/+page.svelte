@@ -18,6 +18,7 @@
 	import {
 		chartTickAmount,
 		MAX_DISTANCE,
+		MAX_DISTANCE_STEP,
 		MIN_TABLE_STEP,
 		maxTableStep,
 		tableStep,
@@ -636,7 +637,7 @@
 
 					{#if !rangeUsable}
 						<p id="{uid}-max-msg" class="text-xs text-error-500" role="alert">
-							{m.validation_range_above_zero({ max: formatLimit(MAX_DISTANCE), unit: distLabel })}
+							{m.validation_max_distance_hundreds({ min: formatLimit(MAX_DISTANCE_STEP), max: formatLimit(MAX_DISTANCE), unit: distLabel })}
 						</p>
 					{/if}
 					{#if stepLimit === 'min'}

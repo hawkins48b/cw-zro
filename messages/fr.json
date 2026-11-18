@@ -288,6 +288,7 @@
 	"validation_range": "Saisissez un nombre de {min} à {max} {unit}",
 	"validation_range_no_unit": "Saisissez un nombre de {min} à {max}",
 	"validation_range_above_zero": "Saisissez un nombre supérieur à 0 et jusqu'à {max} {unit}",
+	"validation_max_distance_hundreds": "Saisissez un multiple de 100, de {min} à {max} {unit}",
 	"validation_range_below_max": "Saisissez un nombre de {min} à moins de {max} {unit}",
 
 	"settings_dark_mode": "Mode sombre",

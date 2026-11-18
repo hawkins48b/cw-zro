@@ -288,6 +288,7 @@
 	"validation_range": "Geben Sie eine Zahl von {min} bis {max} {unit} ein",
 	"validation_range_no_unit": "Geben Sie eine Zahl von {min} bis {max} ein",
 	"validation_range_above_zero": "Geben Sie eine Zahl über 0 und bis {max} {unit} ein",
+	"validation_max_distance_hundreds": "Geben Sie ein Vielfaches von 100 von {min} bis {max} {unit} ein",
 	"validation_range_below_max": "Geben Sie eine Zahl von {min} bis unter {max} {unit} ein",
 
 	"settings_dark_mode": "Dunkelmodus",

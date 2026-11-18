@@ -814,7 +814,8 @@ export function calculateMPBR(profile, targetSizeStr, targetUnit) {
 
 		// ── Final detailed trajectory for chart ──────────────────────────
 		const chartMaxDist = Math.ceil((mpbrMaxDistMM / mmPerDist) * 1.2 / 50) * 50;
-		const chartPoints = flightRows(calc, shot, toDistance(chartMaxDist), toDistance(5), EVENT_ROWS);
+		// Rows every 1 unit (#199, owner decision of 2026-11-18; was 5).
+		const chartPoints = flightRows(calc, shot, toDistance(chartMaxDist), toDistance(1), EVENT_ROWS);
 		if (!chartPoints || chartPoints.length === 0) return null;
 
 		// Near/far zero via flags, with manual fallback
