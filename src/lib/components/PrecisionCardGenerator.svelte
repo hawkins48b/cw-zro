@@ -7,8 +7,7 @@
 	 * The units of wind, pressure and temperature are chosen apart (#160), and so is the distance
 	 * unit (#197), whose m / yd chips sit inside the maximum distance box (#198). All four start
 	 * from the zero's unit: metric for m, imperial for yd. The maximum distance has − and + by 100
-	 * and is rounded to the nearest hundred (#198): the box when it loses focus, and always the value
-	 * given to the card.
+	 * and takes only whole hundreds (#198): any other value is a field error, not corrected.
 	 * A profile that cannot make the card dims the form and disables the download; the warning says
 	 * why and links to the profile.
 	 *
@@ -25,7 +24,6 @@
 		PRECISION_MAX_DISTANCE,
 		PRECISION_PAGE_STEP,
 		isUsableMaxDistance,
-		roundMaxDistance,
 		precisionPageDistances,
 		precisionCardRequirements
 	} from '#lib/utils/precisionCard.js';
@@ -142,8 +140,8 @@
 
 	// ── Form ──────────────────────────────────────────────────────────
 	let maxText = $state('800');
-	/** The typed distance rounded to the nearest hundred (#198): what the card gets. */
-	let maxDistance = $derived(roundMaxDistance(parseDecimal(maxText)));
+	/** The typed distance, as typed: a value that is not a whole hundred is an error (#198). */
+	let maxDistance = $derived(parseDecimal(maxText));
 	/** − and + of the box: whole hundreds within the limits; an empty box starts from 800. */
 	const maxSpec = {
 		step: PRECISION_PAGE_STEP,
@@ -151,10 +149,7 @@
 		max: PRECISION_MAX_DISTANCE,
 		start: 800
 	};
-	/** When the box loses focus, it shows the hundred the card uses. */
-	function roundMaxText() {
-		if (isUsableMaxDistance(maxDistance)) maxText = String(maxDistance);
-	}
+
 	let maxValid = $derived(isUsableMaxDistance(maxDistance));
 	let maxError = $derived(
 		maxValid
@@ -352,7 +347,6 @@
 					label={m.dope_precision_max()}
 					value={maxText}
 					onchange={(text) => (maxText = text)}
-					onblur={roundMaxText}
 					spec={maxSpec}
 					decreaseLabel={m.dope_precision_max_down({ step: formatLimit(PRECISION_PAGE_STEP), unit: distUnitLabel })}
 					increaseLabel={m.dope_precision_max_up({ step: formatLimit(PRECISION_PAGE_STEP), unit: distUnitLabel })}

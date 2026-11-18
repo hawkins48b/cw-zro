@@ -596,7 +596,7 @@
 	"dope_precision_max_down": "Maximale Distanz um {step} {unit} verringern",
 	"dope_precision_max_up": "Maximale Distanz um {step} {unit} erhöhen",
 	"dope_precision_max_hint": "{min} bis {max} {unit}, in Hunderterschritten.",
-	"dope_precision_max_invalid": "Geben Sie eine Distanz von {min} bis {max} {unit} ein.",
+	"dope_precision_max_invalid": "Geben Sie einen vollen Hunderter von {min} bis {max} {unit} ein (100, 200, 300…).",
 	"dope_precision_correction": "Korrekturen in",
 	"dope_precision_correction_clicks": "Klicks",
 	"dope_precision_units": "Wind, Luftdruck und Temperatur in",

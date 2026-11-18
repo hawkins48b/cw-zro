@@ -2,8 +2,8 @@ import { flushSync, mount, unmount } from 'svelte';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 // The precision card generator's maximum distance (#198) in jsdom: the m / yd chips inside the box,
-// no Metric / Imperial presets, the box rounded to the nearest hundred when it loses focus, and the
-// card always given a whole hundred. jsdom applies no CSS, so the look is not checked here.
+// no Metric / Imperial presets, and only whole hundreds: any other value is a field error, never
+// corrected, and gives no card. jsdom applies no CSS, so the look is not checked here.
 
 const profileRef = vi.hoisted(() => ({ current: null }));
 const generate = vi.hoisted(() => vi.fn(async () => null));
@@ -89,46 +89,44 @@ describe('PrecisionCardGenerator maximum distance (#198)', () => {
 		expect(target.querySelector('[aria-label="Unit presets"]')).toBeNull();
 	});
 
-	it.each([
-		['850', '900'],
-		['849', '800'],
-		['1234,5', '1200'],
-		['3040', '3000'],
-		['150', '200']
-	])('rounds %s to %s when the box loses focus', (typed, shown) => {
+	const error = () => target.querySelector('[role="alert"]')?.textContent.trim() ?? '';
+
+	it.each(['850', '849', '1234,5', '3040', '150', '50', '3100', 'abc'])('%s: a field error, left as typed, no download', (typed) => {
 		show();
 		type(typed);
 		blur();
-		expect(box().value).toBe(shown);
-	});
-
-	it('leaves text that rounds out of the limits as typed, with the error', () => {
-		show();
-		type('3100');
-		blur();
-		expect(box().value).toBe('3100');
+		expect(box().value).toBe(typed);
 		expect(box().getAttribute('aria-invalid')).toBe('true');
+		expect(error()).toBe('Enter a whole hundred from 100 to 3000 yd (100, 200, 300…).');
 		expect(download().disabled).toBe(true);
 	});
 
-	it('steps by 100 within the limits, then rounds on blur', () => {
+	it.each(['100', '900', '3000', '1200,0'])('%s: no error', (typed) => {
 		show();
-		type('850');
+		type(typed);
+		expect(box().getAttribute('aria-invalid')).toBe('false');
+		expect(error()).toBe('');
+		expect(download().disabled).toBe(false);
+	});
+
+	it('steps by 100 within the limits', () => {
+		show();
+		type('800');
 		const plus = target.querySelector('button[aria-label^="Increase the maximum distance by 100"]');
 		// A keyboard click (detail 0) makes one step.
 		plus.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }));
 		flushSync();
-		expect(box().value).toBe('950');
-		type('2950');
+		expect(box().value).toBe('900');
+		type('2900');
 		plus.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }));
 		plus.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }));
 		flushSync();
 		expect(box().value).toBe('3000');
 	});
 
-	it('gives the card a whole hundred even before the box loses focus, in the chosen unit', async () => {
+	it('gives the card the typed hundred, in the chosen unit', async () => {
 		show();
-		type('850');
+		type('900');
 		const m = [...box().closest('.input').querySelectorAll('button[aria-pressed]')].find((b) => b.textContent.trim() === 'm');
 		m.click();
 		flushSync();

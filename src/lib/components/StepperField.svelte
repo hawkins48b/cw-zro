@@ -28,7 +28,6 @@
 	 * @prop {string} [describedby]   - More ids for aria-describedby (a hint printed elsewhere).
 	 * @prop {string} [placeholder]
 	 * @prop {'right'|'center'} [align] - Text alignment of the value.
-	 * @prop {() => void} [onblur]    - The input lost focus (the precision card rounds its box, #198).
 	 */
 	import { stepValue } from '#lib/utils/fieldStep.js';
 	import ChipGroup from '#lib/components/ChipGroup.svelte';
@@ -53,8 +52,7 @@
 		invalid = undefined,
 		describedby = '',
 		placeholder = '0',
-		align = 'right',
-		onblur = undefined
+		align = 'right'
 	} = $props();
 
 	const uid = $props.id();
@@ -96,7 +94,6 @@
 			aria-invalid={isInvalid}
 			aria-describedby={described}
 			oninput={(e) => onchange?.(e.currentTarget.value)}
-			{onblur}
 		/>
 		{#if suffix}
 			<span class="pr-1.5 text-sm text-surface-600-400 shrink-0">{suffix}</span>

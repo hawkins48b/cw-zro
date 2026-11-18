@@ -16,7 +16,6 @@ import {
 	WIND_ANGLES,
 	computePrecisionCard,
 	isUsableMaxDistance,
-	roundMaxDistance,
 	precisionCardRequirements,
 	precisionPageDistances,
 	precisionColumns,
@@ -81,12 +80,17 @@ afterEach(() => {
 });
 
 describe('maximum distance and pages', () => {
-	it.each([100, 150.5, 800, 3000])('takes %s', (value) => {
+	it.each([100, 200, 800, 2900, 3000])('takes %s', (value) => {
 		expect(isUsableMaxDistance(value)).toBe(true);
 	});
 
 	it.each([
 		['99', 99],
+		['150.5 (not a whole hundred, #198)', 150.5],
+		['850', 850],
+		['199', 199],
+		['2999', 2999],
+		['100.000001', 100.000001],
 		['3001', 3001],
 		['0', 0],
 		['-500', -500],
@@ -106,8 +110,7 @@ describe('maximum distance and pages', () => {
 
 	it('gives one page per whole 100', () => {
 		expect(precisionPageDistances(100)).toEqual([100]);
-		expect(precisionPageDistances(199)).toEqual([100]);
-		expect(precisionPageDistances(850)).toEqual([100, 200, 300, 400, 500, 600, 700, 800]);
+		expect(precisionPageDistances(800)).toEqual([100, 200, 300, 400, 500, 600, 700, 800]);
 		const all = precisionPageDistances(3000);
 		expect(all).toHaveLength(30);
 		expect(all.at(-1)).toBe(3000);
@@ -115,6 +118,7 @@ describe('maximum distance and pages', () => {
 
 	it('gives no pages for a maximum that is not usable', () => {
 		expect(precisionPageDistances(50)).toEqual([]);
+		expect(precisionPageDistances(850)).toEqual([]);
 		expect(precisionPageDistances(NaN)).toEqual([]);
 		expect(precisionPageDistances('800')).toEqual([]);
 	});
@@ -255,6 +259,7 @@ describe('guards (engine stubbed)', () => {
 
 	it.each([
 		['a maximum distance of 50', { maxDistance: 50 }],
+		['a maximum distance of 850 (#198)', { maxDistance: 850 }],
 		['a maximum distance past 3000', { maxDistance: 3100 }],
 		['a NaN maximum distance', { maxDistance: NaN }],
 		['a maximum distance as text', { maxDistance: '800' }],
@@ -716,33 +721,3 @@ describe('the distance unit chosen apart from the zero (#197, real engine)', () 
 	});
 });
 
-describe('roundMaxDistance (#198)', () => {
-	it.each([
-		[850, 900],
-		[849, 800],
-		[849.9, 800],
-		[100, 100],
-		[149, 100],
-		[150, 200],
-		[2950, 3000],
-		[3040, 3000],
-		[3050, 3100],
-		[49, 0],
-		[1234.5, 1200]
-	])('%d → %d', (typed, rounded) => {
-		expect(roundMaxDistance(typed)).toBe(rounded);
-	});
-
-	it('gives NaN for what is not a finite number', () => {
-		for (const v of [NaN, Infinity, -Infinity, '800', null, undefined, {}]) expect(roundMaxDistance(v)).toBeNaN();
-	});
-
-	it('every usable rounded value is a whole page and gives pages up to it', () => {
-		for (let typed = 50; typed <= 3049; typed += 7.3) {
-			const r = roundMaxDistance(typed);
-			expect(isUsableMaxDistance(r)).toBe(true);
-			expect(r % 100).toBe(0);
-			expect(precisionPageDistances(r).at(-1)).toBe(r);
-		}
-	});
-});

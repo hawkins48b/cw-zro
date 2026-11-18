@@ -100,29 +100,23 @@ const ANGLE_UNITS = { MRAD: Unit.MRad, MOA: Unit.MOA };
 const RETICLE_UNITS = { mrad: 'MRAD', 'mil-dot': 'MRAD', moa: 'MOA' };
 
 /**
- * Whether a maximum distance can be given to the card: a finite number from
- * PRECISION_MIN_DISTANCE to PRECISION_MAX_DISTANCE, both included.
+ * Whether a maximum distance can be given to the card: a whole hundred (#198, a multiple of
+ * PRECISION_PAGE_STEP) from PRECISION_MIN_DISTANCE to PRECISION_MAX_DISTANCE, both included.
  * @param {unknown} value
  * @returns {boolean}
  */
 export function isUsableMaxDistance(value) {
-	return typeof value === 'number' && Number.isFinite(value) && value >= PRECISION_MIN_DISTANCE && value <= PRECISION_MAX_DISTANCE;
+	return (
+		typeof value === 'number' &&
+		Number.isFinite(value) &&
+		value >= PRECISION_MIN_DISTANCE &&
+		value <= PRECISION_MAX_DISTANCE &&
+		value % PRECISION_PAGE_STEP === 0
+	);
 }
 
 /**
- * A typed maximum distance rounded to the nearest whole page (#198): 850 gives 900, 849 gives 800,
- * a half rounds up. NaN for anything that is not a finite number. The result is not checked against
- * the limits: isUsableMaxDistance does that.
- * @param {unknown} value
- * @returns {number}
- */
-export function roundMaxDistance(value) {
-	if (typeof value !== 'number' || !Number.isFinite(value)) return NaN;
-	return Math.round(value / PRECISION_PAGE_STEP) * PRECISION_PAGE_STEP;
-}
-
-/**
- * The page distances for a maximum distance: 100, 200, … up to the last whole 100 within it.
+ * The page distances for a maximum distance: 100, 200, … up to it.
  * Empty for a maximum that is not usable.
  * @param {unknown} maxDistance
  * @returns {number[]}
