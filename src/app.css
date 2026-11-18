@@ -16,6 +16,18 @@
 	--safe-area-right: env(safe-area-inset-right, 0px);
 }
 
+/*
+ * Firefox for Android (#196) reports the height of the Android navigation bar as the bottom inset,
+ * but does not draw the page behind that bar, so the inset was an empty band under the tab bar.
+ * Only Gecko matches this test: Firefox on iOS is WebKit and keeps the inset, desktop Firefox has
+ * none anyway.
+ */
+@supports (-moz-appearance: none) {
+	:root {
+		--safe-area-bottom: 0px;
+	}
+}
+
 /* Skeleton 5 dropped the pointer cursor on interactive elements */
 @layer base {
 	button:not(:disabled),
