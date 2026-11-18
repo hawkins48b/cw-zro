@@ -16,6 +16,7 @@ import {
 	WIND_ANGLES,
 	computePrecisionCard,
 	isUsableMaxDistance,
+	roundMaxDistance,
 	precisionCardRequirements,
 	precisionPageDistances,
 	precisionColumns,
@@ -712,5 +713,36 @@ describe('the distance unit chosen apart from the zero (#197, real engine)', () 
 
 	it.each([['km'], ['M'], [''], [null], [['m']], [{ toString: () => 'm' }]])('refuses the distance unit %j', (distanceUnit) => {
 		expect(computePrecisionCard(P308_MOA, { ...options, distanceUnit })).toBeNull();
+	});
+});
+
+describe('roundMaxDistance (#198)', () => {
+	it.each([
+		[850, 900],
+		[849, 800],
+		[849.9, 800],
+		[100, 100],
+		[149, 100],
+		[150, 200],
+		[2950, 3000],
+		[3040, 3000],
+		[3050, 3100],
+		[49, 0],
+		[1234.5, 1200]
+	])('%d → %d', (typed, rounded) => {
+		expect(roundMaxDistance(typed)).toBe(rounded);
+	});
+
+	it('gives NaN for what is not a finite number', () => {
+		for (const v of [NaN, Infinity, -Infinity, '800', null, undefined, {}]) expect(roundMaxDistance(v)).toBeNaN();
+	});
+
+	it('every usable rounded value is a whole page and gives pages up to it', () => {
+		for (let typed = 50; typed <= 3049; typed += 7.3) {
+			const r = roundMaxDistance(typed);
+			expect(isUsableMaxDistance(r)).toBe(true);
+			expect(r % 100).toBe(0);
+			expect(precisionPageDistances(r).at(-1)).toBe(r);
+		}
 	});
 });

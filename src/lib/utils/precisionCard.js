@@ -110,6 +110,18 @@ export function isUsableMaxDistance(value) {
 }
 
 /**
+ * A typed maximum distance rounded to the nearest whole page (#198): 850 gives 900, 849 gives 800,
+ * a half rounds up. NaN for anything that is not a finite number. The result is not checked against
+ * the limits: isUsableMaxDistance does that.
+ * @param {unknown} value
+ * @returns {number}
+ */
+export function roundMaxDistance(value) {
+	if (typeof value !== 'number' || !Number.isFinite(value)) return NaN;
+	return Math.round(value / PRECISION_PAGE_STEP) * PRECISION_PAGE_STEP;
+}
+
+/**
  * The page distances for a maximum distance: 100, 200, … up to the last whole 100 within it.
  * Empty for a maximum that is not usable.
  * @param {unknown} maxDistance
