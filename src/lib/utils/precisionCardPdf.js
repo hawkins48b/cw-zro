@@ -30,6 +30,9 @@ import {
 	WIDTH,
 	WORKSHEET,
 	coverCell,
+	dialInnerFits,
+	dialRingLabelBox,
+	dialValueBox,
 	dialValuePoint,
 	extraCell,
 	painter,
@@ -272,27 +275,26 @@ function fillRange(p, ctx, page, number) {
 	const dl = RANGE.dial;
 	const axisX = dl.origin.x + dl.centre.x;
 	data.columns.wind.speeds.forEach((speed, i) => {
-		const y = dl.origin.y + dl.centre.y - dl.radii[i] + dl.ringLabelSize * dl.baselineDrop;
 		const text = String(speed);
 		const w = p.width(text, dl.ringLabelSize, true);
-		p.rect(axisX - w / 2 - 2, y - dl.ringLabelSize * 0.8, w + 4, dl.ringLabelSize, { fill: COLORS.white });
-		p.text(text, axisX, y, { size: dl.ringLabelSize, bold: true, align: 'center' });
-		p.line(axisX - w / 2, y + 1.5, axisX + w / 2, y + 1.5, { width: 1 });
+		const box = dialRingLabelBox(i, w);
+		p.rect(box.left, box.top, box.right - box.left, box.bottom - box.top, { fill: COLORS.white });
+		p.text(text, axisX, box.baseline, { size: dl.ringLabelSize, bold: true, align: 'center' });
+		p.line(axisX - w / 2, box.baseline + 1.5, axisX + w / 2, box.baseline + 1.5, { width: 1 });
 	});
 	p.text(unitSymbol(data.columns.wind.unit), dl.origin.x + dl.unit.x, dl.origin.y + dl.unit.y, { size: dl.unit.size, bold: true, color: COLORS.muted });
 
-	// One value per ray and ring (#159), on a white halo; staggered on the inner ring (#174)
-	// (dialValuePoint).
+	// One value per ray and ring (#159), on a white halo. The inner ring sits on its ring when its
+	// values fit there (#200), else it is staggered (#174, dialValuePoint).
 	const size = dl.valueSize;
-	const halo = dl.halo;
-	page.wind.forEach((ring, i) => {
-		ring.values.forEach((value, ray) => {
-			const text = formatCorrection(value, correction, { magnitude: true });
-			const at = dialValuePoint(i, ray);
-			const w = p.width(text, size, true);
-			const y = at.y + size * dl.baselineDrop;
-			p.rect(at.x - w / 2 - halo.padding, y - size * halo.top, w + 2 * halo.padding, size, { fill: COLORS.white });
-			p.text(text, at.x, y, { size, bold: true, color: COLORS.value, align: 'center' });
+	const texts = page.wind.map((ring) => ring.values.map((value) => formatCorrection(value, correction, { magnitude: true })));
+	const widths = texts.map((ring) => ring.map((text) => p.width(text, size, true)));
+	const innerStaggered = !dialInnerFits(widths[0], p.width(String(data.columns.wind.speeds[0]), dl.ringLabelSize, true));
+	texts.forEach((ring, i) => {
+		ring.forEach((text, ray) => {
+			const box = dialValueBox(dialValuePoint(i, ray, innerStaggered), widths[i][ray]);
+			p.rect(box.left, box.top, box.right - box.left, box.bottom - box.top, { fill: COLORS.white });
+			p.text(text, (box.left + box.right) / 2, box.top + size * dl.halo.top, { size, bold: true, color: COLORS.value, align: 'center' });
 		});
 	});
 
