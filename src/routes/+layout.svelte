@@ -137,7 +137,13 @@
 </svelte:head>
 
 {#key locale}
-<div class="h-dvh flex flex-col" style="padding-top: var(--safe-area-top); padding-bottom: var(--safe-area-bottom);">
+<!-- The shell is pinned to the screen (fixed, inset 0) instead of sized with 100dvh (#196): Firefox for
+	Android can report a dvh smaller than the visible area, which left a gap under the tab bar. With the
+	phone tab bar shown, the bottom safe area goes inside the bar, so it gets the bar's colour. -->
+<div
+	class="fixed inset-0 flex flex-col {bare || editor ? 'pb-(--safe-area-bottom)' : 'sm:pb-(--safe-area-bottom)'}"
+	style="padding-top: var(--safe-area-top);"
+>
 	{#if bare}
 	<main class="flex-1 min-h-0">
 		{@render children()}
@@ -259,7 +265,7 @@
 	<!-- Phone tab bar (below sm) -->
 	<nav
 		aria-label={m.nav_main()}
-		class="{editor ? 'hidden' : 'grid'} sm:hidden grid-cols-4 px-1.5 pt-1.5 pb-1 border-t border-surface-200-800 bg-surface-100-900"
+		class="{editor ? 'hidden' : 'grid'} sm:hidden grid-cols-4 px-1.5 pt-1.5 pb-[calc(0.25rem+var(--safe-area-bottom))] border-t border-surface-200-800 bg-surface-100-900"
 	>
 		{#each navItems as item (item.href)}
 			{@const Icon = item.icon}
