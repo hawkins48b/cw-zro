@@ -93,6 +93,15 @@ export function coverCell(key) {
 
 // ── Range page ─────────────────────────────────────────────────────────────────
 
+/** Outer ring radius of the wind dial, in px (200 until #200). */
+const DIAL_R = 236;
+
+/** A point `radius` px from the dial centre, `angle` degrees clockwise from XII (y down). */
+function polar(angle, radius) {
+	const rad = (angle * Math.PI) / 180;
+	return { x: radius * Math.sin(rad), y: -radius * Math.cos(rad) };
+}
+
 export const RANGE = Object.freeze({
 	top: Object.freeze({
 		top: 16,
@@ -138,14 +147,17 @@ export const RANGE = Object.freeze({
 		timeLabelRight: 333,
 		rule: 233
 	}),
-	/** The quarter wind dial, in the coordinates of the design's 262 × 254 svg placed at `origin`. */
+	/**
+	 * The quarter wind dial. Positions are in px from `origin` (the page px of the dial centre since
+	 * #200, so `centre` is 0, 0), y down; the labels are placed from the outer radius DIAL_R.
+	 */
 	dial: Object.freeze({
 		badge: Object.freeze({ cx: 25.5, cy: 247.5 }),
-		origin: Object.freeze({ x: 67.5, y: 240 }),
-		centre: Object.freeze({ x: 24, y: 240 }),
-		radii: Object.freeze([50, 100, 150, 200]),
-		axisTop: 24,
-		axisRight: 236,
+		origin: Object.freeze({ x: 60, y: 510 }),
+		centre: Object.freeze({ x: 0, y: 0 }),
+		radii: Object.freeze([DIAL_R / 4, DIAL_R / 2, (3 * DIAL_R) / 4, DIAL_R]),
+		axisTop: -(DIAL_R + 16),
+		axisRight: DIAL_R + 12,
 		/**
 		 * The rays, degrees clockwise from XII (#159): the angles of WIND_ANGLES in precisionCard.js,
 		 * in the same order. 90° is the III axis; the others are drawn as thin lines.
@@ -154,37 +166,38 @@ export const RANGE = Object.freeze({
 		/** Thin rays end this far past the outer ring. */
 		rayOverhang: 20,
 		clockLabels: Object.freeze([
-			Object.freeze({ text: 'XII', x: 24, y: 17 }),
-			Object.freeze({ text: 'I', x: 140, y: 44 }),
-			Object.freeze({ text: 'II', x: 226, y: 128 }),
-			Object.freeze({ text: 'III', x: 250, y: 246 })
+			Object.freeze({ text: 'XII', x: 0, y: -(DIAL_R + 23) }),
+			Object.freeze({ text: 'I', ...polar(30.6, DIAL_R + 28) }),
+			Object.freeze({ text: 'II', ...polar(61, DIAL_R + 31) }),
+			Object.freeze({ text: 'III', x: DIAL_R + 26, y: 6 })
 		]),
 		clockSize: 18,
-		/** The angle of I, II and III, small: after I and II (x the left end), under III (x the centre). */
+		/** The angle of I, II and III, small, after the hour (x the left end; beside III since #200). */
 		clockAngles: Object.freeze([
-			Object.freeze({ text: '30°', x: 146, y: 44, align: 'left' }),
-			Object.freeze({ text: '60°', x: 235, y: 128, align: 'left' }),
-			Object.freeze({ text: '90°', x: 250, y: 260, align: 'center' })
+			Object.freeze({ text: '30°', x: polar(30.6, DIAL_R + 28).x + 6, y: polar(30.6, DIAL_R + 28).y, align: 'left' }),
+			Object.freeze({ text: '60°', x: polar(61, DIAL_R + 31).x + 9, y: polar(61, DIAL_R + 31).y, align: 'left' }),
+			Object.freeze({ text: '90°', x: DIAL_R + 38, y: 6, align: 'left' })
 		]),
 		clockAngleSize: 10,
 		/** The labels of the rays between the hours, centred this far from the centre on their ray. */
 		halfRays: Object.freeze([15, 45, 75]),
-		halfRayRadius: 232,
+		halfRayRadius: DIAL_R + 32,
 		halfRaySize: 12,
 		ringLabelSize: 15,
 		valueSize: 11,
 		/**
-		 * How far past its ring a value sits, by ring, on the rays between the hours (15°, 45°, 75°):
-		 * on the inner ring the rays are too close for a value on each, so every other value sits
-		 * just outside the ring. From the second ring on (#174), and on I, II and III, values sit on
-		 * the ring.
+		 * How far past its ring a value sits, by ring, on the rays between the hours (15°, 45°, 75°),
+		 * when the ring is staggered: on the inner ring long values on neighbouring rays would overlap,
+		 * so every other value sits just outside the ring. Since #200 the inner ring is staggered only
+		 * when its values would overlap on the ring (`dialInnerFits`). From the second ring on (#174),
+		 * and on I, II and III, values sit on the ring.
 		 */
-		stagger: Object.freeze([22, 0, 0, 0]),
+		stagger: Object.freeze([26, 0, 0, 0]),
 		/** From the centre of a text to its baseline, as a share of its size. */
 		baselineDrop: 5.3 / 15,
 		/** The white halo behind a value: padding on each side (1 since #174, so neighbours on the second ring stay clear), and its top above the baseline, as a share of the size. */
 		halo: Object.freeze({ padding: 1, top: 0.8 }),
-		unit: Object.freeze({ x: 36, y: 45, size: 12 })
+		unit: Object.freeze({ x: 12, y: -(DIAL_R - 5), size: 12 })
 	}),
 	footer: Object.freeze({ boxX: 18, boxTop: 526, boxHeight: 19, padding: 6, baseline: 539, size: 12, gap: 10 })
 });
@@ -220,15 +233,56 @@ export function dialPoint(angle, radius) {
 /**
  * The centre of the value of ring `ring` (0 = inner) on the ray `ray` (index in RANGE.dial.rays),
  * in page px: where the ring meets the ray, or just outside the ring on a ray between the hours
- * of a staggered ring.
+ * of a staggered ring. `staggered` false puts the inner ring's values on the ring too (#200).
  * @param {number} ring
  * @param {number} ray
+ * @param {boolean} [staggered]
  */
-export function dialValuePoint(ring, ray) {
+export function dialValuePoint(ring, ray, staggered = true) {
 	const dl = RANGE.dial;
 	const angle = dl.rays[ray];
-	const offset = dl.halfRays.includes(angle) ? dl.stagger[ring] : 0;
+	const offset = staggered && dl.halfRays.includes(angle) ? dl.stagger[ring] : 0;
 	return dialPoint(angle, dl.radii[ring] + offset);
+}
+
+/**
+ * The page box of a dial value centred on `at`, `width` px wide, with its white halo.
+ * @param {{ x: number, y: number }} at
+ * @param {number} width
+ */
+export function dialValueBox(at, width) {
+	const dl = RANGE.dial;
+	const baseline = at.y + dl.valueSize * dl.baselineDrop;
+	const top = baseline - dl.valueSize * dl.halo.top;
+	const half = width / 2 + dl.halo.padding;
+	return { left: at.x - half, right: at.x + half, top, bottom: top + dl.valueSize };
+}
+
+/**
+ * The page box of the speed of ring `ring` on the XII axis, with its white patch.
+ * @param {number} ring
+ * @param {number} width the width of the speed text
+ */
+export function dialRingLabelBox(ring, width) {
+	const dl = RANGE.dial;
+	const x = dl.origin.x + dl.centre.x;
+	const baseline = dl.origin.y + dl.centre.y - dl.radii[ring] + dl.ringLabelSize * dl.baselineDrop;
+	const top = baseline - dl.ringLabelSize * 0.8;
+	return { left: x - width / 2 - 2, right: x + width / 2 + 2, top, bottom: top + dl.ringLabelSize, baseline };
+}
+
+const boxesOverlap = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+
+/**
+ * Whether the inner ring's values all fit on the ring (#200): no value box overlaps another or the
+ * ring's speed on the XII axis. Otherwise the ring is staggered (RANGE.dial.stagger).
+ * @param {number[]} widths the width of each value, in the order of RANGE.dial.rays
+ * @param {number} speedWidth the width of the inner ring's speed
+ */
+export function dialInnerFits(widths, speedWidth) {
+	const boxes = widths.map((w, ray) => dialValueBox(dialValuePoint(0, ray, false), w));
+	const speed = dialRingLabelBox(0, speedWidth);
+	return boxes.every((a, i) => !boxesOverlap(a, speed) && boxes.slice(i + 1).every((b) => !boxesOverlap(a, b)));
 }
 
 // ── Worksheet ──────────────────────────────────────────────────────────────────

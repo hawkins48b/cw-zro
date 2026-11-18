@@ -4,8 +4,10 @@
 	 *
 	 * The user picks a saved profile (the active one by default), sees whether it can make the card
 	 * (precisionCardRequirements), sets the last distance and the units, and downloads an A6 PDF.
-	 * The units of wind, pressure and temperature are chosen apart (#160), with a Metric and an
-	 * Imperial preset that set all three; a mixed choice selects neither preset.
+	 * The units of wind, pressure and temperature are chosen apart (#160), and so is the distance
+	 * unit (#197), whose m / yd chips sit inside the maximum distance box (#198). All four start
+	 * from the zero's unit: metric for m, imperial for yd. The maximum distance has − and + by 100
+	 * and takes only whole hundreds (#198): any other value is a field error, not corrected.
 	 * A profile that cannot make the card dims the form and disables the download; the warning says
 	 * why and links to the profile.
 	 *
@@ -20,13 +22,14 @@
 	import {
 		PRECISION_MIN_DISTANCE,
 		PRECISION_MAX_DISTANCE,
+		PRECISION_PAGE_STEP,
 		isUsableMaxDistance,
 		precisionPageDistances,
 		precisionCardRequirements
 	} from '#lib/utils/precisionCard.js';
-	import { PRECISION_UNIT_PRESETS, precisionUnitPreset } from '#lib/utils/precisionCardFormat.js';
+	import { PRECISION_UNIT_PRESETS } from '#lib/utils/precisionCardFormat.js';
 	import ChipGroup from '#lib/components/ChipGroup.svelte';
-	import UnitField from '#lib/components/UnitField.svelte';
+	import StepperField from '#lib/components/StepperField.svelte';
 	import {
 		BookOpen,
 		Check,
@@ -55,9 +58,8 @@
 	let req = $derived(profile ? precisionCardRequirements(profile) : null);
 	let usable = $derived(Boolean(req?.usable));
 
-	/** 'm' or 'yd': the card's distances follow the zero. A zero in neither unit counts as m. */
-	let distUnit = $derived(req?.zero?.unit === 'yd' ? 'yd' : 'm');
-	let distUnitLabel = $derived(distUnit === 'yd' ? m.unit_yd() : m.unit_m());
+	/** 'm' or 'yd': the zero's unit, the default of the card's distances. A zero in neither unit counts as m. */
+	let zeroUnit = $derived(req?.zero?.unit === 'yd' ? 'yd' : 'm');
 
 	/** A number from the requirements (number or stored text) as the page shows it. */
 	function shownNumber(value) {
@@ -138,7 +140,16 @@
 
 	// ── Form ──────────────────────────────────────────────────────────
 	let maxText = $state('800');
+	/** The typed distance, as typed: a value that is not a whole hundred is an error (#198). */
 	let maxDistance = $derived(parseDecimal(maxText));
+	/** − and + of the box: whole hundreds within the limits; an empty box starts from 800. */
+	const maxSpec = {
+		step: PRECISION_PAGE_STEP,
+		min: PRECISION_MIN_DISTANCE,
+		max: PRECISION_MAX_DISTANCE,
+		start: 800
+	};
+
 	let maxValid = $derived(isUsableMaxDistance(maxDistance));
 	let maxError = $derived(
 		maxValid
@@ -154,18 +165,34 @@
 	let correction = $state('clicks');
 	let angleLabel = $derived(req?.reticle?.unit ?? 'MRAD');
 
+	/** The distance unit that goes with each preset (#197). */
+	const PRESET_DISTANCE = { metric: 'm', imperial: 'yd' };
+
 	/**
-	 * The units of wind, pressure and temperature (#160) the user picked, a plain frozen object (raw
-	 * state, so that the PDF code gets no proxy), kept with the profile they were picked for: when
-	 * another profile is in use (#170) the units follow its zero again, the metric preset for m,
-	 * imperial for yd.
-	 * @type {{ id: string, units: Readonly<import('#lib/utils/precisionCardFormat.js').PrecisionUnits> }|null}
+	 * The units of distance (#197), wind, pressure and temperature (#160) the user picked, a plain
+	 * frozen object (raw state, so that the PDF code gets no proxy), kept with the profile they were
+	 * picked for: when another profile is in use (#170) the units follow its zero again, the metric
+	 * preset for m, imperial for yd.
+	 * @type {{ id: string, units: Readonly<import('#lib/utils/precisionCardFormat.js').PrecisionUnits & { distance: 'm'|'yd' }> }|null}
 	 */
 	let unitsPick = $state.raw(null);
 	let unitsChoice = $derived(unitsPick?.id === profileId ? unitsPick.units : null);
-	let units = $derived(unitsChoice ?? PRECISION_UNIT_PRESETS[distUnit === 'yd' ? 'imperial' : 'metric']);
-	/** The preset the units match, or null for a mixed choice (neither preset pressed). */
-	let unitPreset = $derived(precisionUnitPreset(units));
+	let allUnits = $derived(unitsChoice ?? presetUnits(zeroUnit === 'yd' ? 'imperial' : 'metric'));
+	/** The column units alone, as computePrecisionCard reads them. */
+	let units = $derived(
+		Object.freeze({ wind: allUnits.wind, pressure: allUnits.pressure, temperature: allUnits.temperature })
+	);
+	let distUnit = $derived(allUnits.distance);
+	let distUnitLabel = $derived(distUnit === 'yd' ? m.unit_yd() : m.unit_m());
+	const DISTANCE_UNITS = [
+		{ value: 'm', label: m.unit_m() },
+		{ value: 'yd', label: m.unit_yd() }
+	];
+
+	/** A preset's units with its distance unit: the default for a zero in m or yd. */
+	function presetUnits(name) {
+		return Object.freeze({ ...PRECISION_UNIT_PRESETS[name], distance: PRESET_DISTANCE[name] });
+	}
 
 	/** The unit toggles, one per quantity. */
 	const UNIT_ROWS = [
@@ -195,12 +222,8 @@
 		}
 	];
 
-	function pickPreset(name) {
-		if (Object.hasOwn(PRECISION_UNIT_PRESETS, name)) unitsPick = { id: profileId, units: PRECISION_UNIT_PRESETS[name] };
-	}
-
 	function pickUnit(key, value) {
-		unitsPick = { id: profileId, units: Object.freeze({ ...units, [key]: value }) };
+		unitsPick = { id: profileId, units: Object.freeze({ ...allUnits, [key]: value }) };
 	}
 
 	let distances = $derived(maxValid ? precisionPageDistances(maxDistance) : []);
@@ -221,7 +244,7 @@
 		if (!p || loading || !canDownload) return;
 		loading = true;
 		outcomePick = null;
-		const options = { maxDistance, correction, units };
+		const options = { maxDistance, correction, units, distanceUnit: distUnit };
 		const locale = getLocale();
 		try {
 			// Loaded on demand, inside downloadDopeCard so that a failed load counts as a failure.
@@ -318,18 +341,28 @@
 			<fieldset disabled={!usable} class="space-y-4 min-w-0 {usable ? '' : 'opacity-45'}">
 				<legend class="sr-only">{m.dope_precision_options()}</legend>
 
-				<UnitField
+				<!-- Maximum distance (#198): − and + by 100, the m / yd chips inside the box -->
+				<StepperField
 					id="{uid}-max"
 					label={m.dope_precision_max()}
-					bind:value={maxText}
-					suffix={distUnitLabel}
-					inputmode="decimal"
-					hint={m.dope_precision_max_hint({
-						min: formatLimit(PRECISION_MIN_DISTANCE),
-						max: formatLimit(PRECISION_MAX_DISTANCE),
-						unit: distUnitLabel
-					})}
-					invalid={usable ? maxError : ''}
+					value={maxText}
+					onchange={(text) => (maxText = text)}
+					spec={maxSpec}
+					decreaseLabel={m.dope_precision_max_down({ step: formatLimit(PRECISION_PAGE_STEP), unit: distUnitLabel })}
+					increaseLabel={m.dope_precision_max_up({ step: formatLimit(PRECISION_PAGE_STEP), unit: distUnitLabel })}
+					units={DISTANCE_UNITS}
+					unit={distUnit}
+					unitsLabel={m.dope_precision_units_distance()}
+					onunitchange={(value) => pickUnit('distance', value)}
+					message={usable && maxError
+						? maxError
+						: m.dope_precision_max_hint({
+								min: formatLimit(PRECISION_MIN_DISTANCE),
+								max: formatLimit(PRECISION_MAX_DISTANCE),
+								unit: distUnitLabel
+							})}
+					messageType={usable && maxError ? 'error' : 'hint'}
+					placeholder=""
 				/>
 
 				<!-- Toggles (#161): the app's small unit chips, one labelled row each, as in the profile form -->
@@ -346,27 +379,16 @@
 					/>
 				</div>
 
-				<!-- Units (#160): the presets beside the heading, then one row per quantity -->
+				<!-- Units (#160): one row per quantity, no presets (#198) -->
 				<div class="space-y-1.5">
-					<div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
-						<span class="text-sm font-medium" aria-hidden="true">{m.dope_precision_units()}</span>
-						<ChipGroup
-							label={m.dope_precision_units_presets()}
-							value={unitPreset}
-							onselect={pickPreset}
-							options={[
-								{ value: 'metric', label: m.dope_metric() },
-								{ value: 'imperial', label: m.dope_imperial() }
-							]}
-						/>
-					</div>
+					<p class="text-sm font-medium" aria-hidden="true">{m.dope_precision_units()}</p>
 					{#each UNIT_ROWS as row (row.key)}
 						<div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
 							<!-- The group's aria-label names it; the visible label is for sight only. -->
 							<span class="text-sm text-surface-600-400" aria-hidden="true">{row.label()}</span>
 							<ChipGroup
 								label={row.label()}
-								value={units[row.key]}
+								value={allUnits[row.key]}
 								onselect={(v) => pickUnit(row.key, v)}
 								options={row.options()}
 							/>

@@ -198,6 +198,7 @@ Since the Calculators round of [#166](2026-11-17-166-calculators-redesign.md) th
 The view logic is in `utils/`, tested without Svelte:
 
 - [`mpbrView.js`](../src/lib/utils/mpbrView.js): `mpbrChartMarkers` (near zero, far zero, highest point, MPBR end), `chartLabelAnchor`, `mpbrZeroChange` (before, after, `same`, `usable`, and the patch `{ zeroDist: optimalZero, zeroUnit }` of #110). The MPBR page clears its result when the profile in use changes, so a result is never saved to another profile.
+- [`validationChartAxis`](../src/lib/utils/trajectoryValidation.js) ([#199](https://github.com/hawkins48b/cw-zro/issues/199)): the Trajectory Validation chart's x axis starts at 100 and ends on the first hundred at or past the range (at least 200), with a tick every 100. Both curves are drawn to that end, so past the range when it is not a whole hundred; the range line and the observation stay at the range.
 - [`validationView.js`](../src/lib/utils/validationView.js): `validationChange` (before, after, difference, percent), `validationPatch` (`{ velocity }` or `{ bc }` as text, as before), `validationObservationPoint` (the observation marker on the chart). The applied change stays shown until the observation, solve-for, weather or profile in use changes.
 - Compare draws each profile name at the end of its line as an ApexCharts point annotation (SVG text, checked by `apexcharts.test.js`), with four colours per theme; a fifth line reuses the first.
 

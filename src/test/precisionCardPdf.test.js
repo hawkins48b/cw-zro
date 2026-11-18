@@ -14,7 +14,7 @@ import path from 'node:path';
 import { PDFArray, PDFDocument, PDFPage } from 'pdf-lib';
 import { generatePrecisionDopeCard } from '#lib/utils/precisionCardPdf.js';
 import { computePrecisionCard } from '#lib/utils/precisionCard.js';
-import { FOOTER, LEFT, PAGE_SIZE, PX, RANGE, RIGHT, dialValuePoint, precisionTemplatePath } from '#lib/utils/precisionCardLayout.js';
+import { FOOTER, LEFT, PAGE_SIZE, PX, RANGE, RIGHT, dialInnerFits, dialValuePoint, precisionTemplatePath } from '#lib/utils/precisionCardLayout.js';
 import { PRECISION_LOCALES, precisionWords } from '#lib/utils/precisionCardWords.js';
 import { PRECISION_COLUMNS, PRECISION_QUANTITIES, formatColumn, formatDate, unitSymbol } from '#lib/utils/precisionCardFormat.js';
 import { buildPrecisionTemplate } from '../../scripts/precision-card-templates.js';
@@ -279,18 +279,53 @@ describe('wind dial (#159)', () => {
 		expect(widest).toBeGreaterThanOrEqual(longest);
 	});
 
-	it('staggers only the inner ring: from the second ring on, every value sits on its ring (#174)', () => {
+	it('staggers only the inner ring, and only when its values would overlap on the ring (#174, #200)', () => {
 		const dl = RANGE.dial;
 		const centre = { x: dl.origin.x + dl.centre.x, y: dl.origin.y + dl.centre.y };
-		const radius = (ring, ray) => {
-			const at = dialValuePoint(ring, ray);
+		const radius = (ring, ray, staggered) => {
+			const at = dialValuePoint(ring, ray, staggered);
 			return Math.hypot(at.x - centre.x, at.y - centre.y);
 		};
 		dl.rays.forEach((angle, ray) => {
-			for (let ring = 1; ring < dl.radii.length; ring++) expect(radius(ring, ray)).toBeCloseTo(dl.radii[ring], 9);
-			expect(radius(0, ray)).toBeCloseTo(dl.radii[0] + (dl.halfRays.includes(angle) ? dl.stagger[0] : 0), 9);
+			for (let ring = 1; ring < dl.radii.length; ring++) {
+				expect(radius(ring, ray, true)).toBeCloseTo(dl.radii[ring], 9);
+				expect(radius(ring, ray, false)).toBeCloseTo(dl.radii[ring], 9);
+			}
+			expect(radius(0, ray, true)).toBeCloseTo(dl.radii[0] + (dl.halfRays.includes(angle) ? dl.stagger[0] : 0), 9);
+			expect(radius(0, ray, false)).toBeCloseTo(dl.radii[0], 9);
 		});
 		expect(dl.stagger[0]).toBeGreaterThan(0);
+		// Bold 11 px digits are about 6.1 px wide: one digit on every ray fits on the ring, two digits
+		// on 15° to 60° do not (30° and 45° are too close), nor do three.
+		expect(dialInnerFits(Array(6).fill(6.1), 8.3)).toBe(true);
+		expect(dialInnerFits(Array(6).fill(12.2), 16.7)).toBe(false);
+		expect(dialInnerFits(Array(6).fill(18.4), 16.7)).toBe(false);
+	});
+
+	it('draws the inner ring on its ring when it fits, staggered when it does not (#200)', async () => {
+		const dl = RANGE.dial;
+		const centre = { x: dl.origin.x + dl.centre.x, y: dl.origin.y + dl.centre.y };
+		/** The distances from the centre of the inner ring values of each range page, in px. */
+		const innerRadii = async (profile, options) => {
+			texts.length = 0;
+			const doc = await generatePrecisionDopeCard(profile, options, 'en');
+			return doc.getPages().slice(1, -1).map((page) => {
+				const values = texts.filter((t) => t.page === page.ref && inDial(t) && isValue(t));
+				return values.slice(0, dl.rays.length).map((t) => {
+					const x = (t.x + t.width / 2) / PX;
+					const y = (PAGE_SIZE.height - t.y) / PX - dl.valueSize * dl.baselineDrop;
+					return Math.hypot(x - centre.x, y - centre.y);
+				});
+			});
+		};
+		// The sample to 800 m: one- and two-digit clicks, every inner value on its ring.
+		for (const ring of await innerRadii(SAMPLE, OPTIONS)) {
+			for (const r of ring) expect(r).toBeCloseTo(dl.radii[0], 6);
+		}
+		// 1/4 MOA to 3000 yd: the far pages have three-digit inner values, staggered.
+		const LONG = { ...P223_G1, reticleType: 'moa', elevationClickValue: '0.25', elevationClickUnit: 'MOA', windageClickValue: '0.25', windageClickUnit: 'MOA' };
+		const far = (await innerRadii(LONG, { ...OPTIONS, maxDistance: 3000, units: 'imperial' })).at(-1);
+		expect(far.some((r) => Math.abs(r - dl.radii[0] - dl.stagger[0]) < 1e-6)).toBe(true);
 	});
 
 	it('prints the 700 m values of the sample, ring by ring from 15° to 90°', async () => {
@@ -367,6 +402,28 @@ describe('units (#160)', () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		expect(await generatePrecisionDopeCard(SAMPLE, { ...OPTIONS, units: { ...MIXED, [quantity]: 'kelvin' } }, 'en')).toBeNull();
 		expect(fetched).toEqual([]);
+	});
+});
+
+describe('distance unit (#197)', () => {
+	it.each([
+		['m', 'yd', 'in'],
+		['yd', 'm', 'cm']
+	])('a 100 %s zero on a %s card: the cover keeps the zero, every page uses the chosen unit', async (zero, chosen, size) => {
+		const profile = { ...SAMPLE, zeroUnit: zero };
+		const doc = await generatePrecisionDopeCard(profile, { ...OPTIONS, maxDistance: 300, distanceUnit: chosen }, 'en');
+		const pages = doc.getPages();
+		const on = (page) => texts.filter((t) => t.page === page.ref).map((t) => t.text);
+		const cover = on(pages[0]);
+		expect(cover).toContain(`100 ${zero}`);
+		expect(cover).toContain(`100–300 ${chosen}`);
+		for (const page of pages.slice(1, -1)) {
+			const all = on(page);
+			expect(all).toContain(chosen);
+			expect(all).not.toContain(zero);
+			expect(all.filter((t) => t.startsWith("1 click")).map((t) => t.split(" ").at(-1))).toEqual([size]);
+		}
+		expect(on(pages.at(-1))).toContain(chosen);
 	});
 });
 

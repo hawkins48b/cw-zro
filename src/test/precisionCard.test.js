@@ -80,12 +80,17 @@ afterEach(() => {
 });
 
 describe('maximum distance and pages', () => {
-	it.each([100, 150.5, 800, 3000])('takes %s', (value) => {
+	it.each([100, 200, 800, 2900, 3000])('takes %s', (value) => {
 		expect(isUsableMaxDistance(value)).toBe(true);
 	});
 
 	it.each([
 		['99', 99],
+		['150.5 (not a whole hundred, #198)', 150.5],
+		['850', 850],
+		['199', 199],
+		['2999', 2999],
+		['100.000001', 100.000001],
 		['3001', 3001],
 		['0', 0],
 		['-500', -500],
@@ -105,8 +110,7 @@ describe('maximum distance and pages', () => {
 
 	it('gives one page per whole 100', () => {
 		expect(precisionPageDistances(100)).toEqual([100]);
-		expect(precisionPageDistances(199)).toEqual([100]);
-		expect(precisionPageDistances(850)).toEqual([100, 200, 300, 400, 500, 600, 700, 800]);
+		expect(precisionPageDistances(800)).toEqual([100, 200, 300, 400, 500, 600, 700, 800]);
 		const all = precisionPageDistances(3000);
 		expect(all).toHaveLength(30);
 		expect(all.at(-1)).toBe(3000);
@@ -114,6 +118,7 @@ describe('maximum distance and pages', () => {
 
 	it('gives no pages for a maximum that is not usable', () => {
 		expect(precisionPageDistances(50)).toEqual([]);
+		expect(precisionPageDistances(850)).toEqual([]);
 		expect(precisionPageDistances(NaN)).toEqual([]);
 		expect(precisionPageDistances('800')).toEqual([]);
 	});
@@ -254,6 +259,7 @@ describe('guards (engine stubbed)', () => {
 
 	it.each([
 		['a maximum distance of 50', { maxDistance: 50 }],
+		['a maximum distance of 850 (#198)', { maxDistance: 850 }],
 		['a maximum distance past 3000', { maxDistance: 3100 }],
 		['a NaN maximum distance', { maxDistance: NaN }],
 		['a maximum distance as text', { maxDistance: '800' }],
@@ -665,3 +671,53 @@ describe('unit presets and mixed units (real engine, #160)', () => {
 		at(mph).forEach((v, i) => expect(v).toBeGreaterThanOrEqual(at(mps)[i]));
 	});
 });
+
+describe('the distance unit chosen apart from the zero (#197, real engine)', () => {
+	const options = { maxDistance: 1000, correction: 'angle', units: 'imperial' };
+	const yards = computePrecisionCard(P308_MOA, options);
+	const metres = computePrecisionCard(P308_MOA, { ...options, distanceUnit: 'm' });
+
+	it('defaults to the zero unit, and the zero unit asked gives the same card', () => {
+		expect(yards.distanceUnit).toBe('yd');
+		expect(yards.zeroUnit).toBe('yd');
+		expect(computePrecisionCard(P308_MOA, { ...options, distanceUnit: 'yd' })).toEqual(yards);
+		const metric = computePrecisionCard(SAMPLE, { ...METRIC_CLICKS, distanceUnit: 'm' });
+		expect(metric).toEqual(computePrecisionCard(SAMPLE, METRIC_CLICKS));
+		expect(metric.zeroUnit).toBe('m');
+	});
+
+	it('a 100 yd zero gives a metre card: pages, steps and click size in metres, the zero kept', () => {
+		expect(metres.distanceUnit).toBe('m');
+		expect(metres.zeroUnit).toBe('yd');
+		expect(metres.sizeUnit).toBe('cm');
+		expect(metres.pages.map((p) => p.distance)).toEqual([100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]);
+		expect(page(metres, 500).extras.map((e) => e.distance)).toEqual([525, 550, 575]);
+		// The zero is at 100 yd: at 100 yd nothing to dial, at 100 m (109.4 yd) a little up.
+		expect(page(yards, 100).elevation).toBe(0);
+		expect(page(metres, 100).elevation).toBeGreaterThanOrEqual(0);
+		// Each metre page lies between the yard pages around it (1 m = 1.094 yd).
+		for (const d of [300, 500, 800]) {
+			const yd = Math.round(d / 0.9144);
+			const low = Math.floor(yd / 100) * 100;
+			expect(page(metres, d).elevation).toBeGreaterThanOrEqual(page(yards, low).elevation);
+			expect(page(metres, d).elevation).toBeLessThanOrEqual(page(yards, low + 100).elevation);
+		}
+	});
+
+	it('a 100 m zero gives a yard card with the click size in inches', () => {
+		const card = computePrecisionCard(SAMPLE, { ...METRIC_CLICKS, correction: 'angle', distanceUnit: 'yd' });
+		const own = computePrecisionCard(SAMPLE, { ...METRIC_CLICKS, correction: 'angle' });
+		expect(card.distanceUnit).toBe('yd');
+		expect(card.zeroUnit).toBe('m');
+		expect(card.sizeUnit).toBe('in');
+		// 100 yd is 91.4 m, short of the 100 m zero: the bullet is still a little high or level.
+		expect(page(card, 100).elevation).toBeLessThanOrEqual(0);
+		expect(page(own, 100).elevation).toBe(0);
+		expect(page(card, 1000).elevation).toBeLessThan(page(own, 1000).elevation);
+	});
+
+	it.each([['km'], ['M'], [''], [null], [['m']], [{ toString: () => 'm' }]])('refuses the distance unit %j', (distanceUnit) => {
+		expect(computePrecisionCard(P308_MOA, { ...options, distanceUnit })).toBeNull();
+	});
+});
+

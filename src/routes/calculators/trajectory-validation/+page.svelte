@@ -6,7 +6,7 @@
 	import { profiles } from '#lib/stores/profiles.svelte.js';
 	import { settings } from '#lib/stores/settings.svelte.js';
 	import { trajectoryValidation } from '#lib/stores/trajectoryValidation.svelte.js';
-	import { calculateTrajectoryValidation } from '#lib/utils/trajectoryValidation.js';
+	import { calculateTrajectoryValidation, validationChartAxis } from '#lib/utils/trajectoryValidation.js';
 	import {
 		validationChange,
 		validationObservationPoint,
@@ -122,10 +122,12 @@
 		if (!profile) return null;
 
 		const rangeDist = readDecimal(trajectoryValidation.range.distance);
-		if (!isFinite(rangeDist) || rangeDist < 100 || rangeDist > MAX_DISTANCE) return null;
+		// A tick every 100 (#199): the curves run to the axis end, the first hundred at or past the range.
+		const axis = validationChartAxis(rangeDist);
+		if (!axis) return null;
 
 		const step = 1;
-		const chartRange = { distance: rangeDist, unit: trajectoryValidation.range.unit, step };
+		const chartRange = { distance: axis.max, unit: trajectoryValidation.range.unit, step };
 
 		const initial = calculateFullTrajectory(profile, chartRange, atmoParams, null);
 		if (!initial) return null;
@@ -138,7 +140,7 @@
 			validated = calculateFullTrajectory(validatedProfile, chartRange, atmoParams, null);
 		}
 
-		return { initial, validated };
+		return { initial, validated, axis };
 	});
 
 	// ── Display helpers (the result's numbers, in the locale) ────────
@@ -197,7 +199,7 @@
 			})).filter((p) => p.x >= 100)
 			: [];
 
-		const maxX = rangeVal || (initialData.at(-1)?.x ?? 0);
+		const maxX = data.axis.max;
 		const cPrimary = resolveCSSColor('--color-primary-500', '#0a7a38');
 		const cWarning = resolveCSSColor('--color-warning-500', '#a35f00');
 		const cMuted = dark ? '#a9adaa' : '#4f5350';
@@ -245,8 +247,9 @@
 			},
 			xaxis: {
 				type: 'numeric',
-				min: 100,
-				max: maxX || undefined,
+				min: data.axis.min,
+				max: data.axis.max,
+				tickAmount: data.axis.tickAmount,
 				title: { text: m.calc_axis_distance({ unit: dLabel }), style: { fontSize: '12px', fontWeight: 600, color: cText } },
 				labels: { formatter: (v) => `${Math.round(v)}`, style: { colors: cMuted } }
 			},

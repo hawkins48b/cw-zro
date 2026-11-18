@@ -220,3 +220,22 @@ export function calculateTrajectoryValidation(
 		return null;
 	}
 }
+
+/** Spacing of the Trajectory Validation chart's x-axis ticks, in the range unit (#199). */
+export const VALIDATION_CHART_TICK = 100;
+
+/**
+ * The x axis of the Trajectory Validation chart (#199): it starts at 100 and ends on the first
+ * hundred at or past the range, with a tick every VALIDATION_CHART_TICK. A range of 100 ends at
+ * 200, so the axis is never empty. The page draws the curves to `max`, past the range when the
+ * range is not a whole hundred. Null for a range the page does not chart (not 100 to MAX_DISTANCE).
+ *
+ * @param {number} range - the range, in its unit
+ * @returns {{ min: number, max: number, tickAmount: number } | null}
+ */
+export function validationChartAxis(range) {
+	if (!Number.isFinite(range) || range < VALIDATION_CHART_TICK || range > MAX_DISTANCE) return null;
+	const min = VALIDATION_CHART_TICK;
+	const max = Math.max(min + VALIDATION_CHART_TICK, Math.ceil(range / VALIDATION_CHART_TICK) * VALIDATION_CHART_TICK);
+	return { min, max, tickAmount: (max - min) / VALIDATION_CHART_TICK };
+}

@@ -1,18 +1,18 @@
 import { calculateFullTrajectory } from './ballisticCalculator.js';
 import { readDecimal } from './decimal.js';
-import { isUsableRange } from './inputLimits.js';
+import { isUsableHundredsRange } from './inputLimits.js';
 import { isUsableScopeRange } from './scopeRange.js';
 
 /**
- * Whether the range box of the Ballistic page holds a range the page calculates (#122): above 0
- * and at most MAX_DISTANCE, read with a comma as a decimal point, as on the compare page. The page
- * shows validation_range_above_zero under the box when it does not.
+ * Whether the range box of the Ballistic page holds a range the page calculates (#122): a multiple
+ * of 100 from 100 to MAX_DISTANCE (#199), read with a comma as a decimal point, as on the compare
+ * page. The page shows validation_max_distance_hundreds under the box when it does not.
  *
  * @param {unknown} distance - the range box value
  * @returns {boolean}
  */
 export function isUsableBallisticRange(distance) {
-	return isUsableRange(readDecimal(distance));
+	return isUsableHundredsRange(readDecimal(distance));
 }
 
 /**
