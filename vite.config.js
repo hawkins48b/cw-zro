@@ -4,7 +4,6 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
 import { readFileSync } from 'fs';
 import { defineConfig } from 'vite';
-import { modelViewer } from './tools/model-viewer/plugin.js';
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
 const isCapacitor = process.env.BUILD_TARGET === 'capacitor';
@@ -68,10 +67,7 @@ export default defineConfig({
 						}
 					}
 				: {})
-		}),
-		// Dev-only viewer of the tutorial models at /dev/models (#181): `apply: 'serve'`, so no build
-		// has it. See tools/model-viewer/plugin.js.
-		modelViewer()
+		})
 	],
 	test: {
 		environment: 'jsdom',

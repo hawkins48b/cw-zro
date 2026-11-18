@@ -40,7 +40,6 @@ The [development guide](docs/development.md) covers the production, mobile and d
 | `npm run test:run` | Runs the tests once, as CI does |
 | `npm run audit:check` | Fails on high or critical audit findings, as CI does |
 | `npm run templates:precision` | Redraws the precision dope card templates in `static/pdf/` (#157). See [Precision card templates](docs/development.md#precision-card-templates) |
-| `npm run models:build` | Redraws the 3D models of the tutorial in `static/models/` (#181). The viewer is at `/dev/models` in `npm run dev`. See [Tutorial models](docs/development.md#tutorial-models) |
 | `npm run licenses:generate` | Rewrites `src/lib/data/licenses.json`, the included software list of the Licences page, from the lockfile (#166). Needs `npm ci` first; `node scripts/licenses.js --check` only checks. See [Included software list](docs/development.md#included-software-list) |
 | `npm run cap:sync` | Runs `build:mobile`, then `npx cap sync` |
 | `npm run cap:android` | Runs `cap:sync`, then opens the Android project |

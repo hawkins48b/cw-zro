@@ -29,8 +29,7 @@
 		"cap:android": "npm run cap:sync && npx cap open android",
 		"cap:ios": "npm run cap:sync && npx cap open ios",
 		"electron:dev": "npm run build && electron .",
-		"electron:build": "npm run build && electron-builder --config electron-builder.json",
-		"models:build": "node scripts/build-models.js"
+		"electron:build": "npm run build && electron-builder --config electron-builder.json"
 	},
 	"devDependencies": {
 		"@inlang/plugin-message-format": "4.6.0",
@@ -62,7 +61,6 @@
 		"electron-serve": "^3.0.1",
 		"js-ballistics": "3.1.0",
 		"pdf-lib": "^1.17.1",
-		"svelte-gestures": "^5.2.2",
-		"three": "0.187.0"
+		"svelte-gestures": "^5.2.2"
 	}
 }
