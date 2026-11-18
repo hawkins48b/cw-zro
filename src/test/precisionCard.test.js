@@ -665,3 +665,52 @@ describe('unit presets and mixed units (real engine, #160)', () => {
 		at(mph).forEach((v, i) => expect(v).toBeGreaterThanOrEqual(at(mps)[i]));
 	});
 });
+
+describe('the distance unit chosen apart from the zero (#197, real engine)', () => {
+	const options = { maxDistance: 1000, correction: 'angle', units: 'imperial' };
+	const yards = computePrecisionCard(P308_MOA, options);
+	const metres = computePrecisionCard(P308_MOA, { ...options, distanceUnit: 'm' });
+
+	it('defaults to the zero unit, and the zero unit asked gives the same card', () => {
+		expect(yards.distanceUnit).toBe('yd');
+		expect(yards.zeroUnit).toBe('yd');
+		expect(computePrecisionCard(P308_MOA, { ...options, distanceUnit: 'yd' })).toEqual(yards);
+		const metric = computePrecisionCard(SAMPLE, { ...METRIC_CLICKS, distanceUnit: 'm' });
+		expect(metric).toEqual(computePrecisionCard(SAMPLE, METRIC_CLICKS));
+		expect(metric.zeroUnit).toBe('m');
+	});
+
+	it('a 100 yd zero gives a metre card: pages, steps and click size in metres, the zero kept', () => {
+		expect(metres.distanceUnit).toBe('m');
+		expect(metres.zeroUnit).toBe('yd');
+		expect(metres.sizeUnit).toBe('cm');
+		expect(metres.pages.map((p) => p.distance)).toEqual([100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]);
+		expect(page(metres, 500).extras.map((e) => e.distance)).toEqual([525, 550, 575]);
+		// The zero is at 100 yd: at 100 yd nothing to dial, at 100 m (109.4 yd) a little up.
+		expect(page(yards, 100).elevation).toBe(0);
+		expect(page(metres, 100).elevation).toBeGreaterThanOrEqual(0);
+		// Each metre page lies between the yard pages around it (1 m = 1.094 yd).
+		for (const d of [300, 500, 800]) {
+			const yd = Math.round(d / 0.9144);
+			const low = Math.floor(yd / 100) * 100;
+			expect(page(metres, d).elevation).toBeGreaterThanOrEqual(page(yards, low).elevation);
+			expect(page(metres, d).elevation).toBeLessThanOrEqual(page(yards, low + 100).elevation);
+		}
+	});
+
+	it('a 100 m zero gives a yard card with the click size in inches', () => {
+		const card = computePrecisionCard(SAMPLE, { ...METRIC_CLICKS, correction: 'angle', distanceUnit: 'yd' });
+		const own = computePrecisionCard(SAMPLE, { ...METRIC_CLICKS, correction: 'angle' });
+		expect(card.distanceUnit).toBe('yd');
+		expect(card.zeroUnit).toBe('m');
+		expect(card.sizeUnit).toBe('in');
+		// 100 yd is 91.4 m, short of the 100 m zero: the bullet is still a little high or level.
+		expect(page(card, 100).elevation).toBeLessThanOrEqual(0);
+		expect(page(own, 100).elevation).toBe(0);
+		expect(page(card, 1000).elevation).toBeLessThan(page(own, 1000).elevation);
+	});
+
+	it.each([['km'], ['M'], [''], [null], [['m']], [{ toString: () => 'm' }]])('refuses the distance unit %j', (distanceUnit) => {
+		expect(computePrecisionCard(P308_MOA, { ...options, distanceUnit })).toBeNull();
+	});
+});

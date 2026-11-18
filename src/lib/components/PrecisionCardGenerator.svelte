@@ -4,8 +4,9 @@
 	 *
 	 * The user picks a saved profile (the active one by default), sees whether it can make the card
 	 * (precisionCardRequirements), sets the last distance and the units, and downloads an A6 PDF.
-	 * The units of wind, pressure and temperature are chosen apart (#160), with a Metric and an
-	 * Imperial preset that set all three; a mixed choice selects neither preset.
+	 * The units of wind, pressure and temperature are chosen apart (#160), and so is the distance
+	 * unit (#197), with a Metric and an Imperial preset that set all four; a mixed choice selects
+	 * neither preset. The distance unit starts as the zero's.
 	 * A profile that cannot make the card dims the form and disables the download; the warning says
 	 * why and links to the profile.
 	 *
@@ -55,9 +56,8 @@
 	let req = $derived(profile ? precisionCardRequirements(profile) : null);
 	let usable = $derived(Boolean(req?.usable));
 
-	/** 'm' or 'yd': the card's distances follow the zero. A zero in neither unit counts as m. */
-	let distUnit = $derived(req?.zero?.unit === 'yd' ? 'yd' : 'm');
-	let distUnitLabel = $derived(distUnit === 'yd' ? m.unit_yd() : m.unit_m());
+	/** 'm' or 'yd': the zero's unit, the default of the card's distances. A zero in neither unit counts as m. */
+	let zeroUnit = $derived(req?.zero?.unit === 'yd' ? 'yd' : 'm');
 
 	/** A number from the requirements (number or stored text) as the page shows it. */
 	function shownNumber(value) {
@@ -154,21 +154,46 @@
 	let correction = $state('clicks');
 	let angleLabel = $derived(req?.reticle?.unit ?? 'MRAD');
 
+	/** The distance unit of each preset (#197). */
+	const PRESET_DISTANCE = { metric: 'm', imperial: 'yd' };
+
 	/**
-	 * The units of wind, pressure and temperature (#160) the user picked, a plain frozen object (raw
-	 * state, so that the PDF code gets no proxy), kept with the profile they were picked for: when
-	 * another profile is in use (#170) the units follow its zero again, the metric preset for m,
-	 * imperial for yd.
-	 * @type {{ id: string, units: Readonly<import('#lib/utils/precisionCardFormat.js').PrecisionUnits> }|null}
+	 * The units of distance (#197), wind, pressure and temperature (#160) the user picked, a plain
+	 * frozen object (raw state, so that the PDF code gets no proxy), kept with the profile they were
+	 * picked for: when another profile is in use (#170) the units follow its zero again, the metric
+	 * preset for m, imperial for yd.
+	 * @type {{ id: string, units: Readonly<import('#lib/utils/precisionCardFormat.js').PrecisionUnits & { distance: 'm'|'yd' }> }|null}
 	 */
 	let unitsPick = $state.raw(null);
 	let unitsChoice = $derived(unitsPick?.id === profileId ? unitsPick.units : null);
-	let units = $derived(unitsChoice ?? PRECISION_UNIT_PRESETS[distUnit === 'yd' ? 'imperial' : 'metric']);
+	let allUnits = $derived(unitsChoice ?? presetUnits(zeroUnit === 'yd' ? 'imperial' : 'metric'));
+	/** The column units alone, as computePrecisionCard reads them. */
+	let units = $derived(
+		Object.freeze({ wind: allUnits.wind, pressure: allUnits.pressure, temperature: allUnits.temperature })
+	);
+	let distUnit = $derived(allUnits.distance);
+	let distUnitLabel = $derived(distUnit === 'yd' ? m.unit_yd() : m.unit_m());
 	/** The preset the units match, or null for a mixed choice (neither preset pressed). */
-	let unitPreset = $derived(precisionUnitPreset(units));
+	let unitPreset = $derived.by(() => {
+		const preset = precisionUnitPreset(units);
+		return preset && PRESET_DISTANCE[preset] === distUnit ? preset : null;
+	});
+
+	/** A preset's units with its distance unit. */
+	function presetUnits(name) {
+		return Object.freeze({ ...PRECISION_UNIT_PRESETS[name], distance: PRESET_DISTANCE[name] });
+	}
 
 	/** The unit toggles, one per quantity. */
 	const UNIT_ROWS = [
+		{
+			key: 'distance',
+			label: () => m.dope_precision_units_distance(),
+			options: () => [
+				{ value: 'm', label: m.unit_m() },
+				{ value: 'yd', label: m.unit_yd() }
+			]
+		},
 		{
 			key: 'wind',
 			label: () => m.dope_precision_units_wind(),
@@ -196,11 +221,11 @@
 	];
 
 	function pickPreset(name) {
-		if (Object.hasOwn(PRECISION_UNIT_PRESETS, name)) unitsPick = { id: profileId, units: PRECISION_UNIT_PRESETS[name] };
+		if (Object.hasOwn(PRECISION_UNIT_PRESETS, name)) unitsPick = { id: profileId, units: presetUnits(name) };
 	}
 
 	function pickUnit(key, value) {
-		unitsPick = { id: profileId, units: Object.freeze({ ...units, [key]: value }) };
+		unitsPick = { id: profileId, units: Object.freeze({ ...allUnits, [key]: value }) };
 	}
 
 	let distances = $derived(maxValid ? precisionPageDistances(maxDistance) : []);
@@ -221,7 +246,7 @@
 		if (!p || loading || !canDownload) return;
 		loading = true;
 		outcomePick = null;
-		const options = { maxDistance, correction, units };
+		const options = { maxDistance, correction, units, distanceUnit: distUnit };
 		const locale = getLocale();
 		try {
 			// Loaded on demand, inside downloadDopeCard so that a failed load counts as a failure.
@@ -366,7 +391,7 @@
 							<span class="text-sm text-surface-600-400" aria-hidden="true">{row.label()}</span>
 							<ChipGroup
 								label={row.label()}
-								value={units[row.key]}
+								value={allUnits[row.key]}
 								onselect={(v) => pickUnit(row.key, v)}
 								options={row.options()}
 							/>

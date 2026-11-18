@@ -370,6 +370,28 @@ describe('units (#160)', () => {
 	});
 });
 
+describe('distance unit (#197)', () => {
+	it.each([
+		['m', 'yd', 'in'],
+		['yd', 'm', 'cm']
+	])('a 100 %s zero on a %s card: the cover keeps the zero, every page uses the chosen unit', async (zero, chosen, size) => {
+		const profile = { ...SAMPLE, zeroUnit: zero };
+		const doc = await generatePrecisionDopeCard(profile, { ...OPTIONS, maxDistance: 300, distanceUnit: chosen }, 'en');
+		const pages = doc.getPages();
+		const on = (page) => texts.filter((t) => t.page === page.ref).map((t) => t.text);
+		const cover = on(pages[0]);
+		expect(cover).toContain(`100 ${zero}`);
+		expect(cover).toContain(`100–300 ${chosen}`);
+		for (const page of pages.slice(1, -1)) {
+			const all = on(page);
+			expect(all).toContain(chosen);
+			expect(all).not.toContain(zero);
+			expect(all.filter((t) => t.startsWith("1 click")).map((t) => t.split(" ").at(-1))).toEqual([size]);
+		}
+		expect(on(pages.at(-1))).toContain(chosen);
+	});
+});
+
 describe('templates', () => {
 	it.each(PRECISION_LOCALES)('%s: the committed file is what the script writes', async (locale) => {
 		const file = path.join(process.cwd(), 'static', precisionTemplatePath(locale));

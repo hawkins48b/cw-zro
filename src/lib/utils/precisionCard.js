@@ -5,6 +5,9 @@
  *
  * The model (owner decisions of 2026-11-17 on #157; see docs/ballistics-model.md):
  *
+ * - Distances (pages, the steps of ②, the click size) are in the `distanceUnit` option, m or yd
+ *   (#197), the zero's unit when it is left out. The zero stays at 100 in its own unit.
+ *
  * - The rifle is zeroed once, at 100 in the zero's unit, in the reference atmosphere: ICAO standard,
  *   altitude 0, 1013.25 hPa, 15 °C, humidity 0 (`new Atmo()`). Every other column fires with that
  *   same zero elevation; only the atmosphere changes. So the pressure and temperature columns show
@@ -92,6 +95,7 @@ const TEMPERATURE_VALUE = { c: (v) => UNew.Celsius(v), f: (v) => UNew.Fahrenheit
 const WIND_VALUE = { mps: (v) => UNew.MPS(v), mph: (v) => UNew.MPH(v) };
 
 const CORRECTIONS = new Set(['clicks', 'angle']);
+const DISTANCE_UNITS = new Set(['m', 'yd']);
 const ANGLE_UNITS = { MRAD: Unit.MRad, MOA: Unit.MOA };
 const RETICLE_UNITS = { mrad: 'MRAD', 'mil-dot': 'MRAD', moa: 'MOA' };
 
@@ -200,16 +204,19 @@ const tenthOf = (value) => roundHalfAway(value * 10) / 10;
  *
  * @param {object} profile - flat v2 profile
  * @param {{ maxDistance: number, correction: 'clicks'|'angle',
- *   units: 'metric'|'imperial'|import('./precisionCardFormat.js').PrecisionUnits }} options
+ *   units: 'metric'|'imperial'|import('./precisionCardFormat.js').PrecisionUnits,
+ *   distanceUnit?: 'm'|'yd' }} options
  *   units: a preset name, or one unit per quantity (#160), read by precisionUnits; anything it
- *   refuses gives null
+ *   refuses gives null. distanceUnit (#197): the unit of the card's distances, the zero's unit
+ *   when undefined; any other value gives null
  * @returns {PrecisionCard|null}
  *
  * @typedef {object} PrecisionCard
  * @property {'clicks'|'angle'} correction
  * @property {Readonly<import('./precisionCardFormat.js').PrecisionUnits>} units - the choice, as an
  *   object even for a preset name
- * @property {'m'|'yd'} distanceUnit - the zero's unit: the unit of every distance on the card
+ * @property {'m'|'yd'} distanceUnit - the unit of every distance on the card (#197)
+ * @property {'m'|'yd'} zeroUnit - the unit of the 100 zero, the profile's
  * @property {'cm'|'in'} sizeUnit - of the click size in the footer
  * @property {'MRAD'|'MOA'} reticleUnit - the unit of the values in 'angle' mode
  * @property {{ elevation: { value: number, unit: 'MRAD'|'MOA' }, windage: { value: number, unit: 'MRAD'|'MOA' } }} click
@@ -240,6 +247,8 @@ export function computePrecisionCard(profile, options) {
 		if (!CORRECTIONS.has(correction)) return null;
 		const units = precisionUnits(options.units);
 		if (!units) return null;
+		const askedUnit = options.distanceUnit;
+		if (askedUnit !== undefined && !DISTANCE_UNITS.has(askedUnit)) return null;
 
 		const req = precisionCardRequirements(profile);
 		if (!req.usable) return null;
@@ -288,13 +297,15 @@ export function computePrecisionCard(profile, options) {
 		const reference = new Atmo();
 		if (!hasFlyableVelocity(ammo, reference)) return null;
 
-		const isMetricDistance = req.zero.unit === 'm';
+		// The zero in its own unit; every distance of the card in the asked unit (#197).
+		const zeroUnit = req.zero.unit === 'm' ? 'm' : 'yd';
+		const isMetricDistance = (askedUnit ?? zeroUnit) === 'm';
 		const distance = (value) => (isMetricDistance ? UNew.Meter(value) : UNew.Yard(value));
 		const distanceUnit = isMetricDistance ? Unit.Meter : Unit.Yard;
 
 		const calc = new Calculator();
 		const refShot = new Shot({ weapon, ammo, atmo: reference, winds: [] });
-		calc.setWeaponZero(refShot, distance(PRECISION_ZERO));
+		calc.setWeaponZero(refShot, zeroUnit === 'm' ? UNew.Meter(PRECISION_ZERO) : UNew.Yard(PRECISION_ZERO));
 		if (!hasFiniteElevation(refShot)) return null;
 
 		const pageDistances = precisionPageDistances(maxDistance);
@@ -426,6 +437,7 @@ export function computePrecisionCard(profile, options) {
 			correction,
 			units,
 			distanceUnit: isMetricDistance ? 'm' : 'yd',
+			zeroUnit,
 			sizeUnit: isMetricDistance ? 'cm' : 'in',
 			reticleUnit,
 			click: { elevation: { ...elevation }, windage: { ...windage } },

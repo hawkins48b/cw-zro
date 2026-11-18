@@ -10,8 +10,8 @@
  * reference pressure, reference temperature and wind unit.
  *
  * Words that depend on the data are drawn here, from precisionCardWords.js: click or clicks, MRAD
- * or MOA, the spin drift direction, the distance unit (the zero's, independent of the units
- * chosen for the columns), and "page". Profile text goes through encodableText (#140) and is
+ * or MOA, the spin drift direction, the distance unit (chosen apart, #197: the zero's by default;
+ * the cover's zero keeps its own unit), and "page". Profile text goes through encodableText (#140) and is
  * shrunk, then cut with an ellipsis, to fit its place (#137).
  */
 import { PDFDocument, StandardFonts } from 'pdf-lib';
@@ -45,8 +45,10 @@ import { NO_VALUE, formatColumn, formatCorrection, formatDate, unitSymbol } from
  *
  * @param {object} profile - flat v2 profile
  * @param {{ maxDistance: number, correction: 'clicks'|'angle',
- *   units: 'metric'|'imperial'|import('./precisionCardFormat.js').PrecisionUnits, date?: Date }} options
- *   units: as computePrecisionCard reads them; date: printed on the cover, today by default
+ *   units: 'metric'|'imperial'|import('./precisionCardFormat.js').PrecisionUnits,
+ *   distanceUnit?: 'm'|'yd', date?: Date }} options
+ *   units and distanceUnit: as computePrecisionCard reads them; date: printed on the cover, today
+ *   by default
  * @param {unknown} locale - 'en', 'fr' or 'de'; anything else is 'en'
  * @returns {Promise<PDFDocument|null>} null when the card has no data (see dopeCardDownload.js)
  */
@@ -141,7 +143,7 @@ function coverValues(ctx) {
 	const last = data.lastDistance;
 	const { pressure, temperature, wind } = data.columns;
 	return {
-		zero: `100 ${data.distanceUnit}`,
+		zero: `100 ${data.zeroUnit}`,
 		sightHeight: `${readDecimal(profile.opticHeight)} ${profile.opticHeightUnit === 'cm' ? 'cm' : 'in'}`,
 		reticle: RETICLE_NAMES[profile.reticleType] ?? NO_VALUE,
 		click,
