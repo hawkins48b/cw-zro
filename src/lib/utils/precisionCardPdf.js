@@ -30,6 +30,7 @@ import {
 	WIDTH,
 	WORKSHEET,
 	coverCell,
+	coverLogoLeft,
 	dialInnerFits,
 	dialRingLabelBox,
 	dialValueBox,
@@ -170,9 +171,11 @@ function coverValues(ctx) {
 function fillCover(p, ctx, date) {
 	const { fonts, words } = ctx;
 	const h = COVER.header;
-	drawFitted(p, fonts, ctx.name, h.textX, h.name.baseline, WIDTH - 20, { size: h.name.size, minSize: h.name.minSize, bold: true, color: COLORS.white });
+	// The name and the ammo stop before the logo (#201).
+	const room = coverLogoLeft() - h.logoGap - h.textX;
+	drawFitted(p, fonts, ctx.name, h.textX, h.name.baseline, room, { size: h.name.size, minSize: h.name.minSize, bold: true, color: COLORS.white });
 	const ammo = profileText(fonts.regular, ctx.profile.ammo) || profileText(fonts.regular, ctx.profile.bulletBrand);
-	drawFitted(p, fonts, ammo, h.textX, h.ammo.baseline, WIDTH - 20, { size: h.ammo.size, minSize: h.ammo.minSize, color: COLORS.white });
+	drawFitted(p, fonts, ammo, h.textX, h.ammo.baseline, room, { size: h.ammo.size, minSize: h.ammo.minSize, color: COLORS.white });
 
 	const c = COVER.cell;
 	for (const [key, value] of Object.entries(coverValues(ctx))) {

@@ -14,7 +14,7 @@ import path from 'node:path';
 import { PDFArray, PDFDocument, PDFPage } from 'pdf-lib';
 import { generatePrecisionDopeCard } from '#lib/utils/precisionCardPdf.js';
 import { computePrecisionCard } from '#lib/utils/precisionCard.js';
-import { FOOTER, LEFT, PAGE_SIZE, PX, RANGE, RIGHT, dialInnerFits, dialValuePoint, precisionTemplatePath } from '#lib/utils/precisionCardLayout.js';
+import { COVER, FOOTER, LEFT, PAGE_SIZE, coverLogoLeft, PX, RANGE, RIGHT, dialInnerFits, dialValuePoint, precisionTemplatePath } from '#lib/utils/precisionCardLayout.js';
 import { PRECISION_LOCALES, precisionWords } from '#lib/utils/precisionCardWords.js';
 import { PRECISION_COLUMNS, PRECISION_QUANTITIES, formatColumn, formatDate, unitSymbol } from '#lib/utils/precisionCardFormat.js';
 import { buildPrecisionTemplate } from '../../scripts/precision-card-templates.js';
@@ -207,6 +207,16 @@ describe('generatePrecisionDopeCard', () => {
 		for (const t of texts) expect(t.text).not.toMatch(/[Łźкарбин🎯混合\n]/u);
 		expect(texts.some((t) => t.text.startsWith('ódz') || t.text.startsWith('ód'))).toBe(true);
 		expect(texts.some((t) => t.text.includes('…'))).toBe(true);
+	});
+
+	it('stops a long name and ammo before the cover logo (#201)', async () => {
+		const name = 'Long rifle name '.repeat(10);
+		const doc = await generatePrecisionDopeCard({ ...SAMPLE, name, ammo: 'Long ammunition text '.repeat(10) }, OPTIONS, 'en');
+		const cover = doc.getPages()[0].ref;
+		const header = texts.filter((t) => t.page === cover && t.y > PAGE_SIZE.height - (COVER.header.top + COVER.header.height) * PX);
+		const logoLeft = coverLogoLeft() * PX;
+		expect(header.filter((t) => t.text.includes('…'))).toHaveLength(2);
+		for (const t of header) expect(t.x + t.width).toBeLessThanOrEqual(logoLeft - COVER.header.logoGap * PX + 0.01);
 	});
 });
 
@@ -437,5 +447,13 @@ describe('templates', () => {
 		expect(doc.getPages().every(isA6)).toBe(true);
 		const built = Buffer.from(await buildPrecisionTemplate(locale));
 		expect(built.equals(committed), 'run npm run templates:precision and commit static/pdf').toBe(true);
+	});
+
+	it('the logo fits the cover header band (#201)', () => {
+		const h = COVER.header;
+		expect(coverLogoLeft()).toBeGreaterThan(LEFT);
+		expect(h.logo.right).toBeLessThanOrEqual(RIGHT);
+		expect(h.logo.centre - h.logo.height / 2).toBeGreaterThanOrEqual(h.top);
+		expect(h.logo.centre + h.logo.height / 2).toBeLessThanOrEqual(h.top + h.height);
 	});
 });

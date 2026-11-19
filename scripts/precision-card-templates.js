@@ -24,12 +24,14 @@ import {
 	COVER,
 	FOOTER,
 	LEFT,
+	LOGO,
 	PAGE_SIZE,
 	RANGE,
 	RIGHT,
 	WIDTH,
 	WORKSHEET,
 	coverCell,
+	coverLogoLeft,
 	dialPoint,
 	painter,
 	precisionTemplatePath,
@@ -64,6 +66,9 @@ function drawCover(p, words) {
 	const h = COVER.header;
 	p.rect(LEFT, h.top, WIDTH, h.height, { fill: COLORS.ink });
 	p.text(words.title.toUpperCase(), h.textX, h.title.baseline, { size: h.title.size, bold: true, color: COLORS.white });
+	// The Chocolate Warfare mark of the mid-range card (#201), white on the header band.
+	const scale = h.logo.height / LOGO.height;
+	for (const d of LOGO.paths) p.path(d, coverLogoLeft(), h.logo.centre - h.logo.height / 2, { color: COLORS.white, scale });
 
 	COVER.groups.forEach((group, g) => {
 		const fields = COVER.fields[g];

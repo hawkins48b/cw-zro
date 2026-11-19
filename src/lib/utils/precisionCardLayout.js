@@ -36,6 +36,25 @@ export const COLORS = Object.freeze({
 	white: rgb(1, 1, 1)
 });
 
+/**
+ * The Chocolate Warfare mark (#201), as on the mid-range dope card (`static/pdf/rifle-dataset-*.pdf`,
+ * top right): its two polygons, in units of a box LOGO.width × LOGO.height, y down.
+ */
+export const LOGO = Object.freeze({
+	width: 1156,
+	height: 1000,
+	paths: Object.freeze([
+		'M 578 0 L 1156 999 L 645 998 L 323 438 L 374 349 L 697 906 L 798 907 L 425 263 L 476 175 L 900 907 L 1001 908 L 526 88 Z',
+		'M 298 483 L 354 580 L 170 905 L 542 906 L 596 1000 L 0 999 Z'
+	])
+});
+
+/** Left edge of the cover logo, in px. */
+export function coverLogoLeft() {
+	const l = COVER.header.logo;
+	return l.right - (l.height * LOGO.width) / LOGO.height;
+}
+
 /** Left and right edge of the content of every page. */
 export const LEFT = 18;
 export const RIGHT = 379;
@@ -58,7 +77,11 @@ export const COVER = Object.freeze({
 		textX: 28,
 		title: Object.freeze({ baseline: 33, size: 12 }),
 		name: Object.freeze({ baseline: 58, size: 22, minSize: 12 }),
-		ammo: Object.freeze({ baseline: 79, size: 13, minSize: 9 })
+		ammo: Object.freeze({ baseline: 79, size: 13, minSize: 9 }),
+		/** The Chocolate Warfare mark (#201): right edge, height and vertical centre, in px. */
+		logo: Object.freeze({ right: RIGHT - 12, height: 46, centre: 16 + 75 / 2 }),
+		/** The name and the ammo stop this far before the logo. */
+		logoGap: 10
 	}),
 	/** Three groups of three rows of two cells. */
 	groups: Object.freeze([coverGroup(100), coverGroup(188), coverGroup(276)]),
@@ -405,12 +428,12 @@ export function painter(page, fonts) {
 				...(border ? { borderColor: border, borderWidth: borderWidth * PX } : { borderWidth: 0 })
 			});
 		},
-		/** An svg path in px, relative to the origin (ox, oy). */
-		path(d, ox, oy, { color, border, borderWidth = 1, dash } = {}) {
+		/** An svg path in px (times scale), relative to the origin (ox, oy). */
+		path(d, ox, oy, { color, border, borderWidth = 1, dash, scale = 1 } = {}) {
 			page.drawSvgPath(d, {
 				x: X(ox),
 				y: Y(oy),
-				scale: PX,
+				scale: PX * scale,
 				...(color ? { color } : {}),
 				...(border ? { borderColor: border, borderWidth: borderWidth * PX } : { borderWidth: 0 }),
 				...(dash ? { borderDashArray: dash.map((d2) => d2 * PX) } : {})
